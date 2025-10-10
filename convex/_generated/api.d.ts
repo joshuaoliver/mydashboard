@@ -1,0 +1,60 @@
+/* eslint-disable */
+/**
+ * Generated `api` utility.
+ *
+ * THIS CODE IS AUTOMATICALLY GENERATED.
+ *
+ * To regenerate, run `npx convex dev`.
+ * @module
+ */
+
+import type {
+  ApiFromModules,
+  FilterApi,
+  FunctionReference,
+} from "convex/server";
+import type * as auth from "../auth.js";
+import type * as beeperActions from "../beeperActions.js";
+import type * as beeperQueries from "../beeperQueries.js";
+import type * as beeperSync from "../beeperSync.js";
+import type * as crons from "../crons.js";
+import type * as dexActions from "../dexActions.js";
+import type * as dexAdmin from "../dexAdmin.js";
+import type * as dexQueries from "../dexQueries.js";
+import type * as dexSync from "../dexSync.js";
+import type * as dexUpsert from "../dexUpsert.js";
+import type * as dexWriteback from "../dexWriteback.js";
+import type * as myFunctions from "../myFunctions.js";
+import type * as prompts from "../prompts.js";
+
+/**
+ * A utility for referencing Convex functions in your app's API.
+ *
+ * Usage:
+ * ```js
+ * const myFunctionReference = api.myModule.myFunction;
+ * ```
+ */
+declare const fullApi: ApiFromModules<{
+  auth: typeof auth;
+  beeperActions: typeof beeperActions;
+  beeperQueries: typeof beeperQueries;
+  beeperSync: typeof beeperSync;
+  crons: typeof crons;
+  dexActions: typeof dexActions;
+  dexAdmin: typeof dexAdmin;
+  dexQueries: typeof dexQueries;
+  dexSync: typeof dexSync;
+  dexUpsert: typeof dexUpsert;
+  dexWriteback: typeof dexWriteback;
+  myFunctions: typeof myFunctions;
+  prompts: typeof prompts;
+}>;
+export declare const api: FilterApi<
+  typeof fullApi,
+  FunctionReference<any, "public">
+>;
+export declare const internal: FilterApi<
+  typeof fullApi,
+  FunctionReference<any, "internal">
+>;

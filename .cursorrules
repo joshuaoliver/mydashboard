@@ -1,0 +1,185 @@
+# Personal Dashboard Project
+
+## Project Purpose
+This is a personal dashboard application for managing tools, data sources, and personal utilities in one centralized location. The goal is to create a customizable, real-time dashboard where users can integrate various services, APIs, and data sources into reusable widgets and tools.
+
+## Tech Stack
+
+### Frontend
+- **Framework**: TanStack Start (React-based full-stack framework with SSR)
+- **Routing**: TanStack Router (file-based routing)
+- **UI Library**: Shadcn/ui (accessible components built on Radix UI)
+- **Styling**: Tailwind CSS v4
+- **Icons**: Lucide React
+- **Forms**: React Hook Form + Zod validation
+- **Build Tool**: Vite
+
+### Backend
+- **Database**: Convex (real-time database with built-in sync)
+- **Auth**: @convex-dev/auth (authentication framework)
+- **API**: Convex functions (queries, mutations, actions)
+
+### State Management
+- **Query Client**: TanStack Query (@tanstack/react-query)
+- **Convex Integration**: @convex-dev/react-query (connects Convex with React Query)
+
+## Project Structure
+
+```
+mydashboard/
+├── src/
+│   ├── routes/              # File-based routes (TanStack Router)
+│   │   ├── __root.tsx      # Root layout
+│   │   ├── index.tsx       # Dashboard page (/)
+│   │   └── messages.tsx    # Messages page (/messages)
+│   ├── components/
+│   │   ├── ui/             # Shadcn/ui components
+│   │   └── layout/         # Layout components
+│   ├── lib/                # Utility functions
+│   └── styles/             # Global styles
+├── convex/                 # Backend (Convex functions)
+│   ├── schema.ts          # Database schema
+│   ├── auth.ts            # Auth configuration
+│   └── myFunctions.ts     # API functions (queries/mutations)
+└── public/                # Static assets
+```
+
+## Key Conventions
+
+### Routing
+- Use file-based routing in `src/routes/`
+- Each route file exports a `Route` using `createFileRoute()`
+- Routes automatically use the DashboardLayout wrapper
+
+### Components
+- UI components from Shadcn/ui live in `src/components/ui/`
+- Custom components in `src/components/`
+- Use Lucide React for icons
+
+### Styling
+- Use Tailwind CSS utility classes
+- Follow Tailwind v4 conventions
+- Shadcn/ui provides pre-styled base components
+
+### Backend (Convex)
+- **Queries**: Read data from database (real-time)
+- **Mutations**: Write/update data
+- **Actions**: Call external APIs or run server-side code
+- All backend functions are in `convex/` directory
+- Use `v` from "convex/values" for argument validation
+- Schema defined in `convex/schema.ts`
+
+### Database Schema
+Current tables:
+- `users` - User authentication (Convex Auth)
+- `numbers` - Demo/testing table
+- `dashboardItems` - User's widgets and tools
+- `dataSources` - External data connections (APIs, files, webhooks)
+- `beeperChats` - Cached chat data from Beeper integration
+- `beeperMessages` - Cached messages per chat
+- `contacts` - Synced contacts from Dex CRM
+- `prompts` - User-defined AI prompts and templates
+
+### Data Fetching Pattern
+```tsx
+// Use Convex queries with React Query
+import { useSuspenseQuery } from '@tanstack/react-query'
+import { convexQuery } from '@convex-dev/react-query'
+import { api } from '../../convex/_generated/api'
+
+const { data } = useSuspenseQuery(
+  convexQuery(api.myFunctions.listNumbers, { count: 10 })
+)
+```
+
+### Mutations Pattern
+```tsx
+// Use Convex mutations
+import { useMutation } from 'convex/react'
+import { api } from '../../convex/_generated/api'
+
+const addItem = useMutation(api.myFunctions.addNumber)
+addItem({ value: 42 })
+```
+
+## Development Commands
+- `npm run dev` - Start dev server (Vite + Convex)
+- `npm run build` - Build for production
+- `npm run format` - Format with Prettier
+- `npx tsr generate` - Regenerate route tree (if needed)
+
+## Environment Variables
+- `VITE_CONVEX_URL` - Convex backend URL (auto-configured on first run)
+
+## Code Style
+- Use TypeScript for all files
+- Prefer functional components with hooks
+- Use named exports for components
+- Follow ESLint and Prettier configurations
+- Keep components small and focused
+
+## Authentication
+- Framework: @convex-dev/auth
+- Currently configured with empty providers array
+- Ready for OAuth providers (GitHub, Google, etc.)
+- User context available via `ctx.auth.getUserIdentity()` in Convex functions
+
+## UI/UX Patterns
+- Horizontal navigation menu in header (Dashboard, Messages, Settings tabs)
+- Full-width content area
+- Search bar in header
+- User dropdown menu for account actions
+- Responsive design with Tailwind breakpoints
+
+## Key Features to Implement
+- User authentication (login/signup)
+- Customizable dashboard widgets
+- Data source integrations
+- Real-time data synchronization
+- Drag-and-drop customization
+- Dark/light theme toggle
+
+## Prompts Management
+
+The application includes a prompts management system for storing and organizing AI prompts:
+
+### Prompts Table Schema
+- **name** (string) - Unique identifier/key for the prompt (e.g., "code-review")
+- **title** (string) - Display title (e.g., "Code Review Assistant")
+- **description** (string) - The actual prompt text or detailed description
+- **createdAt** (number) - Creation timestamp
+- **updatedAt** (number) - Last update timestamp
+
+### API Functions (convex/prompts.ts)
+- `listPrompts()` - Query to get all prompts ordered by creation time
+- `getPrompt(id)` - Query to get a single prompt by ID
+- `createPrompt(name, title, description)` - Mutation to create a new prompt
+- `updatePrompt(id, name, title, description)` - Mutation to update an existing prompt
+- `deletePrompt(id)` - Mutation to delete a prompt
+
+### Frontend Route
+- **Path**: `/settings/prompts`
+- **File**: `src/routes/settings.prompts.tsx`
+- **Features**: Full CRUD interface with dialogs for create/edit, list view with cards, and delete confirmation
+
+### Usage Example
+```tsx
+import { useSuspenseQuery } from '@tanstack/react-query'
+import { convexQuery } from '@convex-dev/react-query'
+import { useConvexMutation } from '@convex-dev/react-query'
+import { api } from '../../convex/_generated/api'
+
+// List all prompts
+const { data: prompts } = useSuspenseQuery(
+  convexQuery(api.prompts.listPrompts, {})
+)
+
+// Create a prompt
+const { mutate: createPrompt } = useConvexMutation(api.prompts.createPrompt)
+createPrompt({
+  name: "code-review",
+  title: "Code Review Assistant",
+  description: "Review this code for best practices..."
+})
+```
+
