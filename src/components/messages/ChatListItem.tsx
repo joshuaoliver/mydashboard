@@ -1,4 +1,3 @@
-import { MessageCircle, Clock } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface ChatListItemProps {
@@ -45,9 +44,11 @@ export function ChatListItem({
   }
 
   // Truncate message preview
-  const truncatedMessage = lastMessage.length > 60 
-    ? `${lastMessage.substring(0, 60)}...` 
+  const truncatedMessage = lastMessage.length > 80 
+    ? `${lastMessage.substring(0, 80)}...` 
     : lastMessage
+
+  const hasUnread = unreadCount > 0
 
   return (
     <button
@@ -55,60 +56,67 @@ export function ChatListItem({
       className={cn(
         'w-full text-left px-4 py-3 transition-colors',
         'hover:bg-gray-50',
-        isSelected && 'bg-blue-50 border-l-4 border-l-blue-500'
+        isSelected && 'bg-blue-50 border-l-4 border-l-blue-500',
+        hasUnread && !isSelected && 'bg-blue-50/30'
       )}
     >
       <div className="flex items-start gap-3">
-        {/* Avatar placeholder */}
-        <div className="flex-shrink-0 w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center text-white font-semibold">
-          {name.charAt(0).toUpperCase()}
+        {/* Avatar with unread indicator */}
+        <div className="flex-shrink-0 relative">
+          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center text-white font-semibold">
+            {name.charAt(0).toUpperCase()}
+          </div>
+          {hasUnread && (
+            <div className="absolute -top-0.5 -right-0.5 w-3 h-3 bg-blue-500 rounded-full border-2 border-white"></div>
+          )}
         </div>
 
         {/* Chat info */}
         <div className="flex-1 min-w-0">
-          <div className="flex items-center justify-between mb-1">
+          {/* Header row: Name, network badge, time */}
+          <div className="flex items-center justify-between gap-2 mb-1">
             <div className="flex items-center gap-2 min-w-0 flex-1">
-              <div className="min-w-0 flex-1">
-                <h3 className="font-semibold text-gray-900 truncate">
-                  {name}
-                </h3>
-                {(username || phoneNumber) && (
-                  <p className="text-xs text-gray-500 truncate">
-                    {username ? `@${username}` : phoneNumber}
-                  </p>
-                )}
-              </div>
+              <h3 className={cn(
+                "truncate text-sm",
+                hasUnread ? "font-bold text-gray-900" : "font-medium text-gray-700"
+              )}>
+                {name}
+              </h3>
               {network && (
-                <span className="px-2 py-0.5 text-xs font-medium bg-gray-100 text-gray-600 rounded flex-shrink-0">
+                <span className="px-1.5 py-0.5 text-xs font-medium bg-gray-100 text-gray-600 rounded flex-shrink-0">
                   {network}
                 </span>
               )}
             </div>
-            {unreadCount > 0 && (
-              <span className="ml-2 px-2 py-0.5 text-xs font-medium bg-blue-500 text-white rounded-full flex-shrink-0">
+            <span className={cn(
+              "text-xs flex-shrink-0",
+              hasUnread ? "font-semibold text-blue-600" : "text-gray-500"
+            )}>
+              {formatTime(lastMessageTime)}
+            </span>
+          </div>
+
+          {/* Username/Phone (smaller, secondary) */}
+          {(username || phoneNumber) && (
+            <p className="text-xs text-gray-500 truncate mb-1">
+              {username ? `@${username}` : phoneNumber}
+            </p>
+          )}
+
+          {/* Last message preview */}
+          <div className="flex items-start gap-2">
+            <p className={cn(
+              "text-sm truncate flex-1",
+              hasUnread ? "font-medium text-gray-900" : "text-gray-600"
+            )}>
+              {truncatedMessage}
+            </p>
+            {hasUnread && (
+              <span className="px-1.5 py-0.5 text-xs font-bold bg-blue-500 text-white rounded-full flex-shrink-0 min-w-[20px] text-center">
                 {unreadCount}
               </span>
             )}
           </div>
-
-          <p className="text-sm text-gray-600 truncate mb-1">
-            {truncatedMessage}
-          </p>
-
-          <div className="flex items-center text-xs text-gray-500">
-            <Clock className="w-3 h-3 mr-1" />
-            {formatTime(lastMessageTime)}
-          </div>
-        </div>
-
-        {/* Indicator */}
-        <div className="flex-shrink-0">
-          <MessageCircle 
-            className={cn(
-              'w-5 h-5',
-              isSelected ? 'text-blue-500' : 'text-gray-400'
-            )} 
-          />
         </div>
       </div>
     </button>

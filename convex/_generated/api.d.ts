@@ -19,6 +19,7 @@ import type * as beeperActions from "../beeperActions.js";
 import type * as beeperActions_improved from "../beeperActions_improved.js";
 import type * as beeperQueries from "../beeperQueries.js";
 import type * as beeperSync from "../beeperSync.js";
+import type * as cleanupMessages from "../cleanupMessages.js";
 import type * as crons from "../crons.js";
 import type * as dexActions from "../dexActions.js";
 import type * as dexAdmin from "../dexAdmin.js";
@@ -44,6 +45,7 @@ declare const fullApi: ApiFromModules<{
   beeperActions_improved: typeof beeperActions_improved;
   beeperQueries: typeof beeperQueries;
   beeperSync: typeof beeperSync;
+  cleanupMessages: typeof cleanupMessages;
   crons: typeof crons;
   dexActions: typeof dexActions;
   dexAdmin: typeof dexAdmin;

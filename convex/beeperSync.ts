@@ -66,10 +66,18 @@ export const upsertChat = internalMutation({
       shouldSyncMessages =
         !existingChat.lastMessagesSyncedAt ||
         args.chatData.lastActivity > existingChat.lastMessagesSyncedAt;
+      
+      console.log(
+        `[upsertChat] Chat ${args.chatData.chatId}: ` +
+        `lastMessagesSyncedAt=${existingChat.lastMessagesSyncedAt}, ` +
+        `lastActivity=${args.chatData.lastActivity}, ` +
+        `shouldSync=${shouldSyncMessages}`
+      );
     } else {
       chatDocId = await ctx.db.insert("beeperChats", args.chatData);
       // New chat - always sync messages
       shouldSyncMessages = true;
+      console.log(`[upsertChat] New chat ${args.chatData.chatId}: will sync messages`);
     }
 
     return { chatDocId, shouldSyncMessages };
@@ -102,15 +110,17 @@ export const syncChatMessages = internalMutation({
 
     // Upsert each message
     for (const msg of args.messages) {
-      // Check if message already exists
-      const existingMessage = await ctx.db
+      // Check if message already exists FOR THIS SPECIFIC CHAT
+      // Use by_chat index to check chatId + messageId combination
+      const existingMessages = await ctx.db
         .query("beeperMessages")
-        .withIndex("by_message_id", (q) => q.eq("messageId", msg.messageId))
+        .withIndex("by_chat", (q) => q.eq("chatId", args.chatId))
+        .filter((q) => q.eq(q.field("messageId"), msg.messageId))
         .first();
 
-      if (existingMessage) {
+      if (existingMessages) {
         // Update existing message (in case content changed)
-        await ctx.db.patch(existingMessage._id, {
+        await ctx.db.patch(existingMessages._id, {
           text: msg.text,
           timestamp: msg.timestamp,
           senderId: msg.senderId,
@@ -233,6 +243,8 @@ export const syncBeeperChatsInternal = internalAction({
 
         if (shouldSyncMessages) {
           try {
+            console.log(`[Beeper Sync] Fetching messages for chat ${chat.id}...`);
+            
             // Fetch messages using SDK
             const messagesResponse = await client.get('/v0/search-messages', {
               query: {
@@ -242,6 +254,7 @@ export const syncBeeperChatsInternal = internalAction({
             }) as any; // Type assertion needed for custom V0 endpoint
 
             const messages = messagesResponse.items || [];
+            console.log(`[Beeper Sync] Received ${messages.length} messages from API for chat ${chat.id}`);
 
             // Prepare messages for mutation
             const messagesToSync = messages.map((msg: any) => ({
@@ -274,6 +287,8 @@ export const syncBeeperChatsInternal = internalAction({
               `[Beeper Sync] Error syncing messages for chat ${chat.id}: ${msgErrorMsg}`
             );
           }
+        } else {
+          console.log(`[Beeper Sync] Skipping message sync for chat ${chat.id} (already up to date)`);
         }
       }
 

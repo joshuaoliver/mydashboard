@@ -13,6 +13,7 @@ import { Route as MessagesRouteImport } from './routes/messages'
 import { Route as DexTestRouteImport } from './routes/dex-test'
 import { Route as AnotherPageRouteImport } from './routes/anotherPage'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as SettingsIndexRouteImport } from './routes/settings.index'
 import { Route as SettingsPromptsRouteImport } from './routes/settings.prompts'
 
 const MessagesRoute = MessagesRouteImport.update({
@@ -35,6 +36,11 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SettingsIndexRoute = SettingsIndexRouteImport.update({
+  id: '/settings/',
+  path: '/settings/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SettingsPromptsRoute = SettingsPromptsRouteImport.update({
   id: '/settings/prompts',
   path: '/settings/prompts',
@@ -47,6 +53,7 @@ export interface FileRoutesByFullPath {
   '/dex-test': typeof DexTestRoute
   '/messages': typeof MessagesRoute
   '/settings/prompts': typeof SettingsPromptsRoute
+  '/settings': typeof SettingsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -54,6 +61,7 @@ export interface FileRoutesByTo {
   '/dex-test': typeof DexTestRoute
   '/messages': typeof MessagesRoute
   '/settings/prompts': typeof SettingsPromptsRoute
+  '/settings': typeof SettingsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -62,6 +70,7 @@ export interface FileRoutesById {
   '/dex-test': typeof DexTestRoute
   '/messages': typeof MessagesRoute
   '/settings/prompts': typeof SettingsPromptsRoute
+  '/settings/': typeof SettingsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -71,8 +80,15 @@ export interface FileRouteTypes {
     | '/dex-test'
     | '/messages'
     | '/settings/prompts'
+    | '/settings'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/anotherPage' | '/dex-test' | '/messages' | '/settings/prompts'
+  to:
+    | '/'
+    | '/anotherPage'
+    | '/dex-test'
+    | '/messages'
+    | '/settings/prompts'
+    | '/settings'
   id:
     | '__root__'
     | '/'
@@ -80,6 +96,7 @@ export interface FileRouteTypes {
     | '/dex-test'
     | '/messages'
     | '/settings/prompts'
+    | '/settings/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -88,6 +105,7 @@ export interface RootRouteChildren {
   DexTestRoute: typeof DexTestRoute
   MessagesRoute: typeof MessagesRoute
   SettingsPromptsRoute: typeof SettingsPromptsRoute
+  SettingsIndexRoute: typeof SettingsIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -120,6 +138,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/settings/': {
+      id: '/settings/'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof SettingsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/settings/prompts': {
       id: '/settings/prompts'
       path: '/settings/prompts'
@@ -136,6 +161,7 @@ const rootRouteChildren: RootRouteChildren = {
   DexTestRoute: DexTestRoute,
   MessagesRoute: MessagesRoute,
   SettingsPromptsRoute: SettingsPromptsRoute,
+  SettingsIndexRoute: SettingsIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

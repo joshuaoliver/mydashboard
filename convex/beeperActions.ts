@@ -338,11 +338,20 @@ Format your response as JSON with this structure:
       // Parse the AI response
       let suggestions;
       try {
-        const aiResponse = JSON.parse(result.text);
+        // Strip markdown code blocks if present (OpenAI sometimes wraps JSON in ```json ... ```)
+        let cleanedText = result.text.trim();
+        if (cleanedText.startsWith('```json')) {
+          cleanedText = cleanedText.replace(/^```json\s*/, '').replace(/\s*```$/, '');
+        } else if (cleanedText.startsWith('```')) {
+          cleanedText = cleanedText.replace(/^```\s*/, '').replace(/\s*```$/, '');
+        }
+        
+        const aiResponse = JSON.parse(cleanedText);
         suggestions = aiResponse.suggestions || [];
       } catch (parseError) {
         // If JSON parsing fails, use a fallback
         console.error("Error parsing AI response:", parseError);
+        console.error("Raw AI response:", result.text);
         suggestions = [
           {
             reply: "Thanks for your message! I'll get back to you soon.",

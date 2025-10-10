@@ -260,11 +260,11 @@ function Messages() {
         </Sidebar>
 
         {/* Main Content Area - Chat detail and AI suggestions */}
-        <div className="flex-1 flex min-h-0 bg-gray-50">
+        <div className="flex-1 flex bg-gray-50">
           {selectedChatId && selectedChat ? (
             <>
-              {/* Chat Messages - Takes up majority of space */}
-              <div className="flex-1 flex flex-col bg-white border-r border-gray-200 min-w-0">
+              {/* Chat Messages */}
+              <div className="flex-1 bg-white border-r border-gray-200">
                 {isLoadingMessages ? (
                   <div className="flex items-center justify-center h-full">
                     <div className="text-center">
@@ -277,8 +277,8 @@ function Messages() {
                 )}
               </div>
 
-              {/* AI Reply Suggestions - Fixed width sidebar with ScrollArea */}
-              <ScrollArea className="w-[500px] flex-shrink-0 bg-white">
+              {/* AI Reply Suggestions */}
+              <ScrollArea className="w-[500px] bg-white">
                 <ReplySuggestions
                   suggestions={replySuggestions}
                   isLoading={isLoadingSuggestions}
