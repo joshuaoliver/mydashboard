@@ -4,6 +4,7 @@ import { useMutation } from 'convex/react'
 import { useSuspenseQuery } from '@tanstack/react-query'
 import { convexQuery } from '@convex-dev/react-query'
 import { DashboardLayout } from '@/components/layout/dashboard-layout'
+import { PageHeader } from '@/components/layout/page-header'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 
@@ -20,16 +21,12 @@ function Home() {
 
   return (
     <DashboardLayout>
+      <PageHeader 
+        title="Welcome to Your Dashboard"
+        description="Manage your personal tools and data sources in one place."
+      />
+
       <div className="space-y-6">
-        {/* Welcome Section */}
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">
-            Welcome to Your Dashboard
-          </h1>
-          <p className="text-gray-600 mt-2">
-            Manage your personal tools and data sources in one place.
-          </p>
-        </div>
 
         {/* Demo Section */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

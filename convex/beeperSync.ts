@@ -1,10 +1,28 @@
 import { internalMutation, internalAction, action } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { v } from "convex/values";
+import BeeperDesktop from '@beeper/desktop-api';
 
 // Beeper API configuration
 const BEEPER_API_URL = process.env.BEEPER_API_URL || "https://beeper.bywave.com.au";
 const BEEPER_TOKEN = process.env.BEEPER_TOKEN;
+
+/**
+ * Initialize Beeper SDK client
+ * Configured for your custom V0 endpoint server
+ */
+function createBeeperClient() {
+  if (!BEEPER_TOKEN) {
+    throw new Error("BEEPER_TOKEN environment variable is not set");
+  }
+
+  return new BeeperDesktop({
+    accessToken: BEEPER_TOKEN,
+    baseURL: BEEPER_API_URL,
+    maxRetries: 2,
+    timeout: 15000, // 15 seconds
+  });
+}
 
 /**
  * Helper mutation to upsert a single chat into database
@@ -130,55 +148,32 @@ export const syncChatMessages = internalMutation({
 
 /**
  * Internal action to fetch data from Beeper API and sync to database
- * Actions can use fetch() and setTimeout()
- * Called by cron job or manual sync actions
+ * NOW USING OFFICIAL BEEPER SDK! 🎉
+ * 
+ * Benefits:
+ * - Type safety
+ * - Built-in error handling & retries
+ * - Cleaner code
+ * - Better timeout handling
  */
 export const syncBeeperChatsInternal = internalAction({
   handler: async (ctx, args: { syncSource: string }) => {
     try {
-      // Fetch chats from Beeper API with timeout
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+      // Initialize Beeper SDK client
+      const client = createBeeperClient();
 
-      let response;
-      try {
-        response = await fetch(`${BEEPER_API_URL}/v0/search-chats?limit=100`, {
-          method: "GET",
-          headers: {
-            "Authorization": `Bearer ${BEEPER_TOKEN}`,
-          },
-          signal: controller.signal,
-        });
-        clearTimeout(timeoutId);
-      } catch (fetchError) {
-        clearTimeout(timeoutId);
-        // Network error or timeout
-        const errorMsg = fetchError instanceof Error ? fetchError.message : "Unknown error";
-        console.error(`[Beeper Sync] Network error: ${errorMsg}`);
-        return {
-          success: false,
-          syncedChats: 0,
-          syncedMessages: 0,
-          timestamp: Date.now(),
-          source: args.syncSource,
-          error: `Network error: ${errorMsg}`,
-        };
-      }
+      // Fetch chats using SDK (automatically handles V0 endpoints)
+      // The SDK will retry on failures and handle errors gracefully
+      const response = await client.get('/v0/search-chats', {
+        query: { 
+          limit: 100,
+          // Optional filters:
+          // type: 'single',  // Only direct messages
+          // unreadOnly: true,  // Only unread chats
+        }
+      }) as any; // Type assertion needed for custom V0 endpoint
 
-      if (!response.ok) {
-        console.error(`[Beeper Sync] API error: ${response.status} ${response.statusText}`);
-        return {
-          success: false,
-          syncedChats: 0,
-          syncedMessages: 0,
-          timestamp: Date.now(),
-          source: args.syncSource,
-          error: `API error: ${response.status} ${response.statusText}`,
-        };
-      }
-
-      const data = await response.json();
-      const chats = data.items || [];
+      const chats = response.items || [];
 
       let syncedChatsCount = 0;
       let syncedMessagesCount = 0;
@@ -238,57 +233,42 @@ export const syncBeeperChatsInternal = internalAction({
 
         if (shouldSyncMessages) {
           try {
-            // Fetch messages for this chat with timeout
-            const msgController = new AbortController();
-            const msgTimeoutId = setTimeout(() => msgController.abort(), 10000); // 10 second timeout per chat
+            // Fetch messages using SDK
+            const messagesResponse = await client.get('/v0/search-messages', {
+              query: {
+                chatID: chat.id,
+                limit: 30,
+              }
+            }) as any; // Type assertion needed for custom V0 endpoint
 
-            const messagesResponse = await fetch(
-              `${BEEPER_API_URL}/v0/search-messages?chatID=${encodeURIComponent(chat.id)}&limit=30`,
+            const messages = messagesResponse.items || [];
+
+            // Prepare messages for mutation
+            const messagesToSync = messages.map((msg: any) => ({
+              messageId: msg.id,
+              text: msg.text || "",
+              timestamp: new Date(msg.timestamp).getTime(),
+              senderId: msg.senderID,
+              senderName: msg.senderName || msg.senderID,
+              isFromUser: msg.isSender || false,
+            }));
+
+            console.log(`[Beeper Sync] Syncing ${messagesToSync.length} messages for chatId: ${chat.id}`);
+            
+            // Sync messages via mutation
+            const messageCount = await ctx.runMutation(
+              internal.beeperSync.syncChatMessages,
               {
-                method: "GET",
-                headers: {
-                  "Authorization": `Bearer ${BEEPER_TOKEN}`,
-                },
-                signal: msgController.signal,
+                chatId: chat.id,
+                messages: messagesToSync,
+                chatDocId,
+                lastMessagesSyncedAt: now,
               }
             );
-            clearTimeout(msgTimeoutId);
 
-            if (messagesResponse.ok) {
-              const messagesData = await messagesResponse.json();
-              const messages = messagesData.items || [];
-
-              // Prepare messages for mutation
-              const messagesToSync = messages.map((msg: any) => ({
-                messageId: msg.id,
-                text: msg.text || "",
-                timestamp: new Date(msg.timestamp).getTime(),
-                senderId: msg.senderID,
-                senderName: msg.senderName || msg.senderID,
-                isFromUser: msg.isSender || false,
-              }));
-
-              console.log(`[Beeper Sync] Syncing ${messagesToSync.length} messages for chatId: ${chat.id}`);
-              
-              // Sync messages via mutation
-              const messageCount = await ctx.runMutation(
-                internal.beeperSync.syncChatMessages,
-                {
-                  chatId: chat.id,
-                  messages: messagesToSync,
-                  chatDocId,
-                  lastMessagesSyncedAt: now,
-                }
-              );
-
-              syncedMessagesCount += messageCount;
-            } else {
-              console.warn(
-                `[Beeper Sync] Failed to fetch messages for chat ${chat.id}: ${messagesResponse.status}`
-              );
-            }
+            syncedMessagesCount += messageCount;
           } catch (msgError) {
-            // Log error but continue with other chats
+            // SDK handles retries, but log if it still fails
             const msgErrorMsg = msgError instanceof Error ? msgError.message : "Unknown error";
             console.warn(
               `[Beeper Sync] Error syncing messages for chat ${chat.id}: ${msgErrorMsg}`
@@ -309,12 +289,10 @@ export const syncBeeperChatsInternal = internalAction({
         source: args.syncSource,
       };
     } catch (error) {
-      // Gracefully handle any unexpected errors
+      // SDK provides better error messages
       const errorMsg = error instanceof Error ? error.message : "Unknown error";
       console.error(`[Beeper Sync] Unexpected error: ${errorMsg}`);
       
-      // Return failure status instead of throwing
-      // This prevents the cron job from crashing
       return {
         success: false,
         syncedChats: 0,

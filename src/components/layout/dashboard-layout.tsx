@@ -7,6 +7,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import {
+  NavigationMenu,
+  NavigationMenuItem,
+  NavigationMenuLink,
+  NavigationMenuList,
+  navigationMenuTriggerStyle,
+} from "@/components/ui/navigation-menu"
 import { Input } from "@/components/ui/input"
 import { 
   Bell, 
@@ -17,16 +24,13 @@ import {
   MessageSquare,
   LayoutDashboard
 } from "lucide-react"
-import { Link, useRouterState } from '@tanstack/react-router'
+import { Link } from '@tanstack/react-router'
 
 interface DashboardLayoutProps {
   children: React.ReactNode
 }
 
 export function DashboardLayout({ children }: DashboardLayoutProps) {
-  const routerState = useRouterState()
-  const currentPath = routerState.location.pathname
-
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -36,43 +40,39 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
             {/* Logo */}
             <div className="flex items-center">
               <h1 className="text-xl font-bold text-gray-900">
-                My Dashboard
+                Dashboard
               </h1>
             </div>
 
-            {/* Navigation Tabs */}
-            <nav className="flex items-center space-x-1 ml-8">
-              <Link to="/">
-                <Button 
-                  variant={currentPath === '/' ? 'default' : 'ghost'}
-                  size="sm"
-                  className="flex items-center"
-                >
-                  <LayoutDashboard className="h-4 w-4 mr-2" />
-                  Dashboard
-                </Button>
-              </Link>
-              <Link to="/messages">
-                <Button 
-                  variant={currentPath === '/messages' ? 'default' : 'ghost'}
-                  size="sm"
-                  className="flex items-center"
-                >
-                  <MessageSquare className="h-4 w-4 mr-2" />
-                  Messages
-                </Button>
-              </Link>
-              <Link to="/settings/prompts">
-                <Button 
-                  variant={currentPath.startsWith('/settings') ? 'default' : 'ghost'}
-                  size="sm"
-                  className="flex items-center"
-                >
-                  <Settings className="h-4 w-4 mr-2" />
-                  Settings
-                </Button>
-              </Link>
-            </nav>
+            {/* Navigation Menu */}
+            <NavigationMenu className="ml-8">
+              <NavigationMenuList>
+                <NavigationMenuItem>
+                  <NavigationMenuLink asChild className={navigationMenuTriggerStyle()}>
+                    <Link to="/" className="flex items-center gap-2">
+                      <LayoutDashboard className="h-4 w-4" />
+                      Home
+                    </Link>
+                  </NavigationMenuLink>
+                </NavigationMenuItem>
+                <NavigationMenuItem>
+                  <NavigationMenuLink asChild className={navigationMenuTriggerStyle()}>
+                    <Link to="/messages" className="flex items-center gap-2">
+                      <MessageSquare className="h-4 w-4" />
+                      Messages
+                    </Link>
+                  </NavigationMenuLink>
+                </NavigationMenuItem>
+                <NavigationMenuItem>
+                  <NavigationMenuLink asChild className={navigationMenuTriggerStyle()}>
+                    <Link to="/settings/prompts" className="flex items-center gap-2">
+                      <Settings className="h-4 w-4" />
+                      Settings
+                    </Link>
+                  </NavigationMenuLink>
+                </NavigationMenuItem>
+              </NavigationMenuList>
+            </NavigationMenu>
 
             {/* Search */}
             <div className="flex-1 max-w-md mx-8">

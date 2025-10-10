@@ -115,4 +115,24 @@ export default defineSchema({
     updatedAt: v.number(),         // Last update timestamp
   })
     .index("by_name", ["name"]),
+
+  // Cached AI reply suggestions - avoid regenerating for same conversation state
+  aiReplySuggestions: defineTable({
+    chatId: v.string(),                    // Which chat these suggestions are for
+    lastMessageId: v.string(),             // ID of the last message when generated
+    lastMessageTimestamp: v.number(),      // Timestamp of last message (for validation)
+    suggestions: v.array(v.object({        // The AI-generated suggestions
+      reply: v.string(),
+      style: v.string(),
+      reasoning: v.string(),
+    })),
+    conversationContext: v.object({        // Context when generated
+      lastMessage: v.string(),
+      messageCount: v.number(),
+    }),
+    generatedAt: v.number(),               // When suggestions were generated
+    modelUsed: v.string(),                 // Which AI model was used (for tracking)
+  })
+    .index("by_chat_id", ["chatId"])       // Lookup cached suggestions by chat
+    .index("by_chat_and_message", ["chatId", "lastMessageId"]), // Check if cache is valid
 });

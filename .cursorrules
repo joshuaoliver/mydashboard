@@ -41,6 +41,7 @@ mydashboard/
 │   ├── schema.ts          # Database schema
 │   ├── auth.ts            # Auth configuration
 │   └── myFunctions.ts     # API functions (queries/mutations)
+├── docs/                   # Project documentation
 └── public/                # Static assets
 ```
 
@@ -117,6 +118,12 @@ addItem({ value: 42 })
 - Use named exports for components
 - Follow ESLint and Prettier configurations
 - Keep components small and focused
+
+## Documentation
+- All project documentation files (.md) should be placed in the `docs/` folder
+- Exception: `README.md` remains in the project root for standard repository documentation
+- Documentation files in subdirectories (e.g., `convex/README.md`) should remain in their respective folders
+- Use clear, descriptive filenames in UPPER_SNAKE_CASE for documentation files (e.g., `SETUP_GUIDE.md`, `API_REFERENCE.md`)
 
 ## Authentication
 - Framework: @convex-dev/auth

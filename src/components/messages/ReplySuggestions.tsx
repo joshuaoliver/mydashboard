@@ -1,6 +1,6 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Copy, Check, Sparkles, Loader2 } from 'lucide-react'
+import { Copy, Check, Sparkles, Loader2, Database, Zap } from 'lucide-react'
 import { useState } from 'react'
 
 interface ReplySuggestion {
@@ -17,6 +17,8 @@ interface ReplySuggestionsProps {
     lastMessage: string
     messageCount: number
   }
+  isCached?: boolean       // New: indicates if suggestions are from cache
+  generatedAt?: number     // New: when suggestions were generated
   onGenerateClick?: () => void
 }
 
@@ -25,6 +27,8 @@ export function ReplySuggestions({
   isLoading,
   error,
   conversationContext,
+  isCached = false,
+  generatedAt,
   onGenerateClick,
 }: ReplySuggestionsProps) {
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null)
@@ -111,13 +115,31 @@ export function ReplySuggestions({
   return (
     <Card className="h-full flex flex-col">
       <CardHeader className="flex-shrink-0">
-        <div className="flex items-center gap-2">
-          <Sparkles className="w-5 h-5 text-purple-500" />
-          <CardTitle>AI Reply Suggestions</CardTitle>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Sparkles className="w-5 h-5 text-purple-500" />
+            <CardTitle>AI Reply Suggestions</CardTitle>
+          </div>
+          {isCached ? (
+            <div className="flex items-center gap-1.5 px-2.5 py-1 bg-green-50 text-green-700 border border-green-200 rounded-full text-xs font-medium">
+              <Database className="w-3.5 h-3.5" />
+              Cached
+            </div>
+          ) : (
+            <div className="flex items-center gap-1.5 px-2.5 py-1 bg-blue-50 text-blue-700 border border-blue-200 rounded-full text-xs font-medium">
+              <Zap className="w-3.5 h-3.5" />
+              Fresh
+            </div>
+          )}
         </div>
         {conversationContext && (
           <CardDescription>
-            Based on {conversationContext.messageCount} messages in the conversation
+            Based on {conversationContext.messageCount} messages
+            {isCached && generatedAt && (
+              <span className="text-xs text-gray-500">
+                {' • '}Generated {new Date(generatedAt).toLocaleTimeString()}
+              </span>
+            )}
           </CardDescription>
         )}
       </CardHeader>

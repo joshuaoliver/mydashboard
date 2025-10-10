@@ -1,4 +1,7 @@
+"use node";
+
 import { action } from "./_generated/server";
+import { internal } from "./_generated/api";
 import { v } from "convex/values";
 import { generateText } from "ai";
 import { createOpenAI } from "@ai-sdk/openai";
@@ -47,6 +50,18 @@ interface BeeperMessage {
  */
 export const listUnrepliedChats = action({
   args: {},
+  returns: v.object({
+    chats: v.array(v.object({
+      id: v.string(),
+      roomId: v.string(),
+      name: v.string(),
+      network: v.string(),
+      accountID: v.string(),
+      lastMessage: v.string(),
+      lastMessageTime: v.number(),
+      unreadCount: v.number(),
+    })),
+  }),
   handler: async (ctx) => {
     try {
       // Note: Auth disabled for now - this is a personal dashboard
@@ -149,6 +164,16 @@ export const getChatMessages = action({
   args: {
     chatId: v.string(),
   },
+  returns: v.object({
+    messages: v.array(v.object({
+      id: v.string(),
+      text: v.string(),
+      timestamp: v.number(),
+      sender: v.string(),
+      senderName: v.string(),
+      isFromUser: v.boolean(),
+    })),
+  }),
   handler: async (ctx, args) => {
     try {
       // Note: Auth disabled for now - this is a personal dashboard
@@ -169,7 +194,11 @@ export const getChatMessages = action({
 });
 
 /**
- * Generate AI-powered reply suggestions
+ * Generate AI-powered reply suggestions with smart caching
+ * 
+ * Checks cache first - only regenerates if last message has changed
+ * This saves OpenAI API calls and provides instant results for unchanged conversations
+ * 
  * Uses OpenAI via Vercel AI SDK to analyze conversation and suggest replies
  */
 export const generateReplySuggestions = action({
@@ -177,7 +206,32 @@ export const generateReplySuggestions = action({
     chatId: v.string(),
     chatName: v.string(),
   },
-  handler: async (ctx, args) => {
+  returns: v.object({
+    suggestions: v.array(v.object({
+      reply: v.string(),
+      style: v.string(),
+      reasoning: v.string(),
+    })),
+    conversationContext: v.object({
+      lastMessage: v.string(),
+      messageCount: v.number(),
+    }),
+    isCached: v.boolean(),
+    generatedAt: v.number(),
+  }),
+  handler: async (ctx, args): Promise<{
+    suggestions: Array<{
+      reply: string;
+      style: string;
+      reasoning: string;
+    }>;
+    conversationContext: {
+      lastMessage: string;
+      messageCount: number;
+    };
+    isCached: boolean;
+    generatedAt: number;
+  }> => {
     try {
       // Note: Auth disabled for now - this is a personal dashboard
       // const identity = await ctx.auth.getUserIdentity();
@@ -190,9 +244,44 @@ export const generateReplySuggestions = action({
       if (messages.length === 0) {
         return {
           suggestions: [],
-          error: "No messages found in this conversation",
+          conversationContext: {
+            lastMessage: "",
+            messageCount: 0,
+          },
+          isCached: false,
+          generatedAt: Date.now(),
         };
       }
+
+      // Get the last message to check cache
+      const lastMessage = messages[messages.length - 1];
+      
+      // Try to get cached suggestions for this conversation state
+      const cached: {
+        suggestions: Array<{
+          reply: string;
+          style: string;
+          reasoning: string;
+        }>;
+        conversationContext: {
+          lastMessage: string;
+          messageCount: number;
+        };
+        isCached: boolean;
+        generatedAt: number;
+      } | null = await ctx.runQuery(internal.aiSuggestions.getCachedSuggestions, {
+        chatId: args.chatId,
+        lastMessageId: lastMessage.id,
+      });
+
+      // If we have valid cached suggestions, return them immediately
+      if (cached) {
+        console.log(`[generateReplySuggestions] Using cached suggestions for chat ${args.chatId}`);
+        return cached;
+      }
+
+      // No cache or last message changed - generate new suggestions
+      console.log(`[generateReplySuggestions] Generating new suggestions for chat ${args.chatId}`);
 
       // Format conversation for AI prompt
       const conversationHistory = messages
@@ -203,8 +292,7 @@ export const generateReplySuggestions = action({
         })
         .join("\n");
 
-      // Get last message to understand context
-      const lastMessage = messages[messages.length - 1];
+      // Get last message for context
       const lastMessageText = lastMessage.text;
 
       // Generate reply suggestions using OpenAI
@@ -248,32 +336,46 @@ Format your response as JSON with this structure:
       });
 
       // Parse the AI response
+      let suggestions;
       try {
         const aiResponse = JSON.parse(result.text);
-        return {
-          suggestions: aiResponse.suggestions || [],
-          conversationContext: {
-            lastMessage: lastMessageText,
-            messageCount: messages.length,
-          },
-        };
+        suggestions = aiResponse.suggestions || [];
       } catch (parseError) {
-        // If JSON parsing fails, return a fallback
+        // If JSON parsing fails, use a fallback
         console.error("Error parsing AI response:", parseError);
-        return {
-          suggestions: [
-            {
-              reply: "Thanks for your message! I'll get back to you soon.",
-              style: "Polite and acknowledgment",
-              reasoning: "A safe, professional response while you consider a more detailed reply",
-            },
-          ],
-          conversationContext: {
-            lastMessage: lastMessageText,
-            messageCount: messages.length,
+        suggestions = [
+          {
+            reply: "Thanks for your message! I'll get back to you soon.",
+            style: "Polite acknowledgment",
+            reasoning: "A safe, professional response while you consider a more detailed reply",
           },
-        };
+        ];
       }
+
+      const conversationContext = {
+        lastMessage: lastMessageText,
+        messageCount: messages.length,
+      };
+
+      // Save suggestions to cache for future use
+      await ctx.runMutation(internal.aiSuggestions.saveSuggestionsToCache, {
+        chatId: args.chatId,
+        lastMessageId: lastMessage.id,
+        lastMessageTimestamp: lastMessage.timestamp,
+        suggestions,
+        conversationContext,
+        modelUsed: "gpt-4o-mini",
+      });
+
+      console.log(`[generateReplySuggestions] Saved ${suggestions.length} suggestions to cache for chat ${args.chatId}`);
+
+      // Return fresh suggestions
+      return {
+        suggestions,
+        conversationContext,
+        isCached: false,
+        generatedAt: Date.now(),
+      };
     } catch (error) {
       console.error("Error generating reply suggestions:", error);
       throw new Error(

@@ -1,4 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
+import { DashboardLayout } from '@/components/layout/dashboard-layout'
+import { FullWidthContent } from '@/components/layout/full-width-content'
+import { Sidebar, SidebarHeader } from '@/components/layout/sidebar'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { ChatListItem } from '@/components/messages/ChatListItem'
@@ -50,6 +53,8 @@ function Messages() {
   const [isSyncing, setIsSyncing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [conversationContext, setConversationContext] = useState<any>(null)
+  const [isCachedSuggestions, setIsCachedSuggestions] = useState(false)
+  const [generatedAt, setGeneratedAt] = useState<number | undefined>(undefined)
 
   // Query cached chats from database (instant, reactive)
   const chatsData = useQuery(api.beeperQueries.listCachedChats)
@@ -109,24 +114,40 @@ function Messages() {
       // Clear previous AI suggestions when switching chats
       setReplySuggestions([])
       setConversationContext(null)
+      
+      // Auto-generate AI suggestions when chat is selected
+      // This happens automatically but checks cache first
+      handleGenerateAISuggestions()
     }
   }, [selectedChatId, cachedMessagesData])
 
-  // Manual AI suggestion generation
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+
+  // Auto/Manual AI suggestion generation
+  // Automatically checks cache first, only generates if conversation changed
   const handleGenerateAISuggestions = async () => {
     if (!selectedChatId || !selectedChat) return
-    
+
     setIsLoadingSuggestions(true)
     setError(null)
-    
+
     try {
       const suggestionsResult = await generateReplySuggestions({
         chatId: selectedChatId,
         chatName: selectedChat.name,
       })
-      
+
       setReplySuggestions(suggestionsResult.suggestions || [])
       setConversationContext(suggestionsResult.conversationContext)
+      setIsCachedSuggestions(suggestionsResult.isCached || false)
+      setGeneratedAt(suggestionsResult.generatedAt)
+      
+      // Log cache hit/miss for debugging
+      if (suggestionsResult.isCached) {
+        console.log(`✅ Using cached suggestions for ${selectedChat.name}`)
+      } else {
+        console.log(`🔄 Generated fresh suggestions for ${selectedChat.name}`)
+      }
     } catch (err) {
       console.error('Error generating suggestions:', err)
       const errorMessage = err instanceof Error ? err.message : 'Failed to generate suggestions'
@@ -163,94 +184,80 @@ function Messages() {
     }
   }
 
+  // Construct subtitle with count and sync time
+  const subtitle = [
+    `${chats.length} ${chats.length === 1 ? 'conversation' : 'conversations'}`,
+    syncInfo?.lastSyncedAt ? new Date(syncInfo.lastSyncedAt).toLocaleTimeString() : null,
+  ].filter(Boolean).join(' • ')
+
   return (
-    <div className="h-screen flex flex-col bg-gray-50">
-      {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-6 py-4 flex-shrink-0">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Messages</h1>
-            <div className="flex items-center gap-4 mt-1">
-              <p className="text-sm text-gray-600">
-                AI-powered reply suggestions
-              </p>
-              {syncInfo?.lastSyncedAt && (
-                <p className="text-xs text-gray-500">
-                  Last synced: {new Date(syncInfo.lastSyncedAt).toLocaleTimeString()}
-                </p>
-              )}
-            </div>
-          </div>
-          <Button 
-            onClick={handleRefresh} 
-            variant="outline" 
-            size="sm"
-            disabled={isSyncing}
-          >
-            <RefreshCw className={`w-4 h-4 mr-2 ${isSyncing ? 'animate-spin' : ''}`} />
-            {isSyncing ? 'Syncing...' : 'Refresh'}
-          </Button>
-        </div>
-
-        {/* Error Banner */}
-        {error && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-3 mt-3">
-            <div className="flex items-start gap-3">
-              <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
-              <div className="flex-1">
-                <h3 className="text-sm font-medium text-red-900">Sync Error</h3>
-                <p className="text-xs text-red-700 mt-1">{error}</p>
+    <DashboardLayout>
+      <FullWidthContent>
+        {/* Left Sidebar - Chat List */}
+        <Sidebar
+          width="w-80"
+          header={
+            <SidebarHeader
+              title="Pending Replies"
+              subtitle={subtitle}
+              actions={
+                <Button 
+                  onClick={handleRefresh} 
+                  variant="ghost" 
+                  size="sm"
+                  disabled={isSyncing}
+                  className="h-8"
+                >
+                  <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
+                </Button>
+              }
+            />
+          }
+        >
+          {/* Error Banner */}
+          {error && (
+            <div className="mx-4 mt-3 bg-red-50 border border-red-200 rounded-lg p-3 flex-shrink-0">
+              <div className="flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-xs font-medium text-red-900">Sync Error</h3>
+                  <p className="text-xs text-red-700 mt-1">{error}</p>
+                </div>
               </div>
             </div>
-          </div>
-        )}
-      </div>
+          )}
 
-      {/* Full-width content area - 100vh minus header */}
-      <div className="flex-1 flex min-h-0">
-        {/* Left Sidebar - Scrollable Chat List */}
-        <div className="w-80 bg-white border-r border-gray-200 flex flex-col flex-shrink-0">
-          {/* Chat list header */}
-          <div className="px-4 py-3 border-b border-gray-200 flex-shrink-0">
-            <h2 className="font-semibold text-gray-900">Pending Replies</h2>
-            <p className="text-xs text-gray-600 mt-0.5">
-              {chats.length} {chats.length === 1 ? 'conversation' : 'conversations'}
-            </p>
-          </div>
-
-          {/* Scrollable chat list using ScrollArea */}
-          <ScrollArea className="flex-1">
-            {!chatsData ? (
-              <div className="flex items-center justify-center py-12">
-                <RefreshCw className="w-8 h-8 text-blue-500 animate-spin" />
-              </div>
-            ) : chats.length === 0 ? (
-              <div className="text-center py-12 px-4 text-gray-500">
-                <p className="mb-2">🎉 All caught up!</p>
-                <p className="text-sm">No pending messages to reply to</p>
-              </div>
-            ) : (
-              <div className="divide-y divide-gray-100">
-                {chats.map((chat: Chat) => (
-                  <ChatListItem
-                    key={chat.id}
-                    id={chat.id}
-                    name={chat.name}
-                    network={chat.network}
-                    accountID={chat.accountID}
-                    username={chat.username}
-                    phoneNumber={chat.phoneNumber}
-                    lastMessage={chat.lastMessage}
-                    lastMessageTime={chat.lastMessageTime}
-                    unreadCount={chat.unreadCount}
-                    isSelected={selectedChatId === chat.id}
-                    onClick={() => handleChatSelect(chat.id)}
-                  />
-                ))}
-              </div>
-            )}
-          </ScrollArea>
-        </div>
+          {/* Chat List Content */}
+          {!chatsData ? (
+            <div className="flex items-center justify-center py-12">
+              <RefreshCw className="w-8 h-8 text-blue-500 animate-spin" />
+            </div>
+          ) : chats.length === 0 ? (
+            <div className="text-center py-12 px-4 text-gray-500">
+              <p className="mb-2">🎉 All caught up!</p>
+              <p className="text-sm">No pending messages to reply to</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-gray-100">
+              {chats.map((chat: Chat) => (
+                <ChatListItem
+                  key={chat.id}
+                  id={chat.id}
+                  name={chat.name}
+                  network={chat.network}
+                  accountID={chat.accountID}
+                  username={chat.username}
+                  phoneNumber={chat.phoneNumber}
+                  lastMessage={chat.lastMessage}
+                  lastMessageTime={chat.lastMessageTime}
+                  unreadCount={chat.unreadCount}
+                  isSelected={selectedChatId === chat.id}
+                  onClick={() => handleChatSelect(chat.id)}
+                />
+              ))}
+            </div>
+          )}
+        </Sidebar>
 
         {/* Main Content Area - Chat detail and AI suggestions */}
         <div className="flex-1 flex min-h-0 bg-gray-50">
@@ -277,6 +284,8 @@ function Messages() {
                   isLoading={isLoadingSuggestions}
                   error={error || undefined}
                   conversationContext={conversationContext}
+                  isCached={isCachedSuggestions}
+                  generatedAt={generatedAt}
                   onGenerateClick={handleGenerateAISuggestions}
                 />
               </ScrollArea>
@@ -293,7 +302,7 @@ function Messages() {
             </div>
           )}
         </div>
-      </div>
-    </div>
+      </FullWidthContent>
+    </DashboardLayout>
   )
 }

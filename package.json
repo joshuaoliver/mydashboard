@@ -14,6 +14,7 @@
   },
   "dependencies": {
     "@ai-sdk/openai": "^2.0.47",
+    "@beeper/desktop-api": "^0.1.5",
     "@convex-dev/auth": "^0.0.90",
     "@convex-dev/react-query": "^0.0.0-alpha.11",
     "@hookform/resolvers": "^5.2.2",
@@ -41,6 +42,7 @@
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.1.11",
+    "@types/node": "^24.7.1",
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",
     "@vitejs/plugin-react": "^4.6.0",
