@@ -15,12 +15,12 @@ interface ReplySuggestionsProps {
   suggestions: ReplySuggestion[]
   isLoading: boolean
   error?: string
-  conversationContext?: {
+  _conversationContext?: {
     lastMessage: string
     messageCount: number
   }
-  isCached?: boolean       // New: indicates if suggestions are from cache
-  generatedAt?: number     // New: when suggestions were generated
+  _isCached?: boolean       // New: indicates if suggestions are from cache
+  _generatedAt?: number     // New: when suggestions were generated
   onGenerateClick?: (customContext?: string) => void  // Now accepts custom context
   selectedIndex?: number   // Currently selected suggestion index
   onSuggestionSelect?: (index: number) => void  // Callback when suggestion is clicked
