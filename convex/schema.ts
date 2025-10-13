@@ -1,12 +1,13 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
-// Note: Auth tables removed - will add back when implementing multi-user support
+import { authTables } from "@convex-dev/auth/server";
 
 // The schema is entirely optional.
 // You can delete this file (schema.ts) and the
 // app will continue to work.
 // The schema provides more precise TypeScript types.
 export default defineSchema({
+  ...authTables,
   numbers: defineTable({
     value: v.number(),
   }),
@@ -56,6 +57,7 @@ export default defineSchema({
     // Activity tracking
     lastActivity: v.number(),        // Timestamp (converted from ISO)
     unreadCount: v.number(),
+    lastMessage: v.optional(v.string()),       // Text of the most recent message
     
     // Status flags
     isArchived: v.boolean(),
@@ -67,8 +69,8 @@ export default defineSchema({
     lastMessagesSyncedAt: v.optional(v.number()),  // When we last fetched messages for this chat
     syncSource: v.string(),                // "cron", "manual", or "page_load"
     
-    // Optional: Reply tracking (for future features)
-    lastMessageFrom: v.optional(v.string()),   // Who sent last message
+    // Reply tracking
+    lastMessageFrom: v.optional(v.string()),   // "user" or "them" - who sent last message
     needsReply: v.optional(v.boolean()),       // Does user need to reply?
   })
     .index("by_activity", ["lastActivity"])    // Sort by recent
@@ -103,8 +105,18 @@ export default defineSchema({
     lastSeenAt: v.optional(v.string()), // ISO timestamp from Dex
     lastSyncedAt: v.number(), // Timestamp when last synced from Dex
     lastModifiedAt: v.number(), // Timestamp when last modified locally
+    // Local-only fields (don't sync to Dex)
+    connection: v.optional(v.union(
+      v.literal("Professional"),
+      v.literal("Friend"),
+      v.literal("Good friend"),
+      v.literal("Romantic"),
+      v.literal("Other")
+    )), // Relationship type
+    notes: v.optional(v.string()), // Local notes (separate from Dex description)
   })
-    .index("by_dex_id", ["dexId"]),
+    .index("by_dex_id", ["dexId"])
+    .index("by_instagram", ["instagram"]), // For matching with Beeper Instagram chats
 
   // User-defined prompts for AI interactions
   prompts: defineTable({

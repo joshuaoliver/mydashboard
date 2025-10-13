@@ -47,7 +47,7 @@ export function Sidebar({
     <div 
       className={cn(
         width,
-        "h-full bg-white flex flex-col flex-shrink-0",
+        "h-full min-h-0 bg-white flex flex-col flex-shrink-0",
         borderRight && "border-r border-gray-200",
         className
       )}
@@ -58,7 +58,7 @@ export function Sidebar({
         </div>
       )}
       
-      <ScrollArea className="flex-1">
+      <ScrollArea className="flex-1 min-h-0">
         {children}
       </ScrollArea>
     </div>

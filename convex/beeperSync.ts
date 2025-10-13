@@ -147,9 +147,25 @@ export const syncChatMessages = internalMutation({
       `[syncChatMessages] Chat ${args.chatId}: inserted ${insertedCount}, updated ${updatedCount}`
     );
 
-    // Update lastMessagesSyncedAt
+    // Calculate reply tracking from messages
+    let lastMessageFrom: "user" | "them" | undefined;
+    let needsReply = false;
+    let lastMessageText: string | undefined;
+
+    if (args.messages.length > 0) {
+      // Messages are already sorted by timestamp (oldest to newest)
+      const lastMessage = args.messages[args.messages.length - 1];
+      lastMessageFrom = lastMessage.isFromUser ? "user" : "them";
+      needsReply = !lastMessage.isFromUser; // Need to reply if they sent last message
+      lastMessageText = lastMessage.text;
+    }
+
+    // Update chat with lastMessagesSyncedAt and reply tracking
     await ctx.db.patch(args.chatDocId, {
       lastMessagesSyncedAt: args.lastMessagesSyncedAt,
+      lastMessageFrom,
+      needsReply,
+      lastMessage: lastMessageText,
     });
 
     return insertedCount + updatedCount;
@@ -167,7 +183,7 @@ export const syncChatMessages = internalMutation({
  * - Better timeout handling
  */
 export const syncBeeperChatsInternal = internalAction({
-  handler: async (ctx, args: { syncSource: string }) => {
+  handler: async (ctx, args: { syncSource: string; forceMessageSync?: boolean }) => {
     try {
       // Initialize Beeper SDK client
       const client = createBeeperClient();
@@ -241,20 +257,34 @@ export const syncBeeperChatsInternal = internalAction({
 
         syncedChatsCount++;
 
-        if (shouldSyncMessages) {
-          try {
-            console.log(`[Beeper Sync] Fetching messages for chat ${chat.id}...`);
-            
-            // Fetch messages using SDK
-            const messagesResponse = await client.get('/v0/search-messages', {
-              query: {
-                chatID: chat.id,
-                limit: 30,
-              }
-            }) as any; // Type assertion needed for custom V0 endpoint
+        // Force message sync if explicitly requested (manual refresh)
+        // or if shouldSyncMessages is true (new activity detected)
+        const shouldFetchMessages = args.forceMessageSync || shouldSyncMessages;
 
-            const messages = messagesResponse.items || [];
-            console.log(`[Beeper Sync] Received ${messages.length} messages from API for chat ${chat.id}`);
+        if (shouldFetchMessages) {
+          try {
+            console.log(`[Beeper Sync] Fetching messages for chat ${chat.id} (${chat.title})...`);
+            
+            // Fetch messages using direct fetch (SDK doesn't handle array parameters correctly)
+            // The API expects chatIDs[] (with brackets) for array notation
+            const messagesUrl = `${BEEPER_API_URL}/v0/search-messages?chatIDs[]=${encodeURIComponent(chat.id)}&limit=30`;
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+            const messagesResponse = await fetch(messagesUrl, {
+              method: "GET",
+              headers: { "Authorization": `Bearer ${BEEPER_TOKEN}` },
+              signal: controller.signal,
+            });
+            clearTimeout(timeoutId);
+
+            if (!messagesResponse.ok) {
+              throw new Error(`HTTP ${messagesResponse.status}: ${await messagesResponse.text()}`);
+            }
+
+            const messagesData = await messagesResponse.json() as any;
+            const messages = messagesData.items || [];
+            console.log(`[Beeper Sync] Received ${messages.length} messages from API for chat ${chat.id} (${chat.title})`);
 
             // Prepare messages for mutation
             const messagesToSync = messages.map((msg: any) => ({
@@ -266,7 +296,7 @@ export const syncBeeperChatsInternal = internalAction({
               isFromUser: msg.isSender || false,
             }));
 
-            console.log(`[Beeper Sync] Syncing ${messagesToSync.length} messages for chatId: ${chat.id}`);
+            console.log(`[Beeper Sync] Syncing ${messagesToSync.length} messages for chatId: ${chat.id} (${chat.title})`);
             
             // Sync messages via mutation
             const messageCount = await ctx.runMutation(
@@ -323,6 +353,7 @@ export const syncBeeperChatsInternal = internalAction({
 /**
  * Public action for manual sync
  * Can be triggered by frontend on page load or refresh button
+ * Forces message sync for all chats to ensure latest data
  */
 export const manualSync = action({
   args: {},
@@ -336,6 +367,7 @@ export const manualSync = action({
   }> => {
     const result = await ctx.runAction(internal.beeperSync.syncBeeperChatsInternal, {
       syncSource: "manual",
+      forceMessageSync: true, // Always fetch messages on manual refresh
     });
     return result;
   },
@@ -343,7 +375,7 @@ export const manualSync = action({
 
 /**
  * Page load sync - triggered when user opens the page
- * Same as manual but tagged differently
+ * Only syncs messages for chats with new activity (not forced)
  */
 export const pageLoadSync = action({
   args: {},
@@ -357,6 +389,7 @@ export const pageLoadSync = action({
   }> => {
     const result = await ctx.runAction(internal.beeperSync.syncBeeperChatsInternal, {
       syncSource: "page_load",
+      forceMessageSync: false, // Don't force on page load - only sync new activity
     });
     return result;
   },

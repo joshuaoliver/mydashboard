@@ -65,10 +65,16 @@ mydashboard/
 - ✅ Responsive design with Tailwind CSS
 - ✅ Type-safe API calls between frontend and backend
 - ✅ File-based routing with TanStack Router
+- ✅ Beeper messaging integration with caching
+- ✅ Dex CRM contact sync
+- ✅ Prompts library for AI workflows
 
 ### Planned Features
 
 - 🔄 User authentication (login/signup)
+- 🔄 **AI Chat Assistant** - Conversational AI interface ([See AI Integration Guide](./docs/AI_ELEMENTS_SUMMARY.md))
+- 🔄 **Smart Reply Suggestions** - AI-powered message replies for Beeper
+- 🔄 **Message Summarization** - AI summaries of long conversations
 - 🔄 Customizable dashboard widgets
 - 🔄 Data source integrations (APIs, files, webhooks)
 - 🔄 Personal tools and utilities
@@ -135,9 +141,25 @@ Create new files in `src/routes/` following TanStack Router conventions:
 
 This is a personal project, but feel free to use it as a template for your own dashboard!
 
+## 🤖 AI Integration
+
+This project is ready to integrate AI-powered features using [AI SDK Elements](https://ai-sdk.dev/elements/overview).
+
+**Quick Start:**
+- 📘 [AI Elements Summary](./docs/AI_ELEMENTS_SUMMARY.md) - Overview and recommendations
+- 🚀 [Quick Start Guide](./docs/AI_CHAT_QUICK_START.md) - Build AI chat in 15 minutes
+- 💡 [Use Cases](./docs/AI_USE_CASES.md) - 7 practical implementations with code examples
+- 📖 [Full Integration Guide](./docs/AI_SDK_ELEMENTS_INTEGRATION.md) - Complete reference
+
+**Recommended first steps:**
+1. Add smart reply suggestions to Beeper messages (2-3 hours)
+2. Build standalone AI chat interface (4-6 hours)
+
 ## 📚 Resources
 
 - [TanStack Start Documentation](https://tanstack.com/start)
 - [Convex Documentation](https://docs.convex.dev)
 - [Shadcn/ui Documentation](https://ui.shadcn.com)
 - [Tailwind CSS Documentation](https://tailwindcss.com)
+- [AI SDK Documentation](https://ai-sdk.dev)
+- [AI SDK Elements](https://ai-sdk.dev/elements/overview)

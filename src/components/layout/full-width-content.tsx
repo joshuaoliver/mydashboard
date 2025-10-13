@@ -13,7 +13,7 @@ interface FullWidthContentProps {
 
 export function FullWidthContent({ children, className }: FullWidthContentProps) {
   return (
-    <div className={cn("h-full flex", className)}>
+    <div className={cn("h-full flex overflow-hidden", className)}>
       {children}
     </div>
   )

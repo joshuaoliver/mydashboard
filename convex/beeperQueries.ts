@@ -29,10 +29,12 @@ export const listCachedChats = query({
         accountID: chat.accountID,
         username: chat.username, // Instagram handle, etc.
         phoneNumber: chat.phoneNumber, // WhatsApp number, etc.
-        lastMessage: "Recent activity",
+        lastMessage: chat.lastMessage || "Recent activity",
         lastMessageTime: chat.lastActivity,
         unreadCount: chat.unreadCount,
         lastSyncedAt: chat.lastSyncedAt,
+        needsReply: chat.needsReply,
+        lastMessageFrom: chat.lastMessageFrom,
       })),
       lastSync: chats[0]?.lastSyncedAt || null,
       count: chats.length,
@@ -131,6 +133,45 @@ export const searchByUsername = query({
         network: chat.network,
         lastActivity: chat.lastActivity,
       })),
+    };
+  },
+});
+
+/**
+ * Diagnostic query to check message distribution across chats
+ */
+export const debugMessageDistribution = query({
+  args: {},
+  handler: async (ctx) => {
+    // Get all messages
+    const allMessages = await ctx.db
+      .query("beeperMessages")
+      .collect();
+
+    // Group by chatId
+    const distribution: Record<string, number> = {};
+    for (const msg of allMessages) {
+      distribution[msg.chatId] = (distribution[msg.chatId] || 0) + 1;
+    }
+
+    // Get chat names for each chatId
+    const chatDetails: Record<string, { name: string; count: number }> = {};
+    for (const chatId of Object.keys(distribution)) {
+      const chat = await ctx.db
+        .query("beeperChats")
+        .withIndex("by_chat_id", (q) => q.eq("chatId", chatId))
+        .first();
+      
+      chatDetails[chatId] = {
+        name: chat?.title || "Unknown",
+        count: distribution[chatId],
+      };
+    }
+
+    return {
+      totalMessages: allMessages.length,
+      uniqueChats: Object.keys(distribution).length,
+      distribution: chatDetails,
     };
   },
 });

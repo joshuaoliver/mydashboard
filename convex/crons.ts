@@ -14,4 +14,15 @@ crons.interval(
   { syncSource: "cron" }
 );
 
+/**
+ * Sync Dex contacts every 2 hours
+ * Keeps contact database in sync with Dex CRM
+ */
+crons.interval(
+  "sync-dex-contacts",
+  { hours: 2 },
+  internal.dexSync.syncContactsFromDex,
+  {}
+);
+
 export default crons;

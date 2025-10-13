@@ -9,21 +9,29 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as SignUpRouteImport } from './routes/sign-up'
+import { Route as SignInRouteImport } from './routes/sign-in'
 import { Route as MessagesRouteImport } from './routes/messages'
-import { Route as DexTestRouteImport } from './routes/dex-test'
 import { Route as AnotherPageRouteImport } from './routes/anotherPage'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as SettingsIndexRouteImport } from './routes/settings.index'
+import { Route as ContactsIndexRouteImport } from './routes/contacts.index'
 import { Route as SettingsPromptsRouteImport } from './routes/settings.prompts'
+import { Route as ContactsContactIdRouteImport } from './routes/contacts.$contactId'
 
+const SignUpRoute = SignUpRouteImport.update({
+  id: '/sign-up',
+  path: '/sign-up',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SignInRoute = SignInRouteImport.update({
+  id: '/sign-in',
+  path: '/sign-in',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const MessagesRoute = MessagesRouteImport.update({
   id: '/messages',
   path: '/messages',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const DexTestRoute = DexTestRouteImport.update({
-  id: '/dex-test',
-  path: '/dex-test',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AnotherPageRoute = AnotherPageRouteImport.update({
@@ -41,35 +49,54 @@ const SettingsIndexRoute = SettingsIndexRouteImport.update({
   path: '/settings/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ContactsIndexRoute = ContactsIndexRouteImport.update({
+  id: '/contacts/',
+  path: '/contacts/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SettingsPromptsRoute = SettingsPromptsRouteImport.update({
   id: '/settings/prompts',
   path: '/settings/prompts',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ContactsContactIdRoute = ContactsContactIdRouteImport.update({
+  id: '/contacts/$contactId',
+  path: '/contacts/$contactId',
   getParentRoute: () => rootRouteImport,
 } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/anotherPage': typeof AnotherPageRoute
-  '/dex-test': typeof DexTestRoute
   '/messages': typeof MessagesRoute
+  '/sign-in': typeof SignInRoute
+  '/sign-up': typeof SignUpRoute
+  '/contacts/$contactId': typeof ContactsContactIdRoute
   '/settings/prompts': typeof SettingsPromptsRoute
+  '/contacts': typeof ContactsIndexRoute
   '/settings': typeof SettingsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/anotherPage': typeof AnotherPageRoute
-  '/dex-test': typeof DexTestRoute
   '/messages': typeof MessagesRoute
+  '/sign-in': typeof SignInRoute
+  '/sign-up': typeof SignUpRoute
+  '/contacts/$contactId': typeof ContactsContactIdRoute
   '/settings/prompts': typeof SettingsPromptsRoute
+  '/contacts': typeof ContactsIndexRoute
   '/settings': typeof SettingsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/anotherPage': typeof AnotherPageRoute
-  '/dex-test': typeof DexTestRoute
   '/messages': typeof MessagesRoute
+  '/sign-in': typeof SignInRoute
+  '/sign-up': typeof SignUpRoute
+  '/contacts/$contactId': typeof ContactsContactIdRoute
   '/settings/prompts': typeof SettingsPromptsRoute
+  '/contacts/': typeof ContactsIndexRoute
   '/settings/': typeof SettingsIndexRoute
 }
 export interface FileRouteTypes {
@@ -77,51 +104,70 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/anotherPage'
-    | '/dex-test'
     | '/messages'
+    | '/sign-in'
+    | '/sign-up'
+    | '/contacts/$contactId'
     | '/settings/prompts'
+    | '/contacts'
     | '/settings'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/anotherPage'
-    | '/dex-test'
     | '/messages'
+    | '/sign-in'
+    | '/sign-up'
+    | '/contacts/$contactId'
     | '/settings/prompts'
+    | '/contacts'
     | '/settings'
   id:
     | '__root__'
     | '/'
     | '/anotherPage'
-    | '/dex-test'
     | '/messages'
+    | '/sign-in'
+    | '/sign-up'
+    | '/contacts/$contactId'
     | '/settings/prompts'
+    | '/contacts/'
     | '/settings/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AnotherPageRoute: typeof AnotherPageRoute
-  DexTestRoute: typeof DexTestRoute
   MessagesRoute: typeof MessagesRoute
+  SignInRoute: typeof SignInRoute
+  SignUpRoute: typeof SignUpRoute
+  ContactsContactIdRoute: typeof ContactsContactIdRoute
   SettingsPromptsRoute: typeof SettingsPromptsRoute
+  ContactsIndexRoute: typeof ContactsIndexRoute
   SettingsIndexRoute: typeof SettingsIndexRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/sign-up': {
+      id: '/sign-up'
+      path: '/sign-up'
+      fullPath: '/sign-up'
+      preLoaderRoute: typeof SignUpRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sign-in': {
+      id: '/sign-in'
+      path: '/sign-in'
+      fullPath: '/sign-in'
+      preLoaderRoute: typeof SignInRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/messages': {
       id: '/messages'
       path: '/messages'
       fullPath: '/messages'
       preLoaderRoute: typeof MessagesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/dex-test': {
-      id: '/dex-test'
-      path: '/dex-test'
-      fullPath: '/dex-test'
-      preLoaderRoute: typeof DexTestRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/anotherPage': {
@@ -145,11 +191,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/contacts/': {
+      id: '/contacts/'
+      path: '/contacts'
+      fullPath: '/contacts'
+      preLoaderRoute: typeof ContactsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/settings/prompts': {
       id: '/settings/prompts'
       path: '/settings/prompts'
       fullPath: '/settings/prompts'
       preLoaderRoute: typeof SettingsPromptsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/contacts/$contactId': {
+      id: '/contacts/$contactId'
+      path: '/contacts/$contactId'
+      fullPath: '/contacts/$contactId'
+      preLoaderRoute: typeof ContactsContactIdRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
@@ -158,9 +218,12 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AnotherPageRoute: AnotherPageRoute,
-  DexTestRoute: DexTestRoute,
   MessagesRoute: MessagesRoute,
+  SignInRoute: SignInRoute,
+  SignUpRoute: SignUpRoute,
+  ContactsContactIdRoute: ContactsContactIdRoute,
   SettingsPromptsRoute: SettingsPromptsRoute,
+  ContactsIndexRoute: ContactsIndexRoute,
   SettingsIndexRoute: SettingsIndexRoute,
 }
 export const routeTree = rootRouteImport

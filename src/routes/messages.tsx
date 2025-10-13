@@ -1,19 +1,34 @@
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { DashboardLayout } from '@/components/layout/dashboard-layout'
 import { FullWidthContent } from '@/components/layout/full-width-content'
 import { Sidebar, SidebarHeader } from '@/components/layout/sidebar'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
+// Replace plain Input with PromptInput from AI Elements
+import { 
+  PromptInput, 
+  PromptInputBody, 
+  PromptInputTextarea, 
+  PromptInputToolbar, 
+  PromptInputSubmit,
+} from '@/components/ai-elements/prompt-input'
 import { ChatListItem } from '@/components/messages/ChatListItem'
 import { ChatDetail } from '@/components/messages/ChatDetail'
 import { ReplySuggestions } from '@/components/messages/ReplySuggestions'
+import { ContactPanel } from '@/components/messages/ContactPanel'
 import { useAction, useQuery } from 'convex/react'
 import { api } from '../../convex/_generated/api'
 import { useState, useEffect } from 'react'
 import { RefreshCw, AlertCircle, MessageCircle } from 'lucide-react'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 
 export const Route = createFileRoute('/messages')({
   component: Messages,
+  validateSearch: (search: Record<string, unknown>) => {
+    return {
+      chatId: (search.chatId as string) || undefined,
+    }
+  },
 })
 
 interface Chat {
@@ -28,6 +43,8 @@ interface Chat {
   lastMessageTime: number
   unreadCount: number
   lastSyncedAt?: number
+  needsReply?: boolean
+  lastMessageFrom?: string
 }
 
 interface Message {
@@ -45,16 +62,25 @@ interface ReplySuggestion {
   reasoning: string
 }
 
+type TabFilter = 'unreplied' | 'unread' | 'all'
+
 function Messages() {
-  const [selectedChatId, setSelectedChatId] = useState<string | null>(null)
+  const navigate = useNavigate({ from: '/messages' })
+  const { chatId } = Route.useSearch()
+  const selectedChatId = chatId || null
+  
   const [chatMessages, setChatMessages] = useState<Message[]>([])
   const [replySuggestions, setReplySuggestions] = useState<ReplySuggestion[]>([])
+  const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(0)
+  const [messageInputValue, setMessageInputValue] = useState('')
   const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false)
   const [isSyncing, setIsSyncing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [conversationContext, setConversationContext] = useState<any>(null)
   const [isCachedSuggestions, setIsCachedSuggestions] = useState(false)
   const [generatedAt, setGeneratedAt] = useState<number | undefined>(undefined)
+  const [tabFilter, setTabFilter] = useState<TabFilter>('unreplied')
+  const sendMessage = useAction(api.beeperActions.sendMessage)
 
   // Query cached chats from database (instant, reactive)
   const chatsData = useQuery(api.beeperQueries.listCachedChats)
@@ -71,13 +97,30 @@ function Messages() {
   const manualSync = useAction(api.beeperSync.manualSync)
   const generateReplySuggestions = useAction(api.beeperActions.generateReplySuggestions)
 
-  const chats: Chat[] = chatsData?.chats || []
-  const selectedChat = chats.find((chat: Chat) => chat.id === selectedChatId)
+  const allChats: Chat[] = chatsData?.chats || []
+  
+  // Apply tab filtering
+  const chats = allChats.filter((chat) => {
+    if (tabFilter === 'unreplied') {
+      return chat.needsReply === true
+    } else if (tabFilter === 'unread') {
+      return chat.unreadCount > 0
+    }
+    return true // 'all' tab shows everything
+  })
+  
+  const selectedChat = allChats.find((chat: Chat) => chat.id === selectedChatId)
+  
+  // Query contact by Instagram username if available
+  const contactData = useQuery(
+    api.contactMutations.findContactByInstagram,
+    selectedChat?.username ? { username: selectedChat.username } : "skip"
+  )
   
   // Derived loading state - loading if we have a selected chat but no cached data yet
   const isLoadingMessages = selectedChatId !== null && cachedMessagesData === undefined
 
-  // Trigger sync on page load
+  // Trigger sync on page load and auto-select most recent chat
   useEffect(() => {
     const syncOnLoad = async () => {
       setIsSyncing(true)
@@ -87,11 +130,9 @@ function Messages() {
           console.log(`✅ Beeper synced: ${result.syncedChats} chats, ${result.syncedMessages} messages`)
         } else {
           console.warn(`⚠️ Beeper sync failed: ${result.error || 'Unknown error'}`)
-          // Don't show error to user - cached data will still work
         }
       } catch (err) {
         console.error('Error syncing on page load:', err)
-        // Don't show error to user - cached data will still work
       } finally {
         setIsSyncing(false)
       }
@@ -100,12 +141,22 @@ function Messages() {
     syncOnLoad()
   }, [pageLoadSync])
 
+  // Auto-select most recent chat if no chat is selected
+  useEffect(() => {
+    if (!selectedChatId && chats.length > 0) {
+      const mostRecentChat = chats[0] // Chats are already sorted by most recent
+      navigate({ search: { chatId: mostRecentChat.id } })
+    }
+  }, [chats, selectedChatId, navigate])
+
   // Update messages when cached data changes (automatic via Convex reactivity!)
   useEffect(() => {
     if (!selectedChatId) {
       setChatMessages([])
       setReplySuggestions([])
       setConversationContext(null)
+      setMessageInputValue('')
+      setSelectedSuggestionIndex(0)
       return
     }
 
@@ -114,9 +165,10 @@ function Messages() {
       // Clear previous AI suggestions when switching chats
       setReplySuggestions([])
       setConversationContext(null)
+      setMessageInputValue('')
+      setSelectedSuggestionIndex(0)
       
       // Auto-generate AI suggestions when chat is selected
-      // This happens automatically but checks cache first
       handleGenerateAISuggestions()
     }
   }, [selectedChatId, cachedMessagesData])
@@ -135,12 +187,20 @@ function Messages() {
       const suggestionsResult = await generateReplySuggestions({
         chatId: selectedChatId,
         chatName: selectedChat.name,
+        instagramUsername: selectedChat.username,
       })
 
-      setReplySuggestions(suggestionsResult.suggestions || [])
+      const suggestions = suggestionsResult.suggestions || []
+      setReplySuggestions(suggestions)
       setConversationContext(suggestionsResult.conversationContext)
       setIsCachedSuggestions(suggestionsResult.isCached || false)
       setGeneratedAt(suggestionsResult.generatedAt)
+      
+      // Auto-fill first suggestion into input field
+      if (suggestions.length > 0) {
+        setMessageInputValue(suggestions[0].reply)
+        setSelectedSuggestionIndex(0)
+      }
       
       // Log cache hit/miss for debugging
       if (suggestionsResult.isCached) {
@@ -156,10 +216,35 @@ function Messages() {
       setIsLoadingSuggestions(false)
     }
   }
+  
+  // Handle suggestion selection
+  const handleSuggestionSelect = (index: number) => {
+    setSelectedSuggestionIndex(index)
+    if (replySuggestions[index]) {
+      setMessageInputValue(replySuggestions[index].reply)
+    }
+  }
 
   // Handle chat selection
   const handleChatSelect = (chatId: string) => {
-    setSelectedChatId(chatId)
+    navigate({ search: { chatId } })
+  }
+
+  // Handle sending a reply via PromptInput
+  const handlePromptSubmit = async (
+    message: { text?: string },
+  ) => {
+    if (!selectedChatId) return
+    const text = (message.text || messageInputValue || '').trim()
+    if (!text) return
+
+    try {
+      await sendMessage({ chatId: selectedChatId, text })
+      // Clear input after sending
+      setMessageInputValue('')
+    } catch (err) {
+      console.error('Failed to send message:', err)
+    }
   }
 
   // Handle manual refresh
@@ -195,21 +280,67 @@ function Messages() {
       <FullWidthContent>
         {/* Left Sidebar - Chat List */}
         <Sidebar
-          width="w-80"
+          width="w-96"
           header={
             <SidebarHeader
-              title="Pending Replies"
-              subtitle={subtitle}
+              title=""
+              subtitle=""
               actions={
-                <Button 
-                  onClick={handleRefresh} 
-                  variant="ghost" 
-                  size="sm"
-                  disabled={isSyncing}
-                  className="h-8"
-                >
-                  <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
-                </Button>
+                <div className="flex items-center gap-2">
+                  {/* Tab Filter */}
+                  <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
+                    <button
+                      onClick={() => setTabFilter('unreplied')}
+                      className={`px-3 py-1 text-xs font-medium rounded transition-colors ${
+                        tabFilter === 'unreplied'
+                          ? 'bg-white text-gray-900 shadow-sm'
+                          : 'text-gray-600 hover:text-gray-900'
+                      }`}
+                    >
+                      Unreplied
+                    </button>
+                    <button
+                      onClick={() => setTabFilter('unread')}
+                      className={`px-3 py-1 text-xs font-medium rounded transition-colors ${
+                        tabFilter === 'unread'
+                          ? 'bg-white text-gray-900 shadow-sm'
+                          : 'text-gray-600 hover:text-gray-900'
+                      }`}
+                    >
+                      Unread
+                    </button>
+                    <button
+                      onClick={() => setTabFilter('all')}
+                      className={`px-3 py-1 text-xs font-medium rounded transition-colors ${
+                        tabFilter === 'all'
+                          ? 'bg-white text-gray-900 shadow-sm'
+                          : 'text-gray-600 hover:text-gray-900'
+                      }`}
+                    >
+                      All
+                    </button>
+                  </div>
+                  
+                  {/* Refresh Button */}
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button 
+                          onClick={handleRefresh} 
+                          variant="ghost" 
+                          size="sm"
+                          disabled={isSyncing}
+                          className="h-8"
+                        >
+                          <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>{subtitle}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </div>
               }
             />
           }
@@ -260,11 +391,11 @@ function Messages() {
         </Sidebar>
 
         {/* Main Content Area - Chat detail and AI suggestions */}
-        <div className="flex-1 flex bg-gray-50">
+        <div className="flex-1 flex bg-gray-50 overflow-hidden">
           {selectedChatId && selectedChat ? (
             <>
-              {/* Chat Messages */}
-              <div className="flex-1 bg-white border-r border-gray-200">
+              {/* Chat Messages with Input */}
+              <div className="flex-1 bg-white border-r border-gray-200 flex flex-col overflow-hidden">
                 {isLoadingMessages ? (
                   <div className="flex items-center justify-center h-full">
                     <div className="text-center">
@@ -273,22 +404,57 @@ function Messages() {
                     </div>
                   </div>
                 ) : (
-                  <ChatDetail messages={chatMessages} chatName={selectedChat.name} />
+                  <>
+                    <ChatDetail messages={chatMessages} />
+                    
+                    {/* Reply Input Area */}
+                    <div className="flex-shrink-0 border-t border-gray-200 p-4 bg-gray-50">
+                      <PromptInput onSubmit={handlePromptSubmit} className="w-full">
+                        <PromptInputBody>
+                          <PromptInputTextarea
+                            placeholder="Type your reply..."
+                            value={messageInputValue}
+                            onChange={(e) => setMessageInputValue(e.target.value)}
+                          />
+                        </PromptInputBody>
+                        <PromptInputToolbar>
+                          <div />
+                          <PromptInputSubmit />
+                        </PromptInputToolbar>
+                      </PromptInput>
+                    </div>
+                  </>
                 )}
               </div>
 
-              {/* AI Reply Suggestions */}
-              <ScrollArea className="w-[500px] bg-white">
-                <ReplySuggestions
-                  suggestions={replySuggestions}
-                  isLoading={isLoadingSuggestions}
-                  error={error || undefined}
-                  conversationContext={conversationContext}
-                  isCached={isCachedSuggestions}
-                  generatedAt={generatedAt}
-                  onGenerateClick={handleGenerateAISuggestions}
-                />
-              </ScrollArea>
+              {/* Right Sidebar - Contact Panel + AI Suggestions */}
+              <div className="w-[500px] bg-white flex flex-col overflow-hidden">
+                {/* Contact Panel - Top Half */}
+                <div className="flex-1 overflow-hidden">
+                  <ContactPanel 
+                    contact={contactData || null} 
+                    isLoading={contactData === undefined && !!selectedChat?.username}
+                    searchedUsername={selectedChat?.username}
+                  />
+                </div>
+                
+                {/* AI Reply Suggestions - Bottom Half */}
+                <div className="flex-1 overflow-hidden border-t border-gray-200">
+                  <ScrollArea className="h-full">
+                    <ReplySuggestions
+                      suggestions={replySuggestions}
+                      isLoading={isLoadingSuggestions}
+                      error={error || undefined}
+                      conversationContext={conversationContext}
+                      isCached={isCachedSuggestions}
+                      generatedAt={generatedAt}
+                      onGenerateClick={handleGenerateAISuggestions}
+                      selectedIndex={selectedSuggestionIndex}
+                      onSuggestionSelect={handleSuggestionSelect}
+                    />
+                  </ScrollArea>
+                </div>
+              </div>
             </>
           ) : (
             <div className="flex-1 flex items-center justify-center bg-white">

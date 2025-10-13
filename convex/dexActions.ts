@@ -69,8 +69,8 @@ export const testFetchDexContacts = action({
 });
 
 /**
- * Fetch all contacts from Dex API
- * Returns an array of contact objects
+ * Fetch all contacts from Dex API with pagination
+ * Returns an array of all contact objects
  */
 export const fetchDexContacts = action({
   args: {},
@@ -80,29 +80,54 @@ export const fetchDexContacts = action({
         throw new Error("DEX_API_KEY environment variable is not set");
       }
 
-      const response = await fetch(`${DEX_API_URL}/contacts`, {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-          "x-hasura-dex-api-key": DEX_API_KEY,
-        },
-      });
+      const allContacts: DexContact[] = [];
+      const LIMIT = 100; // Fetch 100 contacts per request
+      let offset = 0;
+      let hasMore = true;
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Dex API error: ${response.status} ${response.statusText} - ${errorText}`);
+      console.log("Starting paginated fetch from Dex API...");
+
+      while (hasMore) {
+        const response = await fetch(
+          `${DEX_API_URL}/contacts?limit=${LIMIT}&offset=${offset}`,
+          {
+            method: "GET",
+            headers: {
+              "Content-Type": "application/json",
+              "x-hasura-dex-api-key": DEX_API_KEY,
+            },
+          }
+        );
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`Dex API error: ${response.status} ${response.statusText} - ${errorText}`);
+        }
+
+        const data = await response.json();
+        
+        // Handle different possible response structures
+        const pageContacts: DexContact[] = Array.isArray(data) 
+          ? data 
+          : data.contacts || data.data || [];
+
+        allContacts.push(...pageContacts);
+        
+        console.log(`Fetched page at offset ${offset}: ${pageContacts.length} contacts`);
+
+        // Check if we got fewer contacts than the limit (meaning we're done)
+        if (pageContacts.length < LIMIT) {
+          hasMore = false;
+        } else {
+          offset += LIMIT;
+          // Small delay to respect rate limits (100ms between requests)
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
       }
 
-      const data = await response.json();
+      console.log(`Successfully fetched ${allContacts.length} total contacts from Dex`);
       
-      // Handle different possible response structures
-      const contacts: DexContact[] = Array.isArray(data) 
-        ? data 
-        : data.contacts || data.data || [];
-
-      console.log(`Successfully fetched ${contacts.length} contacts from Dex`);
-      
-      return { contacts };
+      return { contacts: allContacts };
     } catch (error) {
       console.error("Error fetching Dex contacts:", error);
       throw new Error(

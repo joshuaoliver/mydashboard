@@ -3,10 +3,14 @@ import {
   HeadContent,
   Scripts,
   Outlet,
+  useNavigate,
+  useLocation,
 } from '@tanstack/react-router'
-import { QueryClient } from '@tanstack/react-query'
+import { QueryClient, useQuery } from '@tanstack/react-query'
+import { convexQuery } from '@convex-dev/react-query'
 import * as React from 'react'
 import appCss from '~/styles/app.css?url'
+import { api } from '../../convex/_generated/api'
 
 export const Route = createRootRouteWithContext<{
   queryClient: QueryClient
@@ -52,6 +56,28 @@ export const Route = createRootRouteWithContext<{
 })
 
 function RootComponent() {
+  const navigate = useNavigate()
+  const location = useLocation()
+  const { data: user, isLoading } = useQuery(convexQuery(api.auth.currentUser, {}))
+
+  // Public routes that don't require authentication
+  const publicRoutes = ['/sign-in', '/sign-up']
+  const isPublicRoute = publicRoutes.includes(location.pathname)
+
+  React.useEffect(() => {
+    // Don't redirect while loading auth state
+    if (isLoading) return
+
+    // If not authenticated and trying to access protected route, redirect to sign-in
+    if (!user && !isPublicRoute) {
+      navigate({ to: '/sign-in' })
+    }
+    // If authenticated and on auth pages, redirect to dashboard
+    if (user && isPublicRoute) {
+      navigate({ to: '/' })
+    }
+  }, [user, isPublicRoute, navigate, isLoading])
+
   return (
     <RootDocument>
       <Outlet />

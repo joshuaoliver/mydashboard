@@ -1,7 +1,7 @@
 "use node";
 
 import { action } from "./_generated/server";
-import { internal } from "./_generated/api";
+import { api, internal } from "./_generated/api";
 import { v } from "convex/values";
 import { generateText } from "ai";
 import { createOpenAI } from "@ai-sdk/openai";
@@ -205,6 +205,7 @@ export const generateReplySuggestions = action({
   args: {
     chatId: v.string(),
     chatName: v.string(),
+    instagramUsername: v.optional(v.string()),
   },
   returns: v.object({
     suggestions: v.array(v.object({
@@ -237,6 +238,14 @@ export const generateReplySuggestions = action({
       // const identity = await ctx.auth.getUserIdentity();
       // const userMxid = identity?.subject;
       const userMxid = undefined;
+
+      // Try to find matching contact by Instagram username
+      let contact = null;
+      if (args.instagramUsername) {
+        contact = await ctx.runQuery(api.contactMutations.findContactByInstagram, {
+          username: args.instagramUsername,
+        });
+      }
 
       // Fetch the conversation history
       const messages = await fetchChatMessages(args.chatId, userMxid);
@@ -295,6 +304,28 @@ export const generateReplySuggestions = action({
       // Get last message for context
       const lastMessageText = lastMessage.text;
 
+      // Build contact context if available
+      let contactContext = "";
+      if (contact) {
+        const contactName = [contact.firstName, contact.lastName].filter(Boolean).join(" ");
+        contactContext = `\n\nContact Information:`;
+        if (contactName) contactContext += `\n- Name: ${contactName}`;
+        if (contact.connection) contactContext += `\n- Connection type: ${contact.connection}`;
+        if (contact.description) contactContext += `\n- Description: ${contact.description}`;
+        if (contact.notes) contactContext += `\n- Notes: ${contact.notes}`;
+      }
+
+      // Add Ultimate Man Project principles for romantic connections
+      let guidanceNotes = "";
+      if (contact?.connection === "Romantic") {
+        guidanceNotes = `\n\nIMPORTANT: This is a romantic connection. Follow Ultimate Man Project principles for texting:
+- Match the length and energy of their messages
+- Be authentic and genuine
+- Don't over-invest or chase
+- Lead with confidence
+- Keep it light and playful when appropriate`;
+      }
+
       // Generate reply suggestions using OpenAI
       const prompt = `You are a helpful assistant that suggests thoughtful, contextually appropriate replies to messages.
 
@@ -303,6 +334,7 @@ Given the following conversation history with ${args.chatName}, suggest 3-4 diff
 - Are natural and authentic
 - Vary in style (casual/formal, brief/detailed, etc.)
 - Consider the relationship and conversation history
+- Match the length and style of previous messages in the conversation${contactContext}${guidanceNotes}
 
 Conversation history:
 ${conversationHistory}
@@ -391,6 +423,27 @@ Format your response as JSON with this structure:
         `Failed to generate suggestions: ${error instanceof Error ? error.message : "Unknown error"}`
       );
     }
+  },
+});
+
+/**
+ * Send a message to Beeper (stub), then cache locally for instant UI.
+ * Replace the fetch call with real Beeper send endpoint when available.
+ */
+export const sendMessage = action({
+  args: {
+    chatId: v.string(),
+    text: v.string(),
+  },
+  handler: async (ctx, args) => {
+    // TODO: Implement actual Beeper send API call here when endpoint available.
+    // For now, we optimistically save locally so the UI updates immediately.
+    await ctx.runMutation(internal.beeperMutations.saveUserMessage, {
+      chatId: args.chatId,
+      text: args.text,
+    });
+
+    return { success: true };
   },
 });
 
