@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from '@tanstack/react-router'
+import { createFileRoute } from '@tanstack/react-router'
 import { DashboardLayout } from '@/components/layout/dashboard-layout'
 import { PageHeader } from '@/components/layout/page-header'
 import { Card, CardContent } from '@/components/ui/card'
@@ -9,7 +9,7 @@ import { useSuspenseQuery } from '@tanstack/react-query'
 import { convexQuery } from '@convex-dev/react-query'
 import { api } from '../../convex/_generated/api'
 import { useState } from 'react'
-import { Search, User, Mail, Instagram, Calendar, ExternalLink, Plus } from 'lucide-react'
+import { Search, User, Mail, Instagram, Calendar, Plus } from 'lucide-react'
 
 export const Route = createFileRoute('/contacts/')({
   component: ContactsListPage,

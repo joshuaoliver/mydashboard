@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { useSuspenseQuery, useMutation } from '@tanstack/react-query'
+import { useSuspenseQuery } from '@tanstack/react-query'
 import { convexQuery } from '@convex-dev/react-query'
 import { useConvexMutation } from '@convex-dev/react-query'
 import { api } from '../../convex/_generated/api'
@@ -46,9 +46,9 @@ function PromptsPage() {
     description: string
   } | null>(null)
 
-  const { mutate: createPrompt } = useConvexMutation(api.prompts.createPrompt)
-  const { mutate: updatePrompt } = useConvexMutation(api.prompts.updatePrompt)
-  const { mutate: deletePrompt } = useConvexMutation(api.prompts.deletePrompt)
+  const createPrompt = useConvexMutation(api.prompts.createPrompt)
+  const updatePrompt = useConvexMutation(api.prompts.updatePrompt)
+  const deletePrompt = useConvexMutation(api.prompts.deletePrompt)
 
   const [formData, setFormData] = useState<PromptFormData>({
     name: '',
@@ -62,22 +62,17 @@ function PromptsPage() {
       return
     }
 
-    createPrompt(
-      {
-        name: formData.name,
-        title: formData.title,
-        description: formData.description,
-      },
-      {
-        onSuccess: () => {
-          setFormData({ name: '', title: '', description: '' })
-          setIsCreateDialogOpen(false)
-        },
-        onError: (error) => {
-          alert(error.message)
-        },
-      }
-    )
+    createPrompt({
+      name: formData.name,
+      title: formData.title,
+      description: formData.description,
+    }).then(() => {
+      setFormData({ name: '', title: '', description: '' })
+      setIsCreateDialogOpen(false)
+    }).catch((error: unknown) => {
+      const message = error instanceof Error ? error.message : 'Failed to create prompt'
+      alert(message)
+    })
   }
 
   const handleEditPrompt = () => {
@@ -88,37 +83,28 @@ function PromptsPage() {
       return
     }
 
-    updatePrompt(
-      {
-        id: editingPrompt.id,
-        name: formData.name,
-        title: formData.title,
-        description: formData.description,
-      },
-      {
-        onSuccess: () => {
-          setFormData({ name: '', title: '', description: '' })
-          setEditingPrompt(null)
-          setIsEditDialogOpen(false)
-        },
-        onError: (error) => {
-          alert(error.message)
-        },
-      }
-    )
+    updatePrompt({
+      id: editingPrompt.id,
+      name: formData.name,
+      title: formData.title,
+      description: formData.description,
+    }).then(() => {
+      setFormData({ name: '', title: '', description: '' })
+      setEditingPrompt(null)
+      setIsEditDialogOpen(false)
+    }).catch((error: unknown) => {
+      const message = error instanceof Error ? error.message : 'Failed to update prompt'
+      alert(message)
+    })
   }
 
   const handleDeletePrompt = (id: Id<'prompts'>) => {
-    if (confirm('Are you sure you want to delete this prompt?')) {
-      deletePrompt(
-        { id },
-        {
-          onError: (error) => {
-            alert(error.message)
-          },
-        }
-      )
-    }
+    if (!confirm('Are you sure you want to delete this prompt?')) return
+
+    deletePrompt({ id }).catch((error: unknown) => {
+      const message = error instanceof Error ? error.message : 'Failed to delete prompt'
+      alert(message)
+    })
   }
 
   const openEditDialog = (prompt: {

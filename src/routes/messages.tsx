@@ -15,9 +15,9 @@ import { ChatListItem } from '@/components/messages/ChatListItem'
 import { ChatDetail } from '@/components/messages/ChatDetail'
 import { ReplySuggestions } from '@/components/messages/ReplySuggestions'
 import { ContactPanel } from '@/components/messages/ContactPanel'
-import { useAction, useQuery } from 'convex/react'
+import { useAction, useQuery, useMutation } from 'convex/react'
 import { api } from '../../convex/_generated/api'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { RefreshCw, AlertCircle, MessageCircle } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 
@@ -81,6 +81,10 @@ function Messages() {
   const [generatedAt, setGeneratedAt] = useState<number | undefined>(undefined)
   const [tabFilter, setTabFilter] = useState<TabFilter>('unreplied')
   const sendMessage = useAction(api.beeperActions.sendMessage)
+  const clearCachedSuggestions = useMutation(api.aiSuggestions.clearCachedSuggestions)
+  
+  // Track previous contact data to detect changes
+  const prevContactDataRef = useRef<{ connection?: string; notes?: string } | null>(null)
 
   // Query cached chats from database (instant, reactive)
   const chatsData = useQuery(api.beeperQueries.listCachedChats)
@@ -174,6 +178,47 @@ function Messages() {
   }, [selectedChatId, cachedMessagesData])
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
+
+  // Watch for changes in contact connection type or notes and regenerate suggestions
+  useEffect(() => {
+    if (!contactData || !selectedChatId) {
+      prevContactDataRef.current = null
+      return
+    }
+
+    const currentConnection = contactData.connection
+    const currentNotes = contactData.notes
+
+    // Check if this is the first time we're seeing this contact data
+    if (prevContactDataRef.current === null) {
+      prevContactDataRef.current = { connection: currentConnection, notes: currentNotes }
+      return
+    }
+
+    // Check if connection or notes have changed
+    const connectionChanged = prevContactDataRef.current.connection !== currentConnection
+    const notesChanged = prevContactDataRef.current.notes !== currentNotes
+
+    if (connectionChanged || notesChanged) {
+      console.log('🔄 Contact data changed, regenerating AI suggestions...')
+      if (connectionChanged) {
+        console.log(`  Connection: ${prevContactDataRef.current.connection} → ${currentConnection}`)
+      }
+      if (notesChanged) {
+        console.log(`  Notes changed`)
+      }
+      
+      // Update the ref
+      prevContactDataRef.current = { connection: currentConnection, notes: currentNotes }
+      
+      // Clear cached suggestions to force fresh generation
+      const regenerate = async () => {
+        await clearCachedSuggestions({ chatId: selectedChatId })
+        await handleGenerateAISuggestions()
+      }
+      regenerate()
+    }
+  }, [contactData?.connection, contactData?.notes, selectedChatId])
 
   // Auto/Manual AI suggestion generation
   // Automatically checks cache first, only generates if conversation changed

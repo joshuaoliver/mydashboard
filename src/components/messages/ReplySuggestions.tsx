@@ -82,7 +82,7 @@ export function ReplySuggestions({
           <Sparkles className="w-10 h-10 mx-auto mb-3 text-purple-400" />
           <p className="text-gray-600 text-sm mb-4">Ready to generate smart replies?</p>
           {onGenerateClick && (
-            <Button onClick={onGenerateClick} size="sm" className="gap-2">
+            <Button onClick={() => onGenerateClick()} size="sm" className="gap-2">
               <Sparkles className="w-4 h-4" />
               Generate Suggestions
             </Button>

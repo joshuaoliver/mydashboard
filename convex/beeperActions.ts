@@ -31,16 +31,7 @@ interface BeeperChat {
   };
 }
 
-interface BeeperMessage {
-  id: string;
-  messageID: string;
-  timestamp: string;
-  senderID: string;
-  senderName: string;
-  text: string;
-  isSender: boolean;
-  chatID: string;
-}
+// Note: Previous BeeperMessage interface removed because it was unused
 
 /**
  * List chats where the user hasn't replied yet
@@ -359,9 +350,8 @@ Format your response as JSON with this structure:
       });
 
       const result = await generateText({
-        model: openai("gpt-4o-mini"), // Using GPT-4o-mini for cost-effectiveness
+        model: openai("gpt-5"), // Using GPT-5 for best results
         prompt: prompt,
-        temperature: 0.8, // Slightly higher for creative variety
       });
 
       // Parse the AI response
@@ -402,7 +392,7 @@ Format your response as JSON with this structure:
         lastMessageTimestamp: lastMessage.timestamp,
         suggestions,
         conversationContext,
-        modelUsed: "gpt-4o-mini",
+        modelUsed: "gpt-5",
       });
 
       console.log(`[generateReplySuggestions] Saved ${suggestions.length} suggestions to cache for chat ${args.chatId}`);

@@ -41,7 +41,7 @@ export function ChatDetail({ messages }: ChatDetailProps) {
               {messages.map((message) => (
                 <div key={message.id} className={cn('flex', message.isFromUser ? 'justify-end' : 'justify-start')}>
                   <AIMessage from={message.isFromUser ? 'user' : 'assistant'}>
-                    <MessageContent variant="elevated">
+                    <MessageContent variant="contained">
                       {!message.isFromUser && (
                         <div className="text-xs font-semibold text-gray-700 mb-1">
                           {message.senderName}
