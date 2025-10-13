@@ -478,9 +478,6 @@ function Messages() {
                         suggestions={replySuggestions}
                         isLoading={isLoadingSuggestions}
                         error={error || undefined}
-                        conversationContext={conversationContext}
-                        isCached={isCachedSuggestions}
-                        generatedAt={generatedAt}
                         onGenerateClick={handleGenerateAISuggestions}
                         selectedIndex={selectedSuggestionIndex}
                         onSuggestionSelect={handleSuggestionSelect}
