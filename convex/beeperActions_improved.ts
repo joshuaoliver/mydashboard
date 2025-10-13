@@ -10,9 +10,12 @@ import { createOpenAI } from "@ai-sdk/openai";
 const BEEPER_API_URL = process.env.BEEPER_API_URL || "https://beeper.bywave.com.au";
 const BEEPER_TOKEN = process.env.BEEPER_TOKEN;
 
-// Validate required environment variables
-if (!BEEPER_TOKEN) {
-  throw new Error("BEEPER_TOKEN environment variable is required");
+// Helper to check for required env vars at runtime
+function requireBeeperToken(): string {
+  if (!BEEPER_TOKEN) {
+    throw new Error("BEEPER_TOKEN environment variable is required");
+  }
+  return BEEPER_TOKEN;
 }
 
 // ============================================================================
@@ -93,7 +96,7 @@ async function fetchChatMessages(chatId: string) {
   const response = await fetch(url, {
     method: "GET",
     headers: {
-      "Authorization": `Bearer ${BEEPER_TOKEN}`,
+      "Authorization": `Bearer ${requireBeeperToken()}`,
     },
   });
 
@@ -149,7 +152,7 @@ export const listUnrepliedChats = action({
       const response = await fetch(`${BEEPER_API_URL}/v0/search-chats?limit=50`, {
         method: "GET",
         headers: {
-          "Authorization": `Bearer ${BEEPER_TOKEN}`,
+          "Authorization": `Bearer ${requireBeeperToken()}`,
         },
       });
 

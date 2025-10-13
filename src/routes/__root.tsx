@@ -27,6 +27,10 @@ export const Route = createRootRouteWithContext<{
       {
         title: 'Dashboard',
       },
+      {
+        name: 'theme-color',
+        content: '#6366f1',
+      },
     ],
     links: [
       { rel: 'stylesheet', href: appCss },
@@ -34,6 +38,11 @@ export const Route = createRootRouteWithContext<{
         rel: 'apple-touch-icon',
         sizes: '180x180',
         href: '/apple-touch-icon.png',
+      },
+      {
+        rel: 'icon',
+        type: 'image/svg+xml',
+        href: '/favicon.svg',
       },
       {
         rel: 'icon',
@@ -47,7 +56,7 @@ export const Route = createRootRouteWithContext<{
         sizes: '16x16',
         href: '/favicon-16x16.png',
       },
-      { rel: 'manifest', href: '/site.webmanifest', color: '#fffff' },
+      { rel: 'manifest', href: '/site.webmanifest' },
       { rel: 'icon', href: '/favicon.ico' },
     ],
   }),
@@ -58,25 +67,53 @@ export const Route = createRootRouteWithContext<{
 function RootComponent() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { data: user, isLoading } = useQuery(convexQuery(api.auth.currentUser, {}))
+  const [isMounted, setIsMounted] = React.useState(false)
+  
+  // Only check auth on client-side (not during SSR)
+  const { data: user, isLoading } = useQuery({
+    ...convexQuery(api.auth.currentUser, {}),
+    enabled: isMounted, // Only run on client
+  })
 
   // Public routes that don't require authentication
   const publicRoutes = ['/sign-in', '/sign-up']
   const isPublicRoute = publicRoutes.includes(location.pathname)
 
+  // Set mounted flag after hydration
   React.useEffect(() => {
-    // Don't redirect while loading auth state
-    if (isLoading) return
+    setIsMounted(true)
+  }, [])
+
+  // Handle redirects based on auth state
+  React.useEffect(() => {
+    if (!isMounted || isLoading) return
 
     // If not authenticated and trying to access protected route, redirect to sign-in
     if (!user && !isPublicRoute) {
+      console.log('Not authenticated, redirecting to sign-in')
       navigate({ to: '/sign-in' })
     }
+    
     // If authenticated and on auth pages, redirect to dashboard
     if (user && isPublicRoute) {
+      console.log('Authenticated on auth page, redirecting to dashboard')
       navigate({ to: '/' })
     }
-  }, [user, isPublicRoute, navigate, isLoading])
+  }, [user, isPublicRoute, navigate, isMounted, isLoading])
+
+  // Show loading spinner during SSR and initial client load
+  if (!isMounted || isLoading) {
+    return (
+      <RootDocument>
+        <div className="flex h-screen items-center justify-center">
+          <div className="text-center">
+            <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-current border-r-transparent align-[-0.125em] motion-reduce:animate-[spin_1.5s_linear_infinite]" />
+            <p className="mt-4 text-gray-600">Loading...</p>
+          </div>
+        </div>
+      </RootDocument>
+    )
+  }
 
   return (
     <RootDocument>

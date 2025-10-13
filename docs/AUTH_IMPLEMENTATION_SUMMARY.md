@@ -25,6 +25,20 @@ export const currentUser = query({
 });
 ```
 
+**`convex/http.ts`** - HTTP endpoints for auth (REQUIRED!)
+```typescript
+import { httpRouter } from "convex/server";
+import { auth } from "./auth";
+
+const http = httpRouter();
+
+auth.addHttpRoutes(http);
+
+export default http;
+```
+
+This file is **critical** - it exposes the HTTP endpoints that Convex Auth needs for authentication, token exchange, and session management.
+
 **`convex/schema.ts`** - Auth tables added
 - Added `...authTables` spread to schema
 - Includes: `users`, `sessions`, `accounts`, `refreshTokens`, `verificationCodes`, `verifiers`
@@ -137,6 +151,7 @@ npx tsr generate
 
 ### Backend
 - `convex/auth.ts` - Replaced placeholder with real auth
+- `convex/http.ts` - **NEW** - HTTP endpoints for auth (required!)
 - `convex/schema.ts` - Added auth tables
 
 ### Frontend

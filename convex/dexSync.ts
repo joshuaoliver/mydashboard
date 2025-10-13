@@ -14,6 +14,7 @@ export const syncContactsFromDex = internalAction({
     totalProcessed: number;
     added: number;
     updated: number;
+    skipped: number;
     errors: number;
     errorMessages: string[];
     timestamp: number;

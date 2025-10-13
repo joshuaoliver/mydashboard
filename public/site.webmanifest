@@ -1,6 +1,7 @@
 {
-  "name": "",
-  "short_name": "",
+  "name": "My Dashboard",
+  "short_name": "Dashboard",
+  "description": "Personal dashboard and messaging tool",
   "icons": [
     {
       "src": "/android-chrome-192x192.png",
@@ -13,7 +14,7 @@
       "type": "image/png"
     }
   ],
-  "theme_color": "#ffffff",
-  "background_color": "#ffffff",
+  "theme_color": "#6366f1",
+  "background_color": "#6366f1",
   "display": "standalone"
 }

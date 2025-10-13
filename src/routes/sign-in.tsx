@@ -1,10 +1,13 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useAuthActions } from '@convex-dev/auth/react'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { convexQuery } from '@convex-dev/react-query'
 import { Button } from '~/components/ui/button'
 import { Card } from '~/components/ui/card'
 import { Input } from '~/components/ui/input'
 import { Label } from '~/components/ui/label'
+import { api } from '../../convex/_generated/api'
 
 export const Route = createFileRoute('/sign-in')({
   component: SignInPage,
@@ -15,6 +18,49 @@ function SignInPage() {
   const navigate = useNavigate()
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
+  const [signedIn, setSignedIn] = useState(false)
+  
+  // Check auth state
+  const { data: user } = useQuery(convexQuery(api.auth.currentUser, {}))
+
+  // Debug: Log localStorage auth tokens on mount
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const authKeys = Object.keys(localStorage).filter(k => 
+        k.includes('convex') || k.includes('auth') || k.includes('token')
+      )
+      console.log('=== Auth Debug Info ===')
+      console.log('LocalStorage auth-related keys:', authKeys)
+      authKeys.forEach(key => {
+        const value = localStorage.getItem(key)
+        console.log(`${key}:`, value ? `${value.substring(0, 50)}...` : 'null')
+      })
+      console.log('======================')
+    }
+  }, [])
+
+  // Redirect to dashboard when authenticated
+  useEffect(() => {
+    if (user && signedIn) {
+      console.log('User authenticated, redirecting to dashboard')
+      navigate({ to: '/' })
+    }
+  }, [user, signedIn, navigate])
+
+  const clearAuthStorage = () => {
+    if (typeof window !== 'undefined') {
+      console.log('Clearing all auth-related localStorage items...')
+      const authKeys = Object.keys(localStorage).filter(k => 
+        k.includes('convex') || k.includes('auth') || k.includes('token')
+      )
+      authKeys.forEach(key => {
+        console.log('Removing:', key)
+        localStorage.removeItem(key)
+      })
+      console.log('Auth storage cleared! Please refresh the page.')
+      setError('Auth storage cleared! Please refresh the page and try again.')
+    }
+  }
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -24,13 +70,13 @@ function SignInPage() {
     const formData = new FormData(event.currentTarget)
 
     try {
+      console.log('Attempting sign in...')
       await signIn('password', formData)
-      // On success, the root component will automatically redirect
-      // Just wait a moment for the auth state to update
-      setTimeout(() => {
-        navigate({ to: '/' })
-      }, 100)
+      console.log('Sign in successful, waiting for auth state to update...')
+      setSignedIn(true)
+      // Keep loading state - will redirect when user data loads
     } catch (err) {
+      console.error('Sign in error:', err)
       setError(err instanceof Error ? err.message : 'Sign in failed')
       setIsLoading(false)
     }
@@ -84,8 +130,27 @@ function SignInPage() {
         </form>
 
         <div className="border-t pt-4 text-center text-sm text-gray-500">
-          <p>First time? Use the form above to create your account.</p>
-          <p className="mt-1 text-xs">Change "Sign in" to "Sign up" below if needed.</p>
+          <p>
+            Need to create an account?{' '}
+            <a href="/sign-up" className="text-blue-600 hover:underline font-medium">
+              Sign up here
+            </a>
+          </p>
+        </div>
+
+        {/* Debug button to clear old tokens */}
+        <div className="border-t pt-4">
+          <Button 
+            type="button"
+            variant="outline" 
+            onClick={clearAuthStorage}
+            className="w-full text-xs"
+          >
+            🔧 Clear Auth Storage (Debug)
+          </Button>
+          <p className="mt-2 text-xs text-gray-500 text-center">
+            Click this if you're seeing authentication errors
+          </p>
         </div>
       </Card>
     </div>

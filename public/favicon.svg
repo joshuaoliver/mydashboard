@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Background with gradient -->
+  <defs>
+    <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#6366f1;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#8b5cf6;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Main background -->
+  <rect width="512" height="512" rx="115" fill="url(#grad1)"/>
+  
+  <!-- Dashboard grid icon (simplified 2x2 in top left) -->
+  <g fill="white" opacity="0.9">
+    <rect x="100" y="100" width="70" height="70" rx="14"/>
+    <rect x="190" y="100" width="70" height="70" rx="14"/>
+    <rect x="100" y="190" width="70" height="70" rx="14"/>
+    <rect x="190" y="190" width="70" height="70" rx="14"/>
+  </g>
+  
+  <!-- Message bubble with dots -->
+  <g>
+    <!-- Speech bubble -->
+    <path d="M 280,280 Q 280,250 310,250 L 430,250 Q 460,250 460,280 L 460,360 Q 460,390 430,390 L 350,390 L 310,430 L 310,390 Q 280,390 280,360 Z" 
+          fill="white" 
+          opacity="0.9"/>
+    
+    <!-- Three dots -->
+    <circle cx="335" cy="320" r="12" fill="#6366f1"/>
+    <circle cx="370" cy="320" r="12" fill="#6366f1"/>
+    <circle cx="405" cy="320" r="12" fill="#6366f1"/>
+  </g>
+</svg>
+

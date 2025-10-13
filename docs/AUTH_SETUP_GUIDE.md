@@ -144,6 +144,7 @@ Now that authentication is set up, you can:
 
 **Backend:**
 - `convex/auth.ts` - Auth configuration and currentUser query
+- `convex/http.ts` - HTTP endpoints for auth (CRITICAL - required for auth to work!)
 - `convex/schema.ts` - Database schema with auth tables
 
 **Frontend:**

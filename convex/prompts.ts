@@ -1,8 +1,10 @@
 import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
+import { getAuthUserId } from "@convex-dev/auth/server";
 
 /**
  * List all prompts ordered by creation time (most recent first)
+ * Requires authentication
  */
 export const listPrompts = query({
   args: {},
@@ -18,6 +20,12 @@ export const listPrompts = query({
     })
   ),
   handler: async (ctx) => {
+    // Require authentication
+    const userId = await getAuthUserId(ctx);
+    if (userId === null) {
+      throw new Error("Not authenticated");
+    }
+    
     const prompts = await ctx.db
       .query("prompts")
       .order("desc")
@@ -28,6 +36,7 @@ export const listPrompts = query({
 
 /**
  * Get a single prompt by ID
+ * Requires authentication
  */
 export const getPrompt = query({
   args: { id: v.id("prompts") },
@@ -44,12 +53,19 @@ export const getPrompt = query({
     v.null()
   ),
   handler: async (ctx, args) => {
+    // Require authentication
+    const userId = await getAuthUserId(ctx);
+    if (userId === null) {
+      throw new Error("Not authenticated");
+    }
+    
     return await ctx.db.get(args.id);
   },
 });
 
 /**
  * Create a new prompt
+ * Requires authentication
  */
 export const createPrompt = mutation({
   args: {
@@ -59,6 +75,12 @@ export const createPrompt = mutation({
   },
   returns: v.id("prompts"),
   handler: async (ctx, args) => {
+    // Require authentication
+    const userId = await getAuthUserId(ctx);
+    if (userId === null) {
+      throw new Error("Not authenticated");
+    }
+    
     const now = Date.now();
     
     // Check if a prompt with this name already exists
@@ -83,6 +105,7 @@ export const createPrompt = mutation({
 
 /**
  * Update an existing prompt
+ * Requires authentication
  */
 export const updatePrompt = mutation({
   args: {
@@ -93,6 +116,12 @@ export const updatePrompt = mutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
+    // Require authentication
+    const userId = await getAuthUserId(ctx);
+    if (userId === null) {
+      throw new Error("Not authenticated");
+    }
+    
     const existing = await ctx.db.get(args.id);
     if (!existing) {
       throw new Error("Prompt not found");
@@ -123,11 +152,18 @@ export const updatePrompt = mutation({
 
 /**
  * Delete a prompt
+ * Requires authentication
  */
 export const deletePrompt = mutation({
   args: { id: v.id("prompts") },
   returns: v.null(),
   handler: async (ctx, args) => {
+    // Require authentication
+    const userId = await getAuthUserId(ctx);
+    if (userId === null) {
+      throw new Error("Not authenticated");
+    }
+    
     const existing = await ctx.db.get(args.id);
     if (!existing) {
       throw new Error("Prompt not found");

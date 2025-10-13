@@ -30,6 +30,7 @@ import type * as dexSync from "../dexSync.js";
 import type * as dexUpsert from "../dexUpsert.js";
 import type * as dexWriteback from "../dexWriteback.js";
 import type * as diagnostics from "../diagnostics.js";
+import type * as http from "../http.js";
 import type * as myFunctions from "../myFunctions.js";
 import type * as prompts from "../prompts.js";
 
@@ -59,6 +60,7 @@ declare const fullApi: ApiFromModules<{
   dexUpsert: typeof dexUpsert;
   dexWriteback: typeof dexWriteback;
   diagnostics: typeof diagnostics;
+  http: typeof http;
   myFunctions: typeof myFunctions;
   prompts: typeof prompts;
 }>;

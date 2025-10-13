@@ -1,10 +1,13 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useAuthActions } from '@convex-dev/auth/react'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { convexQuery } from '@convex-dev/react-query'
 import { Button } from '~/components/ui/button'
 import { Card } from '~/components/ui/card'
 import { Input } from '~/components/ui/input'
 import { Label } from '~/components/ui/label'
+import { api } from '../../convex/_generated/api'
 
 export const Route = createFileRoute('/sign-up')({
   component: SignUpPage,
@@ -15,6 +18,18 @@ function SignUpPage() {
   const navigate = useNavigate()
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
+  const [signedUp, setSignedUp] = useState(false)
+  
+  // Check auth state
+  const { data: user } = useQuery(convexQuery(api.auth.currentUser, {}))
+
+  // Redirect to dashboard when authenticated
+  useEffect(() => {
+    if (user && signedUp) {
+      console.log('User authenticated, redirecting to dashboard')
+      navigate({ to: '/' })
+    }
+  }, [user, signedUp, navigate])
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -22,14 +37,22 @@ function SignUpPage() {
     setIsLoading(true)
 
     const formData = new FormData(event.currentTarget)
+    const email = formData.get('email') as string
+
+    // Hardcoded restriction: Only allow josh@bywave.com.au to sign up
+    if (email !== 'josh@bywave.com.au') {
+      setError('This account is for personal use only. Sign-ups are restricted.')
+      setIsLoading(false)
+      return
+    }
 
     try {
       await signIn('password', formData)
-      // On success, navigate to dashboard
-      navigate({ to: '/' })
+      console.log('Sign up successful, waiting for auth state to update...')
+      setSignedUp(true)
+      // Keep loading state - will redirect when user data loads
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Sign up failed')
-    } finally {
       setIsLoading(false)
     }
   }
@@ -85,15 +108,15 @@ function SignUpPage() {
         <div className="border-t pt-4 text-center text-sm text-gray-500">
           <p>
             Already have an account?{' '}
-            <a href="/sign-in" className="text-blue-600 hover:underline">
-              Sign in
+            <a href="/sign-in" className="text-blue-600 hover:underline font-medium">
+              Sign in here
             </a>
           </p>
         </div>
 
         <div className="rounded-md bg-yellow-50 p-3 text-xs text-yellow-800">
-          <strong>Note:</strong> This is for your personal use only. After creating your account,
-          you can delete this sign-up page if desired.
+          <strong>Restricted Access:</strong> This account is for personal use only. 
+          Only <span className="font-mono font-semibold">josh@bywave.com.au</span> can create an account.
         </div>
       </Card>
     </div>

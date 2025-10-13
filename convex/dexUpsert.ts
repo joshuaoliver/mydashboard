@@ -15,6 +15,7 @@ export const upsertContacts = internalMutation({
 
     let addedCount = 0;
     let updatedCount = 0;
+    let skippedCount = 0;
     let errorCount = 0;
     const errors: string[] = [];
 
@@ -45,13 +46,28 @@ export const upsertContacts = internalMutation({
         };
 
         if (existing) {
-          // Only update if our local version wasn't recently modified
+          // Check if contact was recently modified locally - protect local changes
           const fiveMinutesAgo = now - 5 * 60 * 1000;
-          if (existing.lastModifiedAt < fiveMinutesAgo) {
-            await ctx.db.patch(existing._id, contactData);
-            updatedCount++;
+          if (existing.lastModifiedAt >= fiveMinutesAgo) {
+            skippedCount++;
+            continue; // Skip - local changes are too recent
           }
+
+          // Check if Dex data actually changed by comparing updated_at timestamps
+          const dexUpdatedAt = dexContact.updated_at ? new Date(dexContact.updated_at).getTime() : 0;
+          const existingLastSynced = existing.lastSyncedAt || 0;
+          
+          // Skip update if Dex hasn't changed since our last sync
+          if (dexUpdatedAt <= existingLastSynced) {
+            skippedCount++;
+            continue; // No changes in Dex since last sync
+          }
+
+          // Contact changed in Dex - update it
+          await ctx.db.patch(existing._id, contactData);
+          updatedCount++;
         } else {
+          // New contact - insert it
           await ctx.db.insert("contacts", contactData);
           addedCount++;
         }
@@ -62,14 +78,19 @@ export const upsertContacts = internalMutation({
       }
     }
 
-    return {
+    const summary = {
       totalProcessed: dexContacts.length,
       added: addedCount,
       updated: updatedCount,
+      skipped: skippedCount,
       errors: errorCount,
       errorMessages: errors,
       timestamp: now,
     };
+
+    console.log(`Dex sync complete: ${addedCount} added, ${updatedCount} updated, ${skippedCount} skipped (unchanged)`);
+
+    return summary;
   },
 });
 
