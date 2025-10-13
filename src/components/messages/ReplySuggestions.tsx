@@ -7,7 +7,7 @@ import { Response } from '@/components/ai-elements/response'
 
 interface ReplySuggestion {
   reply: string
-  style: string
+  style: string  // Conversation pathway label (e.g., "Ask deeper question", "Shift to plans")
   reasoning: string
 }
 

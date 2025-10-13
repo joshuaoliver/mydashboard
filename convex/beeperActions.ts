@@ -324,12 +324,13 @@ ${args.customContext}`;
       // Generate reply suggestions using OpenAI
       const prompt = `You are a helpful assistant that suggests thoughtful, contextually appropriate replies to messages.
 
-Given the following conversation history with ${args.chatName}, suggest 3-4 different reply options that:
-- Match the conversation's tone and context
-- Are natural and authentic
-- Vary in style (casual/formal, brief/detailed, etc.)
-- Consider the relationship and conversation history
-- Match the length and style of previous messages in the conversation${contactContext}${guidanceNotes}${customContextSection}
+Given the following conversation history with ${args.chatName}, suggest 3-4 different reply options that represent DIFFERENT CONVERSATION PATHWAYS - not just style variations, but different directions the conversation could take:
+
+- Each suggestion should take the conversation in a meaningfully different direction
+- Consider different topics, tones, levels of engagement, or types of responses
+- Think about: asking questions vs. making statements, being playful vs. serious, shifting topics vs. staying on topic, ending vs. continuing the conversation
+- Match the conversation's context and relationship
+- Be natural and authentic${contactContext}${guidanceNotes}${customContextSection}
 
 Conversation history:
 ${conversationHistory}
@@ -338,15 +339,16 @@ The most recent message from ${args.chatName} was: "${lastMessageText}"
 
 For each suggestion, provide:
 1. The suggested reply text
-2. A brief explanation of the tone/style (e.g., "Casual and friendly", "Professional and brief")
+2. A brief label describing what pathway this represents (e.g., "Ask deeper question", "Shift to plans", "Playful tease", "Share personal story", "End conversation warmly")
+3. Brief reasoning for why this pathway makes sense
 
 Format your response as JSON with this structure:
 {
   "suggestions": [
     {
       "reply": "The actual reply text here",
-      "style": "Description of tone/style",
-      "reasoning": "Brief explanation of why this reply works"
+      "style": "Label for this conversation pathway",
+      "reasoning": "Brief explanation of why this pathway works"
     }
   ]
 }`;

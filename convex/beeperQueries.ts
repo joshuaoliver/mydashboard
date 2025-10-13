@@ -5,6 +5,7 @@ import { v } from "convex/values";
  * Query cached chats from database
  * Fast, reactive, real-time updates
  * Replaces direct API calls from frontend
+ * Includes contact images from DEX integration
  */
 export const listCachedChats = query({
   handler: async (ctx) => {
@@ -20,22 +21,42 @@ export const listCachedChats = query({
       )
       .take(50);
 
+    // Fetch contact images for chats with Instagram usernames
+    const chatsWithContacts = await Promise.all(
+      chats.map(async (chat) => {
+        let contactImageUrl: string | undefined = undefined;
+        
+        // If chat has Instagram username, look up contact
+        if (chat.username) {
+          const contact = await ctx.db
+            .query("contacts")
+            .withIndex("by_instagram", (q) => q.eq("instagram", chat.username))
+            .first();
+          
+          contactImageUrl = contact?.imageUrl;
+        }
+        
+        return {
+          id: chat.chatId,
+          roomId: chat.localChatID,
+          name: chat.title,
+          network: chat.network,
+          accountID: chat.accountID,
+          username: chat.username, // Instagram handle, etc.
+          phoneNumber: chat.phoneNumber, // WhatsApp number, etc.
+          lastMessage: chat.lastMessage || "Recent activity",
+          lastMessageTime: chat.lastActivity,
+          unreadCount: chat.unreadCount,
+          lastSyncedAt: chat.lastSyncedAt,
+          needsReply: chat.needsReply,
+          lastMessageFrom: chat.lastMessageFrom,
+          contactImageUrl, // From DEX integration
+        };
+      })
+    );
+
     return {
-      chats: chats.map((chat) => ({
-        id: chat.chatId,
-        roomId: chat.localChatID,
-        name: chat.title,
-        network: chat.network,
-        accountID: chat.accountID,
-        username: chat.username, // Instagram handle, etc.
-        phoneNumber: chat.phoneNumber, // WhatsApp number, etc.
-        lastMessage: chat.lastMessage || "Recent activity",
-        lastMessageTime: chat.lastActivity,
-        unreadCount: chat.unreadCount,
-        lastSyncedAt: chat.lastSyncedAt,
-        needsReply: chat.needsReply,
-        lastMessageFrom: chat.lastMessageFrom,
-      })),
+      chats: chatsWithContacts,
       lastSync: chats[0]?.lastSyncedAt || null,
       count: chats.length,
     };

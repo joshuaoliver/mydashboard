@@ -44,6 +44,7 @@ interface Chat {
   lastSyncedAt?: number
   needsReply?: boolean
   lastMessageFrom?: string
+  contactImageUrl?: string // From DEX integration
 }
 
 interface Message {
@@ -57,7 +58,7 @@ interface Message {
 
 interface ReplySuggestion {
   reply: string
-  style: string
+  style: string  // Conversation pathway label (e.g., "Ask deeper question", "Shift to plans")
   reasoning: string
 }
 
@@ -376,7 +377,6 @@ function Messages() {
                   id={chat.id}
                   name={chat.name}
                   network={chat.network}
-                  accountID={chat.accountID}
                   username={chat.username}
                   phoneNumber={chat.phoneNumber}
                   lastMessage={chat.lastMessage}
@@ -384,6 +384,7 @@ function Messages() {
                   unreadCount={chat.unreadCount}
                   isSelected={selectedChatId === chat.id}
                   onClick={() => handleChatSelect(chat.id)}
+                  contactImageUrl={chat.contactImageUrl}
                 />
               ))}
             </div>

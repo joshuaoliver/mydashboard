@@ -154,14 +154,15 @@ function PromptsPage() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold">Prompts</h1>
-            <p className="text-gray-500 mt-1">
-              Manage your AI prompts and templates
-            </p>
-          </div>
+      <div className="p-6">
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold">Prompts</h1>
+              <p className="text-gray-500 mt-1">
+                Manage your AI prompts and templates
+              </p>
+            </div>
           <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
             <DialogTrigger asChild>
               <Button>
@@ -342,6 +343,7 @@ function PromptsPage() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
     </DashboardLayout>
   )

@@ -19,7 +19,8 @@ import {
   MessageSquare,
   LayoutDashboard,
   Users,
-  LogOut
+  LogOut,
+  MessageCircle
 } from "lucide-react"
 import { Link, useNavigate } from '@tanstack/react-router'
 import { useAuthActions } from '@convex-dev/auth/react'
@@ -107,6 +108,25 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                 <NavigationMenuItem>
                   <NavigationMenuLink asChild>
                     <Link 
+                      to="/settings/prompts" 
+                      className={cn(
+                        "inline-flex items-center gap-2 px-4 py-2 rounded-md",
+                        "text-sm font-medium transition-all",
+                        "text-slate-300 hover:text-white hover:bg-slate-800/80",
+                        "[&.active]:bg-slate-800 [&.active]:text-white"
+                      )}
+                      activeProps={{
+                        className: "active"
+                      }}
+                    >
+                      <MessageCircle className="h-4 w-4" />
+                      Prompts
+                    </Link>
+                  </NavigationMenuLink>
+                </NavigationMenuItem>
+                <NavigationMenuItem>
+                  <NavigationMenuLink asChild>
+                    <Link 
                       to="/settings" 
                       className={cn(
                         "inline-flex items-center gap-2 px-4 py-2 rounded-md",
@@ -161,7 +181,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
       </header>
 
       {/* Main content */}
-      <main className="flex-1 overflow-hidden">
+      <main className="flex-1 overflow-auto">
         {children}
       </main>
     </div>

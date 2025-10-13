@@ -3,12 +3,13 @@ import { DashboardLayout } from '@/components/layout/dashboard-layout'
 import { PageHeader } from '@/components/layout/page-header'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { useSuspenseQuery } from '@tanstack/react-query'
 import { convexQuery } from '@convex-dev/react-query'
 import { api } from '../../convex/_generated/api'
 import { useState } from 'react'
-import { Search, User, Mail, Instagram, Calendar, ExternalLink } from 'lucide-react'
+import { Search, User, Mail, Instagram, Calendar, ExternalLink, Plus } from 'lucide-react'
 
 export const Route = createFileRoute('/contacts/')({
   component: ContactsListPage,
@@ -43,6 +44,12 @@ function ContactsListPage() {
           <PageHeader
             title="Contacts"
             description={`${total} contact${total !== 1 ? 's' : ''} synced from Dex`}
+            actions={
+              <Button className="gap-2">
+                <Plus className="w-4 h-4" />
+                Add Custom Contact
+              </Button>
+            }
           />
 
           {/* Search Bar */}

@@ -4,7 +4,6 @@ interface ChatListItemProps {
   id: string
   name: string
   network?: string
-  accountID?: string
   username?: string      // Instagram handle, etc.
   phoneNumber?: string   // WhatsApp number, etc.
   lastMessage: string
@@ -12,6 +11,7 @@ interface ChatListItemProps {
   unreadCount?: number
   isSelected: boolean
   onClick: () => void
+  contactImageUrl?: string // From DEX integration
 }
 
 export function ChatListItem({
@@ -24,6 +24,7 @@ export function ChatListItem({
   unreadCount = 0,
   isSelected,
   onClick,
+  contactImageUrl,
 }: ChatListItemProps) {
   // Format timestamp
   const formatTime = (timestamp: number) => {
@@ -60,11 +61,19 @@ export function ChatListItem({
       )}
     >
       <div className="flex items-start gap-3">
-        {/* Avatar with unread indicator */}
+        {/* Avatar with unread indicator - Use contact image if available */}
         <div className="flex-shrink-0 relative">
-          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center text-white font-semibold">
-            {name.charAt(0).toUpperCase()}
-          </div>
+          {contactImageUrl ? (
+            <img
+              src={contactImageUrl}
+              alt={name}
+              className="w-10 h-10 rounded-full object-cover"
+            />
+          ) : (
+            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center text-white font-semibold">
+              {name.charAt(0).toUpperCase()}
+            </div>
+          )}
           {hasUnread && (
             <div className="absolute -top-0.5 -right-0.5 w-3 h-3 bg-blue-500 rounded-full border-2 border-white"></div>
           )}
@@ -75,10 +84,14 @@ export function ChatListItem({
           {/* Header row: Name, network badge, time */}
           <div className="flex items-center justify-between gap-2 mb-1">
             <div className="flex items-center gap-2 min-w-0 flex-1">
-              <h3 className={cn(
-                "truncate text-sm",
-                hasUnread ? "font-bold text-gray-900" : "font-medium text-gray-700"
-              )}>
+              {/* Name with username tooltip on hover */}
+              <h3 
+                className={cn(
+                  "truncate text-sm",
+                  hasUnread ? "font-bold text-gray-900" : "font-medium text-gray-700"
+                )}
+                title={username ? `@${username}` : phoneNumber || undefined}
+              >
                 {name}
               </h3>
               {network && (
@@ -94,13 +107,6 @@ export function ChatListItem({
               {formatTime(lastMessageTime)}
             </span>
           </div>
-
-          {/* Username/Phone (smaller, secondary) */}
-          {(username || phoneNumber) && (
-            <p className="text-xs text-gray-500 truncate mb-1">
-              {username ? `@${username}` : phoneNumber}
-            </p>
-          )}
 
           {/* Last message preview */}
           <div className="flex items-start gap-2">

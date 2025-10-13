@@ -117,12 +117,13 @@ function SettingsPage() {
 
   return (
     <DashboardLayout>
-      <PageHeader
-        title="Settings"
-        description="Manage your dashboard configuration and data"
-      />
+      <div className="p-6">
+        <PageHeader
+          title="Settings"
+          description="Manage your dashboard configuration and data"
+        />
 
-      <div className="space-y-6 max-w-4xl">
+        <div className="space-y-6 max-w-4xl mt-6">
         {/* Dex Contacts Sync */}
         <Card>
           <CardHeader>
@@ -335,6 +336,7 @@ function SettingsPage() {
             </div>
           </CardContent>
         </Card>
+        </div>
       </div>
     </DashboardLayout>
   )
