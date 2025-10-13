@@ -2,7 +2,6 @@ import { createRouter as createTanStackRouter } from '@tanstack/react-router'
 import { QueryClient } from '@tanstack/react-query'
 import { routerWithQueryClient } from '@tanstack/react-router-with-query'
 import { ConvexQueryClient } from '@convex-dev/react-query'
-import { ConvexProvider } from 'convex/react'
 import { ConvexAuthProvider } from '@convex-dev/auth/react'
 import { routeTree } from './routeTree.gen'
 

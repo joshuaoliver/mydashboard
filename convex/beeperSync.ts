@@ -153,7 +153,8 @@ export const syncChatMessages = internalMutation({
     let lastMessageText: string | undefined;
 
     if (args.messages.length > 0) {
-      // Messages are already sorted by timestamp (oldest to newest)
+      // Messages MUST be sorted by timestamp (oldest to newest) before calling this function
+      // Get the MOST RECENT message (last item in sorted array)
       const lastMessage = args.messages[args.messages.length - 1];
       lastMessageFrom = lastMessage.isFromUser ? "user" : "them";
       needsReply = !lastMessage.isFromUser; // Need to reply if they sent last message
@@ -287,14 +288,18 @@ export const syncBeeperChatsInternal = internalAction({
             console.log(`[Beeper Sync] Received ${messages.length} messages from API for chat ${chat.id} (${chat.title})`);
 
             // Prepare messages for mutation
-            const messagesToSync = messages.map((msg: any) => ({
-              messageId: msg.id,
-              text: msg.text || "",
-              timestamp: new Date(msg.timestamp).getTime(),
-              senderId: msg.senderID,
-              senderName: msg.senderName || msg.senderID,
-              isFromUser: msg.isSender || false,
-            }));
+            const messagesToSync = messages
+              .map((msg: any) => ({
+                messageId: msg.id,
+                text: msg.text || "",
+                timestamp: new Date(msg.timestamp).getTime(),
+                senderId: msg.senderID,
+                senderName: msg.senderName || msg.senderID,
+                isFromUser: msg.isSender || false,
+              }))
+              // CRITICAL: Sort by timestamp (oldest to newest) before syncing
+              // This ensures lastMessage is correctly identified as the most recent
+              .sort((a: { timestamp: number }, b: { timestamp: number }) => a.timestamp - b.timestamp);
 
             console.log(`[Beeper Sync] Syncing ${messagesToSync.length} messages for chatId: ${chat.id} (${chat.title})`);
             

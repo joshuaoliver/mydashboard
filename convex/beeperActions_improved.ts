@@ -142,7 +142,7 @@ export const listUnrepliedChats = action({
   returns: v.object({
     chats: v.array(chatOutputValidator),
   }),
-  handler: async (ctx) => {
+  handler: async (_ctx) => {
     try {
       // Note: Auth disabled for now - this is a personal dashboard
       // const identity = await ctx.auth.getUserIdentity();
@@ -224,7 +224,7 @@ export const getChatMessages = action({
   returns: v.object({
     messages: v.array(messageOutputValidator),
   }),
-  handler: async (ctx, args) => {
+  handler: async (_ctx, args) => {
     try {
       // Note: Auth disabled for now - this is a personal dashboard
       // const identity = await ctx.auth.getUserIdentity();
@@ -267,7 +267,7 @@ export const generateReplySuggestions = action({
       messageCount: v.number(),
     }),
   }),
-  handler: async (ctx, args) => {
+  handler: async (_ctx, args) => {
     try {
       // Validate OpenAI API key
       if (!process.env.OPENAI_API_KEY) {

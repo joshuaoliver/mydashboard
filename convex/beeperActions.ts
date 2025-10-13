@@ -62,12 +62,11 @@ export const listUnrepliedChats = action({
       unreadCount: v.number(),
     })),
   }),
-  handler: async (ctx) => {
+  handler: async (_ctx) => {
     try {
       // Note: Auth disabled for now - this is a personal dashboard
       // const identity = await ctx.auth.getUserIdentity();
       // const userMxid = identity?.subject;
-      const userMxid = undefined; // Will be set when auth is enabled
 
       // Fetch chats from Beeper API using search endpoint (GET with query params)
       const response = await fetch(`${BEEPER_API_URL}/v0/search-chats?limit=50`, {
@@ -121,39 +120,28 @@ export const listUnrepliedChats = action({
   },
 });
 
+// Type for message returned from cache
+interface CachedMessage {
+  id: string;
+  text: string;
+  timestamp: number;
+  sender: string;
+  senderName: string;
+  isFromUser: boolean;
+}
+
 /**
- * Helper function to fetch messages from Beeper API
+ * Helper function to fetch messages from cached database
+ * Uses the same messages the user sees in the UI for consistency
  * Shared by both getChatMessages and generateReplySuggestions
  */
-async function fetchChatMessages(chatId: string, userMxid?: string) {
-  const response = await fetch(
-    `${BEEPER_API_URL}/v0/search-messages?chatID=${encodeURIComponent(chatId)}&limit=30`,
-    {
-      method: "GET",
-      headers: {
-        "Authorization": `Bearer ${BEEPER_TOKEN}`,
-      },
-    }
-  );
+async function fetchChatMessages(ctx: any, chatId: string): Promise<CachedMessage[]> {
+  // Fetch from cached database instead of API
+  const cachedMessages: { messages: CachedMessage[] } = await ctx.runQuery(api.beeperQueries.getCachedMessages, {
+    chatId: chatId,
+  });
 
-  if (!response.ok) {
-    throw new Error(`Beeper API error: ${response.status} ${response.statusText}`);
-  }
-
-  const data = await response.json();
-  const messages: BeeperMessage[] = data.items || [];
-
-  // Format messages for display
-  return messages
-    .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()) // Chronological order
-    .map((msg) => ({
-      id: msg.id,
-      text: msg.text || "",
-      timestamp: new Date(msg.timestamp).getTime(),
-      sender: msg.senderID,
-      senderName: msg.senderName || msg.senderID,
-      isFromUser: msg.isSender,
-    }));
+  return cachedMessages.messages || [];
 }
 
 /**
@@ -174,14 +162,13 @@ export const getChatMessages = action({
       isFromUser: v.boolean(),
     })),
   }),
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<{ messages: CachedMessage[] }> => {
     try {
       // Note: Auth disabled for now - this is a personal dashboard
       // const identity = await ctx.auth.getUserIdentity();
       // const userMxid = identity?.subject;
-      const userMxid = undefined;
 
-      const messages = await fetchChatMessages(args.chatId, userMxid);
+      const messages: CachedMessage[] = await fetchChatMessages(ctx, args.chatId);
 
       return { messages };
     } catch (error) {
@@ -206,6 +193,7 @@ export const generateReplySuggestions = action({
     chatId: v.string(),
     chatName: v.string(),
     instagramUsername: v.optional(v.string()),
+    customContext: v.optional(v.string()), // NEW: Allow custom context/instructions
   },
   returns: v.object({
     suggestions: v.array(v.object({
@@ -237,7 +225,6 @@ export const generateReplySuggestions = action({
       // Note: Auth disabled for now - this is a personal dashboard
       // const identity = await ctx.auth.getUserIdentity();
       // const userMxid = identity?.subject;
-      const userMxid = undefined;
 
       // Try to find matching contact by Instagram username
       let contact = null;
@@ -247,8 +234,9 @@ export const generateReplySuggestions = action({
         });
       }
 
-      // Fetch the conversation history
-      const messages = await fetchChatMessages(args.chatId, userMxid);
+      // Fetch the conversation history from cached database
+      const messages = await fetchChatMessages(ctx, args.chatId);
+      console.log(`[generateReplySuggestions] Found ${messages.length} cached messages for chat ${args.chatId}`);
 
       if (messages.length === 0) {
         return {
@@ -326,6 +314,13 @@ export const generateReplySuggestions = action({
 - Keep it light and playful when appropriate`;
       }
 
+      // Add custom context if provided
+      let customContextSection = "";
+      if (args.customContext) {
+        customContextSection = `\n\nADDITIONAL CONTEXT/INSTRUCTIONS:
+${args.customContext}`;
+      }
+
       // Generate reply suggestions using OpenAI
       const prompt = `You are a helpful assistant that suggests thoughtful, contextually appropriate replies to messages.
 
@@ -334,7 +329,7 @@ Given the following conversation history with ${args.chatName}, suggest 3-4 diff
 - Are natural and authentic
 - Vary in style (casual/formal, brief/detailed, etc.)
 - Consider the relationship and conversation history
-- Match the length and style of previous messages in the conversation${contactContext}${guidanceNotes}
+- Match the length and style of previous messages in the conversation${contactContext}${guidanceNotes}${customContextSection}
 
 Conversation history:
 ${conversationHistory}

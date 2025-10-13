@@ -17,7 +17,6 @@ interface ChatListItemProps {
 export function ChatListItem({
   name,
   network,
-  accountID,
   username,
   phoneNumber,
   lastMessage,

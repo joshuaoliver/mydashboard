@@ -146,20 +146,20 @@ export function ContactPanel({ contact, isLoading, searchedUsername }: ContactPa
         {/* Connection Type Selector */}
         <div className="mb-4">
           <Label className="text-xs text-gray-600 mb-2 block">Connection Type</Label>
-          <div className="flex flex-wrap gap-2">
-            {connectionOptions.map((option) => (
+          <div className="inline-flex rounded-lg border border-gray-200 overflow-hidden">
+            {connectionOptions.map((option, index) => (
               <button
                 key={option.value}
                 onClick={() => handleConnectionSelect(option.value)}
                 disabled={isSaving}
-                className={`px-3 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
+                title={option.label}
+                className={`px-4 py-2 text-lg transition-all ${
                   selectedConnection === option.value
-                    ? 'bg-blue-100 text-blue-700 border-2 border-blue-300'
-                    : 'bg-gray-50 text-gray-700 border-2 border-gray-200 hover:border-gray-300'
-                }`}
+                    ? 'bg-blue-100 text-blue-700'
+                    : 'bg-white text-gray-600 hover:bg-gray-50'
+                } ${index > 0 ? 'border-l border-gray-200' : ''}`}
               >
-                <span>{option.emoji}</span>
-                <span>{option.label}</span>
+                {option.emoji}
               </button>
             ))}
           </div>

@@ -3,7 +3,6 @@ import { DashboardLayout } from '@/components/layout/dashboard-layout'
 import { FullWidthContent } from '@/components/layout/full-width-content'
 import { Sidebar, SidebarHeader } from '@/components/layout/sidebar'
 import { Button } from '@/components/ui/button'
-import { ScrollArea } from '@/components/ui/scroll-area'
 // Replace plain Input with PromptInput from AI Elements
 import { 
   PromptInput, 
@@ -177,7 +176,7 @@ function Messages() {
 
   // Auto/Manual AI suggestion generation
   // Automatically checks cache first, only generates if conversation changed
-  const handleGenerateAISuggestions = async () => {
+  const handleGenerateAISuggestions = async (customContext?: string) => {
     if (!selectedChatId || !selectedChat) return
 
     setIsLoadingSuggestions(true)
@@ -188,6 +187,7 @@ function Messages() {
         chatId: selectedChatId,
         chatName: selectedChat.name,
         instagramUsername: selectedChat.username,
+        customContext: customContext || undefined, // Pass custom context if provided
       })
 
       const suggestions = suggestionsResult.suggestions || []
@@ -394,7 +394,7 @@ function Messages() {
         <div className="flex-1 flex bg-gray-50 overflow-hidden">
           {selectedChatId && selectedChat ? (
             <>
-              {/* Chat Messages with Input */}
+              {/* Chat Messages with Input and AI Suggestions */}
               <div className="flex-1 bg-white border-r border-gray-200 flex flex-col overflow-hidden">
                 {isLoadingMessages ? (
                   <div className="flex items-center justify-center h-full">
@@ -405,16 +405,18 @@ function Messages() {
                   </div>
                 ) : (
                   <>
+                    {/* Messages */}
                     <ChatDetail messages={chatMessages} />
                     
                     {/* Reply Input Area */}
-                    <div className="flex-shrink-0 border-t border-gray-200 p-4 bg-gray-50">
-                      <PromptInput onSubmit={handlePromptSubmit} className="w-full">
+                    <div className="flex-shrink-0 border-t-2 border-gray-300 p-4 bg-white shadow-sm">
+                      <PromptInput onSubmit={handlePromptSubmit} className="w-full border-2 border-gray-300 rounded-lg shadow-sm hover:border-blue-400 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-200 transition-all">
                         <PromptInputBody>
                           <PromptInputTextarea
                             placeholder="Type your reply..."
                             value={messageInputValue}
                             onChange={(e) => setMessageInputValue(e.target.value)}
+                            className="text-gray-900 placeholder:text-gray-500"
                           />
                         </PromptInputBody>
                         <PromptInputToolbar>
@@ -423,37 +425,32 @@ function Messages() {
                         </PromptInputToolbar>
                       </PromptInput>
                     </div>
+
+                    {/* AI Reply Suggestions - Below Input */}
+                    <div className="flex-shrink-0 border-t-2 border-gray-300 bg-gray-50 overflow-y-auto max-h-[400px]">
+                      <ReplySuggestions
+                        suggestions={replySuggestions}
+                        isLoading={isLoadingSuggestions}
+                        error={error || undefined}
+                        conversationContext={conversationContext}
+                        isCached={isCachedSuggestions}
+                        generatedAt={generatedAt}
+                        onGenerateClick={handleGenerateAISuggestions}
+                        selectedIndex={selectedSuggestionIndex}
+                        onSuggestionSelect={handleSuggestionSelect}
+                      />
+                    </div>
                   </>
                 )}
               </div>
 
-              {/* Right Sidebar - Contact Panel + AI Suggestions */}
-              <div className="w-[500px] bg-white flex flex-col overflow-hidden">
-                {/* Contact Panel - Top Half */}
-                <div className="flex-1 overflow-hidden">
-                  <ContactPanel 
-                    contact={contactData || null} 
-                    isLoading={contactData === undefined && !!selectedChat?.username}
-                    searchedUsername={selectedChat?.username}
-                  />
-                </div>
-                
-                {/* AI Reply Suggestions - Bottom Half */}
-                <div className="flex-1 overflow-hidden border-t border-gray-200">
-                  <ScrollArea className="h-full">
-                    <ReplySuggestions
-                      suggestions={replySuggestions}
-                      isLoading={isLoadingSuggestions}
-                      error={error || undefined}
-                      conversationContext={conversationContext}
-                      isCached={isCachedSuggestions}
-                      generatedAt={generatedAt}
-                      onGenerateClick={handleGenerateAISuggestions}
-                      selectedIndex={selectedSuggestionIndex}
-                      onSuggestionSelect={handleSuggestionSelect}
-                    />
-                  </ScrollArea>
-                </div>
+              {/* Right Sidebar - Contact Panel Only */}
+              <div className="w-[400px] bg-white overflow-hidden">
+                <ContactPanel 
+                  contact={contactData || null} 
+                  isLoading={contactData === undefined && !!selectedChat?.username}
+                  searchedUsername={selectedChat?.username}
+                />
               </div>
             </>
           ) : (

@@ -23,7 +23,7 @@ export interface DexContact {
  */
 export const testFetchDexContacts = action({
   args: {},
-  handler: async (ctx) => {
+  handler: async (_ctx) => {
     try {
       if (!DEX_API_KEY) {
         throw new Error("DEX_API_KEY environment variable is not set");
@@ -74,7 +74,7 @@ export const testFetchDexContacts = action({
  */
 export const fetchDexContacts = action({
   args: {},
-  handler: async (ctx) => {
+  handler: async (_ctx) => {
     try {
       if (!DEX_API_KEY) {
         throw new Error("DEX_API_KEY environment variable is not set");
@@ -154,7 +154,7 @@ export const updateDexContact = action({
       birthday: v.optional(v.string()),
     }),
   },
-  handler: async (ctx, args) => {
+  handler: async (_ctx, args) => {
     try {
       if (!DEX_API_KEY) {
         throw new Error("DEX_API_KEY environment variable is not set");
