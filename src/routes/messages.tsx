@@ -76,9 +76,7 @@ function Messages() {
   const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false)
   const [isSyncing, setIsSyncing] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [conversationContext, setConversationContext] = useState<any>(null)
-  const [isCachedSuggestions, setIsCachedSuggestions] = useState(false)
-  const [generatedAt, setGeneratedAt] = useState<number | undefined>(undefined)
+  // Removed unused conversation context/caching state
   const [tabFilter, setTabFilter] = useState<TabFilter>('unreplied')
   const sendMessage = useAction(api.beeperActions.sendMessage)
   const clearCachedSuggestions = useMutation(api.aiSuggestions.clearCachedSuggestions)
@@ -158,7 +156,7 @@ function Messages() {
     if (!selectedChatId) {
       setChatMessages([])
       setReplySuggestions([])
-      setConversationContext(null)
+      // cleared along with suggestions
       setMessageInputValue('')
       setSelectedSuggestionIndex(0)
       return
@@ -168,7 +166,7 @@ function Messages() {
       setChatMessages(cachedMessagesData.messages || [])
       // Clear previous AI suggestions when switching chats
       setReplySuggestions([])
-      setConversationContext(null)
+      // cleared along with suggestions
       setMessageInputValue('')
       setSelectedSuggestionIndex(0)
       
@@ -238,9 +236,6 @@ function Messages() {
 
       const suggestions = suggestionsResult.suggestions || []
       setReplySuggestions(suggestions)
-      setConversationContext(suggestionsResult.conversationContext)
-      setIsCachedSuggestions(suggestionsResult.isCached || false)
-      setGeneratedAt(suggestionsResult.generatedAt)
       
       // Auto-fill first suggestion into input field
       if (suggestions.length > 0) {

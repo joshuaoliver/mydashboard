@@ -14,8 +14,6 @@ export default defineConfig({
       projects: ['./tsconfig.json'],
     }),
     react(),
-    tanstackStart({
-      customViteReactPlugin: true,
-    }),
+    tanstackStart(),
   ],
 })
