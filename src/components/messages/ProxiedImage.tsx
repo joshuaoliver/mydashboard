@@ -9,18 +9,17 @@ interface ProxiedImageProps {
 }
 
 /**
- * Image component that proxies MXC and file:// URLs through Convex HTTP endpoint
+ * Image component that resolves MXC URLs to local file:// paths
  * 
  * Flow:
- * 1. Browser requests image from Convex: GET /image-proxy?url=mxc://...
- * 2. Convex HTTP endpoint calls Beeper's /v1/assets/download (via beeper.bywave.com.au)
- * 3. Convex extracts media ID and fetches from Matrix endpoints
- * 4. Convex returns image data to browser
+ * 1. For mxc:// or localmxc:// URLs, call Beeper's /v1/assets/download API
+ * 2. Get the local file:// path from the response
+ * 3. Use the file:// URL directly (requires local file permissions in browser)
  * 
- * This works because:
- * - Convex can call beeper.bywave.com.au (which proxies to localhost:23373)
- * - beeper.bywave.com.au supports Matrix media endpoints
- * - Image data flows: Beeper → Convex → Browser
+ * Browser local file permissions must be enabled:
+ * 1. Navigate to the site
+ * 2. Click the padlock/info icon in address bar
+ * 3. Site settings → File access → Allow
  */
 export function ProxiedImage({ src, alt, className }: ProxiedImageProps) {
   const [imageUrl, setImageUrl] = useState<string | null>(null)
@@ -31,11 +30,11 @@ export function ProxiedImage({ src, alt, className }: ProxiedImageProps) {
     let isMounted = true
 
     const loadImage = async () => {
-      // Check if image needs proxying
-      const needsProxy = src.startsWith('mxc://') || src.startsWith('file://') || src.startsWith('localmxc://')
+      // Check if we need to resolve the URL via Beeper API
+      const needsDownload = src.startsWith('mxc://') || src.startsWith('localmxc://')
       
-      if (!needsProxy) {
-        // Regular HTTP URL - use directly
+      if (!needsDownload) {
+        // Regular HTTP or file:// URL - use directly
         if (isMounted) {
           setImageUrl(src)
           setLoading(false)
@@ -43,25 +42,41 @@ export function ProxiedImage({ src, alt, className }: ProxiedImageProps) {
         return
       }
 
-      // Use Convex HTTP endpoint to proxy the image
+      // Call Beeper API to get local file path
       setLoading(true)
       setError(null)
 
       try {
-        // Get Convex deployment URL from environment
-        const convexUrl = import.meta.env.VITE_CONVEX_URL
-        if (!convexUrl) {
-          throw new Error('VITE_CONVEX_URL not configured')
+        // Use localhost:23373 for local Beeper Desktop API
+        const beeperApiUrl = 'http://localhost:23373'
+        
+        const response = await fetch(`${beeperApiUrl}/v1/assets/download`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            // Note: localhost API typically doesn't require authentication
+          },
+          body: JSON.stringify({ url: src }),
+        })
+
+        if (!response.ok) {
+          throw new Error(`Beeper API error: ${response.status}`)
         }
 
-        // Build proxy URL
-        // Convex HTTP endpoints are at: https://<deployment>.convex.site/image-proxy
-        // Convert: https://abc123.convex.cloud/api → https://abc123.convex.site
-        const siteUrl = convexUrl.replace('.cloud', '.site').replace('/api', '')
-        const proxyUrl = `${siteUrl}/image-proxy?url=${encodeURIComponent(src)}`
+        const data = await response.json() as { srcURL?: string; error?: string }
         
-        setImageUrl(proxyUrl)
-        setLoading(false)
+        if (data.error) {
+          throw new Error(data.error)
+        }
+        
+        if (!data.srcURL) {
+          throw new Error('No srcURL returned from Beeper API')
+        }
+
+        if (isMounted) {
+          setImageUrl(data.srcURL)
+          setLoading(false)
+        }
 
       } catch (err) {
         if (!isMounted) return

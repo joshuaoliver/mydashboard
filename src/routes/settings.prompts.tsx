@@ -18,7 +18,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog'
-import { Plus, Pencil, Trash2 } from 'lucide-react'
+import { Plus, Pencil, Trash2, Check, X } from 'lucide-react'
 import { useState } from 'react'
 import type { Id } from '../../convex/_generated/dataModel'
 
@@ -38,13 +38,8 @@ function PromptsPage() {
   )
 
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
-  const [editingPrompt, setEditingPrompt] = useState<{
-    id: Id<'prompts'>
-    name: string
-    title: string
-    description: string
-  } | null>(null)
+  const [editingPromptId, setEditingPromptId] = useState<Id<'prompts'> | null>(null)
+  const [editData, setEditData] = useState<Record<Id<'prompts'>, PromptFormData>>({})
 
   const createPrompt = useConvexMutation(api.prompts.createPrompt)
   const updatePrompt = useConvexMutation(api.prompts.updatePrompt)
@@ -75,23 +70,41 @@ function PromptsPage() {
     })
   }
 
-  const handleEditPrompt = () => {
-    if (!editingPrompt) return
-    
-    if (!formData.name || !formData.title || !formData.description) {
+  const startEditing = (prompt: {
+    _id: Id<'prompts'>
+    name: string
+    title: string
+    description: string
+  }) => {
+    setEditingPromptId(prompt._id)
+    setEditData((prev) => ({
+      ...prev,
+      [prompt._id]: {
+        name: prompt.name,
+        title: prompt.title,
+        description: prompt.description,
+      },
+    }))
+  }
+
+  const cancelEditing = () => {
+    setEditingPromptId(null)
+  }
+
+  const savePrompt = (id: Id<'prompts'>) => {
+    const data = editData[id]
+    if (!data || !data.name || !data.title || !data.description) {
       alert('Please fill in all fields')
       return
     }
 
     updatePrompt({
-      id: editingPrompt.id,
-      name: formData.name,
-      title: formData.title,
-      description: formData.description,
+      id,
+      name: data.name,
+      title: data.title,
+      description: data.description,
     }).then(() => {
-      setFormData({ name: '', title: '', description: '' })
-      setEditingPrompt(null)
-      setIsEditDialogOpen(false)
+      setEditingPromptId(null)
     }).catch((error: unknown) => {
       const message = error instanceof Error ? error.message : 'Failed to update prompt'
       alert(message)
@@ -107,35 +120,23 @@ function PromptsPage() {
     })
   }
 
-  const openEditDialog = (prompt: {
-    _id: Id<'prompts'>
-    name: string
-    title: string
-    description: string
-  }) => {
-    setEditingPrompt({
-      id: prompt._id,
-      name: prompt.name,
-      title: prompt.title,
-      description: prompt.description,
-    })
-    setFormData({
-      name: prompt.name,
-      title: prompt.title,
-      description: prompt.description,
-    })
-    setIsEditDialogOpen(true)
-  }
-
   const closeCreateDialog = () => {
     setIsCreateDialogOpen(false)
     setFormData({ name: '', title: '', description: '' })
   }
 
-  const closeEditDialog = () => {
-    setIsEditDialogOpen(false)
-    setEditingPrompt(null)
-    setFormData({ name: '', title: '', description: '' })
+  const updateEditField = (id: Id<'prompts'>, field: keyof PromptFormData, value: string) => {
+    setEditData((prev) => ({
+      ...prev,
+      [id]: {
+        ...(prev[id] || {
+          name: '',
+          title: '',
+          description: '',
+        }),
+        [field]: value,
+      },
+    }))
   }
 
   return (
@@ -225,110 +226,134 @@ function PromptsPage() {
             </CardContent>
           </Card>
         ) : (
-          <div className="grid gap-4">
-            {prompts.map((prompt) => (
-              <Card key={prompt._id}>
-                <CardHeader>
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <CardTitle>{prompt.title}</CardTitle>
-                      <CardDescription className="mt-1">
-                        <code className="text-xs bg-gray-100 px-2 py-1 rounded">
-                          {prompt.name}
-                        </code>
-                      </CardDescription>
+          <div className="space-y-6">
+            {prompts.map((prompt) => {
+              const isEditing = editingPromptId === prompt._id
+              const currentEditData = editData[prompt._id] || {
+                name: prompt.name,
+                title: prompt.title,
+                description: prompt.description,
+              }
+
+              return (
+                <Card key={prompt._id} className="w-full">
+                  <CardHeader>
+                    <div className="flex items-start justify-between gap-4">
+                      {isEditing ? (
+                        <div className="flex-1 space-y-4">
+                          <div>
+                            <Label htmlFor={`name-${prompt._id}`}>Name</Label>
+                            <Input
+                              id={`name-${prompt._id}`}
+                              placeholder="e.g., code-review"
+                              value={currentEditData.name}
+                              onChange={(e) =>
+                                updateEditField(prompt._id, 'name', e.target.value)
+                              }
+                            />
+                            <p className="text-sm text-gray-500 mt-1">
+                              A unique identifier (use lowercase and hyphens)
+                            </p>
+                          </div>
+                          <div>
+                            <Label htmlFor={`title-${prompt._id}`}>Title</Label>
+                            <Input
+                              id={`title-${prompt._id}`}
+                              placeholder="e.g., Code Review Assistant"
+                              value={currentEditData.title}
+                              onChange={(e) =>
+                                updateEditField(prompt._id, 'title', e.target.value)
+                              }
+                            />
+                            <p className="text-sm text-gray-500 mt-1">
+                              Display name for the prompt
+                            </p>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex-1">
+                          <CardTitle>{prompt.title}</CardTitle>
+                          <CardDescription className="mt-1">
+                            <code className="text-xs bg-gray-100 px-2 py-1 rounded">
+                              {prompt.name}
+                            </code>
+                          </CardDescription>
+                        </div>
+                      )}
+                      <div className="flex space-x-2">
+                        {isEditing ? (
+                          <>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => savePrompt(prompt._id)}
+                            >
+                              <Check className="h-4 w-4 text-green-600" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={cancelEditing}
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </>
+                        ) : (
+                          <>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => startEditing(prompt)}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDeletePrompt(prompt._id)}
+                            >
+                              <Trash2 className="h-4 w-4 text-red-500" />
+                            </Button>
+                          </>
+                        )}
+                      </div>
                     </div>
-                    <div className="flex space-x-2">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => openEditDialog(prompt)}
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleDeletePrompt(prompt._id)}
-                      >
-                        <Trash2 className="h-4 w-4 text-red-500" />
-                      </Button>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-gray-600 whitespace-pre-wrap">
-                    {prompt.description}
-                  </p>
-                  <div className="mt-4 text-xs text-gray-400">
-                    Last updated:{' '}
-                    {new Date(prompt.updatedAt).toLocaleString()}
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                  </CardHeader>
+                  <CardContent>
+                    {isEditing ? (
+                      <div className="space-y-4">
+                        <div>
+                          <Label htmlFor={`description-${prompt._id}`}>Description</Label>
+                          <Textarea
+                            id={`description-${prompt._id}`}
+                            placeholder="Enter the prompt text or description..."
+                            value={currentEditData.description}
+                            onChange={(e) =>
+                              updateEditField(prompt._id, 'description', e.target.value)
+                            }
+                            className="w-full min-h-[400px] font-mono text-sm"
+                          />
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="w-full">
+                          <pre className="text-sm text-gray-600 whitespace-pre-wrap font-mono bg-gray-50 p-4 rounded-lg border overflow-x-auto">
+                            {prompt.description}
+                          </pre>
+                        </div>
+                        <div className="mt-4 text-xs text-gray-400">
+                          Last updated:{' '}
+                          {new Date(prompt.updatedAt).toLocaleString()}
+                        </div>
+                      </>
+                    )}
+                  </CardContent>
+                </Card>
+              )
+            })}
           </div>
         )}
-
-        {/* Edit Dialog */}
-        <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Edit Prompt</DialogTitle>
-              <DialogDescription>
-                Update your prompt details
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="edit-name">Name</Label>
-                <Input
-                  id="edit-name"
-                  placeholder="e.g., code-review"
-                  value={formData.name}
-                  onChange={(e) =>
-                    setFormData({ ...formData, name: e.target.value })
-                  }
-                />
-                <p className="text-sm text-gray-500 mt-1">
-                  A unique identifier (use lowercase and hyphens)
-                </p>
-              </div>
-              <div>
-                <Label htmlFor="edit-title">Title</Label>
-                <Input
-                  id="edit-title"
-                  placeholder="e.g., Code Review Assistant"
-                  value={formData.title}
-                  onChange={(e) =>
-                    setFormData({ ...formData, title: e.target.value })
-                  }
-                />
-                <p className="text-sm text-gray-500 mt-1">
-                  Display name for the prompt
-                </p>
-              </div>
-              <div>
-                <Label htmlFor="edit-description">Description</Label>
-                <Textarea
-                  id="edit-description"
-                  placeholder="Enter the prompt text or description..."
-                  value={formData.description}
-                  onChange={(e) =>
-                    setFormData({ ...formData, description: e.target.value })
-                  }
-                  rows={6}
-                />
-              </div>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={closeEditDialog}>
-                Cancel
-              </Button>
-              <Button onClick={handleEditPrompt}>Save Changes</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
         </div>
       </div>
     </DashboardLayout>

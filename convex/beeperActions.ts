@@ -127,9 +127,10 @@ interface CachedMessage {
  * Shared by both getChatMessages and generateReplySuggestions
  */
 async function fetchChatMessages(ctx: any, chatId: string): Promise<CachedMessage[]> {
-  // Fetch from cached database instead of API
-  const cachedMessages: { messages: CachedMessage[] } = await ctx.runQuery(api.beeperQueries.getCachedMessages, {
+  // Fetch ALL cached messages (no pagination) for AI context
+  const cachedMessages: { messages: CachedMessage[] } = await ctx.runQuery(api.beeperQueries.getAllCachedMessages, {
     chatId: chatId,
+    limit: 100, // Limit to last 100 messages for AI context (prevents token overflow)
   });
 
   return cachedMessages.messages || [];
@@ -244,25 +245,32 @@ export const generateReplySuggestions = action({
       // Custom context = user wants fresh suggestions based on their specific input
       if (!args.customContext) {
         // Try to get cached suggestions for this conversation state
-        const cached: {
-          suggestions: Array<{
-            reply: string;
-          }>;
-          conversationContext: {
-            lastMessage: string;
-            messageCount: number;
-          };
-          isCached: boolean;
-          generatedAt: number;
-        } | null = await ctx.runQuery(internal.aiSuggestions.getCachedSuggestions, {
-          chatId: args.chatId,
-          lastMessageId: lastMessage.id,
-        });
+        try {
+          const cached: {
+            suggestions: Array<{
+              reply: string;
+            }>;
+            conversationContext: {
+              lastMessage: string;
+              messageCount: number;
+            };
+            isCached: boolean;
+            generatedAt: number;
+          } | null = await ctx.runQuery(internal.aiSuggestions.getCachedSuggestions, {
+            chatId: args.chatId,
+            lastMessageId: lastMessage.id,
+          });
 
-        // If we have valid cached suggestions, return them immediately
-        if (cached) {
-          console.log(`[generateReplySuggestions] Using cached suggestions for chat ${args.chatId}`);
-          return cached;
+          // If we have valid cached suggestions, return them immediately
+          if (cached) {
+            console.log(`[generateReplySuggestions] ✅ Using cached suggestions for chat ${args.chatId}`);
+            return cached;
+          } else {
+            console.log(`[generateReplySuggestions] No cache found for message ID: ${lastMessage.id}`);
+          }
+        } catch (cacheError) {
+          console.error(`[generateReplySuggestions] ⚠️ Cache lookup failed:`, cacheError);
+          console.log(`[generateReplySuggestions] Falling back to fresh generation`);
         }
       } else {
         console.log(`[generateReplySuggestions] Custom context provided - bypassing cache and generating fresh suggestions`);
@@ -427,7 +435,7 @@ Latest message from ${args.chatName}: "${lastMessageText}"
 
 Suggest 3-4 different reply options representing DIFFERENT conversation pathways. Match the relationship context and be natural.
 
-IMPORTANT: DO NOT use em dashes (—) or en dashes (–). Use regular hyphens (-) or split into separate sentences. Write like a real person texting with standard keyboard characters only.
+IMPORTANT: DO NOT use em dashes (—) or en dashes (–). Use ellipsis (...) or split into separate sentences. Write like a real person texting with standard keyboard characters only.
 
 Format as JSON:
 {

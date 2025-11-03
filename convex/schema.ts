@@ -123,6 +123,7 @@ export default defineSchema({
     objective: v.optional(v.string()), // What's the objective with this person?
     // Extended local-only fields
     sex: v.optional(v.array(v.string())), // Sex identifiers (multi-select emoji-based)
+    tagIds: v.optional(v.array(v.id("tags"))), // User-defined tags for organizing contacts
     locationIds: v.optional(v.array(v.id("locations"))), // Multiple locations (tags)
     leadStatus: v.optional(v.union(
       v.literal("Talking"),
@@ -152,7 +153,16 @@ export default defineSchema({
   locations: defineTable({
     name: v.string(), // Location name
     createdAt: v.number(), // Creation timestamp
-  }),
+  })
+    .index("by_name", ["name"]),
+
+  // Tags - user-defined tags for organizing contacts
+  tags: defineTable({
+    name: v.string(), // Tag name
+    color: v.optional(v.string()), // Optional color for visual distinction
+    createdAt: v.number(), // Creation timestamp
+  })
+    .index("by_name", ["name"]),
 
   // User-defined prompts for AI interactions
   prompts: defineTable({

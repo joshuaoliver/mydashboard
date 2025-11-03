@@ -256,7 +256,7 @@ Your task is to suggest 3-4 different reply options that represent DIFFERENT CON
 
 IMPORTANT FORMATTING RULES:
 - DO NOT use em dashes (—) or en dashes (–) anywhere in the replies
-- Use regular hyphens (-) or split into separate sentences instead
+- Use ellipsis (...) or split into separate sentences instead of dashes
 - Write like a real person texting, not like formal writing
 - Use only standard keyboard characters that someone would naturally type on their phone
 

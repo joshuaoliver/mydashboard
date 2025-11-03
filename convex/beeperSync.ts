@@ -123,31 +123,24 @@ export const syncChatMessages = internalMutation({
   },
   handler: async (ctx, args) => {
     let insertedCount = 0;
-    let updatedCount = 0;
+    let skippedCount = 0;
 
-    // Upsert each message
+    // OPTIMIZATION: Messages are immutable - once sent, they never change.
+    // So we only need to INSERT new messages, never UPDATE existing ones.
+    // This eliminates unnecessary database patches.
+    
     for (const msg of args.messages) {
-      // Check if message already exists FOR THIS SPECIFIC CHAT
-      // Use by_chat index to check chatId + messageId combination
-      const existingMessages = await ctx.db
+      // Check if message already exists using the by_message_id index (faster)
+      const existingMessage = await ctx.db
         .query("beeperMessages")
-        .withIndex("by_chat", (q) => q.eq("chatId", args.chatId))
-        .filter((q) => q.eq(q.field("messageId"), msg.messageId))
+        .withIndex("by_message_id", (q) => q.eq("messageId", msg.messageId))
         .first();
 
-      if (existingMessages) {
-        // Update existing message (in case content changed)
-        await ctx.db.patch(existingMessages._id, {
-          text: msg.text,
-          timestamp: msg.timestamp,
-          senderId: msg.senderId,
-          senderName: msg.senderName,
-          isFromUser: msg.isFromUser,
-          attachments: msg.attachments,
-        });
-        updatedCount++;
+      if (existingMessage) {
+        // Message already exists - skip it (messages are immutable)
+        skippedCount++;
       } else {
-        // Insert new message with chatId
+        // Insert new message
         await ctx.db.insert("beeperMessages", {
           chatId: args.chatId,
           messageId: msg.messageId,
@@ -163,7 +156,7 @@ export const syncChatMessages = internalMutation({
     }
 
     console.log(
-      `[syncChatMessages] Chat ${args.chatId}: inserted ${insertedCount}, updated ${updatedCount}`
+      `[syncChatMessages] Chat ${args.chatId}: inserted ${insertedCount}, skipped ${skippedCount} (already cached)`
     );
 
     // Calculate reply tracking from messages
@@ -309,16 +302,38 @@ export const syncBeeperChatsInternal = internalAction({
 
         if (shouldFetchMessages) {
           try {
-            console.log(`[Beeper Sync] Fetching messages for chat ${chat.id} (${chat.title})...`);
+            // Get the existing chat to check when we last synced messages
+            const existingChat = await ctx.runQuery(
+              internal.beeperQueries.getChatByIdInternal,
+              { chatId: chat.id }
+            );
+
+            // Build query params - only fetch messages newer than last sync
+            const messageQueryParams: any = {};
+            
+            if (existingChat?.lastMessagesSyncedAt && !args.forceMessageSync) {
+              // Only fetch messages since last sync (incremental update)
+              messageQueryParams.dateAfter = new Date(existingChat.lastMessagesSyncedAt).toISOString();
+              console.log(
+                `[Beeper Sync] Fetching NEW messages for chat ${chat.id} (${chat.title}) ` +
+                `since ${new Date(existingChat.lastMessagesSyncedAt).toISOString()}...`
+              );
+            } else {
+              // Full sync - fetch all recent messages
+              console.log(`[Beeper Sync] Fetching ALL messages for chat ${chat.id} (${chat.title})...`);
+            }
             
             // Use the better /v1/chats/{chatID}/messages endpoint
             // This endpoint supports proper pagination and higher limits
             const messagesResponse = await client.get(`/v1/chats/${encodeURIComponent(chat.id)}/messages`, {
-              query: {} // No cursor = get most recent messages
+              query: messageQueryParams
             }) as any;
 
             const messages = messagesResponse.items || [];
-            console.log(`[Beeper Sync] Received ${messages.length} messages from API for chat ${chat.id} (${chat.title})`);
+            console.log(
+              `[Beeper Sync] Received ${messages.length} messages from API for chat ${chat.id} (${chat.title}) ` +
+              `${messageQueryParams.dateAfter ? '(incremental)' : '(full sync)'}`
+            );
 
             // Prepare messages for mutation
             const messagesToSync = messages

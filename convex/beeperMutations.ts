@@ -74,3 +74,55 @@ export const toggleArchiveChat = internalMutation({
   },
 });
 
+/**
+ * Mark a chat as read
+ * Sets the unread count to 0
+ */
+export const markChatAsRead = internalMutation({
+  args: {
+    chatId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const chat = await ctx.db
+      .query("beeperChats")
+      .withIndex("by_chat_id", (q) => q.eq("chatId", args.chatId))
+      .first();
+    
+    if (!chat) {
+      throw new Error(`Chat ${args.chatId} not found`);
+    }
+
+    await ctx.db.patch(chat._id, {
+      unreadCount: 0,
+    });
+
+    return { success: true, chatId: args.chatId };
+  },
+});
+
+/**
+ * Mark a chat as unread
+ * Sets the unread count to 1 (to show as unread in UI)
+ */
+export const markChatAsUnread = internalMutation({
+  args: {
+    chatId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const chat = await ctx.db
+      .query("beeperChats")
+      .withIndex("by_chat_id", (q) => q.eq("chatId", args.chatId))
+      .first();
+    
+    if (!chat) {
+      throw new Error(`Chat ${args.chatId} not found`);
+    }
+
+    await ctx.db.patch(chat._id, {
+      unreadCount: 1,
+    });
+
+    return { success: true, chatId: args.chatId };
+  },
+});
+

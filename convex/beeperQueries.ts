@@ -1,4 +1,4 @@
-import { query } from "./_generated/server";
+import { query, internalQuery } from "./_generated/server";
 import { v } from "convex/values";
 import { paginationOptsValidator } from "convex/server";
 
@@ -155,9 +155,25 @@ export const getChatById = query({
 });
 
 /**
+ * Internal query to get chat by ID (for use in actions)
+ */
+export const getChatByIdInternal = internalQuery({
+  args: { chatId: v.string() },
+  handler: async (ctx, args) => {
+    const chat = await ctx.db
+      .query("beeperChats")
+      .withIndex("by_chat_id", (q) => q.eq("chatId", args.chatId))
+      .first();
+
+    return chat;
+  },
+});
+
+/**
  * Get cached messages for a specific chat with Convex pagination
  * Fast, reactive, no API call needed!
  * Loads recent messages first, then older messages as user scrolls up
+ * FOR FRONTEND USE ONLY (React components)
  */
 export const getCachedMessages = query({
   args: { 
@@ -193,6 +209,51 @@ export const getCachedMessages = query({
     return {
       ...result,
       page: transformedPage.reverse(),
+    };
+  },
+});
+
+/**
+ * Get ALL cached messages for a specific chat (no pagination)
+ * FOR BACKEND USE ONLY (actions, AI context, etc.)
+ * Returns all messages sorted oldest-first
+ */
+export const getAllCachedMessages = query({
+  args: { 
+    chatId: v.string(),
+    limit: v.optional(v.number()), // Optional limit for AI context (e.g., last 100 messages)
+  },
+  handler: async (ctx, args) => {
+    console.log(`[getAllCachedMessages] Querying for chatId: ${args.chatId}`);
+    
+    // Query with compound index - filters by chatId and sorts by timestamp
+    let queryBuilder = ctx.db
+      .query("beeperMessages")
+      .withIndex("by_chat", (q) => 
+        q.eq("chatId", args.chatId)
+      )
+      .order("desc"); // Newest first
+
+    // Collect messages with optional limit
+    const messages = args.limit 
+      ? await queryBuilder.take(args.limit)
+      : await queryBuilder.collect();
+
+    console.log(`[getAllCachedMessages] Found ${messages.length} messages for chatId: ${args.chatId}`);
+
+    // Sort oldest-first for display
+    const sortedMessages = messages.reverse();
+
+    return {
+      messages: sortedMessages.map((msg) => ({
+        id: msg.messageId,
+        text: msg.text,
+        timestamp: msg.timestamp,
+        sender: msg.senderId,
+        senderName: msg.senderName,
+        isFromUser: msg.isFromUser,
+        attachments: msg.attachments,
+      })),
     };
   },
 });

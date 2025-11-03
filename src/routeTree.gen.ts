@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SignUpRouteImport } from './routes/sign-up'
 import { Route as SignInRouteImport } from './routes/sign-in'
+import { Route as SalesRouteImport } from './routes/sales'
 import { Route as MessagesRouteImport } from './routes/messages'
 import { Route as AnotherPageRouteImport } from './routes/anotherPage'
 import { Route as IndexRouteImport } from './routes/index'
@@ -28,6 +29,11 @@ const SignUpRoute = SignUpRouteImport.update({
 const SignInRoute = SignInRouteImport.update({
   id: '/sign-in',
   path: '/sign-in',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SalesRoute = SalesRouteImport.update({
+  id: '/sales',
+  path: '/sales',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MessagesRoute = MessagesRouteImport.update({
@@ -75,6 +81,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/anotherPage': typeof AnotherPageRoute
   '/messages': typeof MessagesRoute
+  '/sales': typeof SalesRoute
   '/sign-in': typeof SignInRoute
   '/sign-up': typeof SignUpRoute
   '/contacts/$contactId': typeof ContactsContactIdRoute
@@ -87,6 +94,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/anotherPage': typeof AnotherPageRoute
   '/messages': typeof MessagesRoute
+  '/sales': typeof SalesRoute
   '/sign-in': typeof SignInRoute
   '/sign-up': typeof SignUpRoute
   '/contacts/$contactId': typeof ContactsContactIdRoute
@@ -100,6 +108,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/anotherPage': typeof AnotherPageRoute
   '/messages': typeof MessagesRoute
+  '/sales': typeof SalesRoute
   '/sign-in': typeof SignInRoute
   '/sign-up': typeof SignUpRoute
   '/contacts/$contactId': typeof ContactsContactIdRoute
@@ -114,6 +123,7 @@ export interface FileRouteTypes {
     | '/'
     | '/anotherPage'
     | '/messages'
+    | '/sales'
     | '/sign-in'
     | '/sign-up'
     | '/contacts/$contactId'
@@ -126,6 +136,7 @@ export interface FileRouteTypes {
     | '/'
     | '/anotherPage'
     | '/messages'
+    | '/sales'
     | '/sign-in'
     | '/sign-up'
     | '/contacts/$contactId'
@@ -138,6 +149,7 @@ export interface FileRouteTypes {
     | '/'
     | '/anotherPage'
     | '/messages'
+    | '/sales'
     | '/sign-in'
     | '/sign-up'
     | '/contacts/$contactId'
@@ -151,6 +163,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AnotherPageRoute: typeof AnotherPageRoute
   MessagesRoute: typeof MessagesRoute
+  SalesRoute: typeof SalesRoute
   SignInRoute: typeof SignInRoute
   SignUpRoute: typeof SignUpRoute
   ContactsContactIdRoute: typeof ContactsContactIdRoute
@@ -174,6 +187,13 @@ declare module '@tanstack/react-router' {
       path: '/sign-in'
       fullPath: '/sign-in'
       preLoaderRoute: typeof SignInRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sales': {
+      id: '/sales'
+      path: '/sales'
+      fullPath: '/sales'
+      preLoaderRoute: typeof SalesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/messages': {
@@ -239,6 +259,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AnotherPageRoute: AnotherPageRoute,
   MessagesRoute: MessagesRoute,
+  SalesRoute: SalesRoute,
   SignInRoute: SignInRoute,
   SignUpRoute: SignUpRoute,
   ContactsContactIdRoute: ContactsContactIdRoute,

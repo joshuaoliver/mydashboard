@@ -18,6 +18,12 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { ChatListItem } from '@/components/messages/ChatListItem'
 import { ChatDetail } from '@/components/messages/ChatDetail'
 import { ReplySuggestions } from '@/components/messages/ReplySuggestions'
@@ -25,7 +31,7 @@ import { ContactPanel } from '@/components/contacts/ContactPanel'
 import { useAction, useQuery, useMutation, usePaginatedQuery } from 'convex/react'
 import { api } from '../../convex/_generated/api'
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { RefreshCw, AlertCircle, MessageCircle, ArrowLeft, Sparkles, Archive } from 'lucide-react'
+import { RefreshCw, AlertCircle, MessageCircle, ArrowLeft, Sparkles, Archive, Mail, MailOpen, ExternalLink, MoreVertical } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import {
   ResizableHandle,
@@ -145,6 +151,8 @@ function Messages() {
   const manualSync = useAction(api.beeperSync.manualSync)
   const generateReplySuggestions = useAction(api.beeperActions.generateReplySuggestions)
   const archiveChat = useAction(api.chatActions.archiveChat)
+  const markChatAsRead = useAction(api.chatActions.markChatAsRead)
+  const markChatAsUnread = useAction(api.chatActions.markChatAsUnread)
 
   // Apply tab filtering to all loaded chats
   const chats = allLoadedChats.filter((chat) => {
@@ -367,6 +375,56 @@ function Messages() {
     } catch (err) {
       console.error('Failed to archive chat:', err)
       setError(err instanceof Error ? err.message : 'Failed to archive chat')
+    }
+  }
+
+  // Handle mark chat as read
+  const handleMarkAsRead = async (chatId: string) => {
+    try {
+      await markChatAsRead({ chatId })
+    } catch (err) {
+      console.error('Failed to mark chat as read:', err)
+      setError(err instanceof Error ? err.message : 'Failed to mark chat as read')
+    }
+  }
+
+  // Handle mark chat as unread
+  const handleMarkAsUnread = async (chatId: string) => {
+    try {
+      await markChatAsUnread({ chatId })
+    } catch (err) {
+      console.error('Failed to mark chat as unread:', err)
+      setError(err instanceof Error ? err.message : 'Failed to mark chat as unread')
+    }
+  }
+
+  // Handle opening chat in Beeper Desktop
+  const handleOpenInBeeper = async (chatId: string, draftText?: string) => {
+    try {
+      const beeperApiUrl = 'http://localhost:23373'
+      
+      const response = await fetch(`${beeperApiUrl}/v1/focus`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          chatID: chatId,
+          ...(draftText && { draftText }),
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error(`Failed to open Beeper: ${response.status}`)
+      }
+
+      const data = await response.json()
+      if (!data.success) {
+        throw new Error('Beeper did not confirm successful focus')
+      }
+    } catch (err) {
+      console.error('Failed to open in Beeper:', err)
+      setError(err instanceof Error ? err.message : 'Failed to open in Beeper')
     }
   }
 
@@ -615,14 +673,48 @@ function Messages() {
                           )}
                         </div>
                       </div>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => selectedChat.unreadCount > 0 ? handleMarkAsRead(selectedChatId) : handleMarkAsUnread(selectedChatId)}
+                          className="gap-2"
+                          title={selectedChat.unreadCount > 0 ? "Mark as read" : "Mark as unread"}
+                        >
+                          {selectedChat.unreadCount > 0 ? (
+                            <>
+                              <MailOpen className="w-4 h-4" />
+                              Mark read
+                            </>
+                          ) : (
+                            <>
+                              <Mail className="w-4 h-4" />
+                              Mark unread
+                            </>
+                          )}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleArchiveChat(selectedChatId)}
+                          className="gap-2"
+                        >
+                          <Archive className="w-4 h-4" />
+                          Archive
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* Open in Beeper Button */}
+                    <div className="border-b border-gray-200 px-4 py-2 bg-gray-50">
                       <Button
-                        variant="ghost"
+                        variant="outline"
                         size="sm"
-                        onClick={() => handleArchiveChat(selectedChatId)}
-                        className="gap-2"
+                        onClick={() => handleOpenInBeeper(selectedChatId)}
+                        className="gap-2 w-full"
                       >
-                        <Archive className="w-4 h-4" />
-                        Archive
+                        <ExternalLink className="w-4 h-4" />
+                        Open in Beeper Desktop
                       </Button>
                     </div>
 
@@ -669,7 +761,24 @@ function Messages() {
                               <Sparkles className="w-4 h-4" />
                               AI
                             </PromptInputButton>
-                            <PromptInputSubmit disabled={isSendingMessage} />
+                            <div className="flex gap-1">
+                              <PromptInputSubmit disabled={isSendingMessage} />
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" size="icon" className="h-9 w-9">
+                                    <MoreVertical className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem
+                                    onClick={() => handleOpenInBeeper(selectedChatId, messageInputValue)}
+                                  >
+                                    <ExternalLink className="mr-2 h-4 w-4" />
+                                    Send with Beeper
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </div>
                           </PromptInputToolbar>
                         </PromptInput>
                       </div>
@@ -852,6 +961,19 @@ function Messages() {
                 <div className="flex-1 flex flex-col sm:flex-row overflow-hidden">
                   {/* Chat Messages with Input and AI Suggestions */}
                   <div className="flex-1 bg-white flex flex-col overflow-hidden">
+                    {/* Open in Beeper Button */}
+                    <div className="border-b border-gray-200 px-4 py-2 bg-gray-50">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleOpenInBeeper(selectedChatId)}
+                        className="gap-2 w-full"
+                      >
+                        <ExternalLink className="w-4 h-4" />
+                        Open in Beeper Desktop
+                      </Button>
+                    </div>
+
                     {isLoadingMessages ? (
                       <div className="flex items-center justify-center h-full">
                         <div className="text-center">
@@ -882,7 +1004,24 @@ function Messages() {
                             </PromptInputBody>
                               <PromptInputToolbar>
                                 <div />
-                                <PromptInputSubmit disabled={isSendingMessage} />
+                                <div className="flex gap-1">
+                                  <PromptInputSubmit disabled={isSendingMessage} />
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                      <Button variant="ghost" size="icon" className="h-9 w-9">
+                                        <MoreVertical className="h-4 w-4" />
+                                      </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end">
+                                      <DropdownMenuItem
+                                        onClick={() => handleOpenInBeeper(selectedChatId, messageInputValue)}
+                                      >
+                                        <ExternalLink className="mr-2 h-4 w-4" />
+                                        Send with Beeper
+                                      </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
+                                </div>
                               </PromptInputToolbar>
                           </PromptInput>
                         </div>

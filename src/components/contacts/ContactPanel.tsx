@@ -5,7 +5,13 @@ import { Switch } from '@/components/ui/switch'
 import { Badge } from '@/components/ui/badge'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
-import { User, Save, Lock, Unlock, X, Check, AlertCircle } from 'lucide-react'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import { User, Save, Lock, Unlock, X, Check, AlertCircle, MoreVertical, Merge } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { useMutation, useQuery } from 'convex/react'
 import { api } from '../../../convex/_generated/api'
@@ -31,6 +37,7 @@ interface Contact {
   objective?: string
   sex?: string[]
   privateNotes?: string
+  tagIds?: Id<"tags">[]
   locationIds?: Id<"locations">[]
   intimateConnection?: boolean
   leadStatus?: "Talking" | "Planning" | "Dated" | "Connected" | "Former"
@@ -77,6 +84,8 @@ export function ContactPanel({ contact, isLoading, searchedUsername, searchedPho
   const [currentContactId, setCurrentContactId] = useState<string | undefined>(contact?._id)
   const [isLocationPopoverOpen, setIsLocationPopoverOpen] = useState(false)
   const [locationSearch, setLocationSearch] = useState("")
+  const [isTagPopoverOpen, setIsTagPopoverOpen] = useState(false)
+  const [tagSearch, setTagSearch] = useState("")
   
   // Extended fields state
   const [privateNotes, setPrivateNotes] = useState(contact?.privateNotes || "")
@@ -97,10 +106,13 @@ export function ContactPanel({ contact, isLoading, searchedUsername, searchedPho
   const updateLeadStatusMutation = useMutation(api.contactMutations.updateLeadStatus)
   const createContactMutation = useMutation(api.contactMutations.createContact)
   const createLocationMutation = useMutation(api.locationMutations.createLocation)
+  const createTagMutation = useMutation(api.tagMutations.createTag)
+  const toggleTagMutation = useMutation(api.tagMutations.toggleTag)
   const mergeContactsMutation = useMutation(api.contactMerge.mergeContacts)
   
-  // Query locations and duplicates
+  // Query locations, tags, and duplicates
   const locations = useQuery(api.locationQueries.listLocations)
+  const tags = useQuery(api.tagQueries.listTags)
   const duplicates = useQuery(
     api.contactDuplicates.findDuplicates,
     contact?._id ? { contactId: contact._id } : "skip"
@@ -246,6 +258,22 @@ export function ContactPanel({ contact, isLoading, searchedUsername, searchedPho
     }
   }
 
+  const handleToggleTag = async (tagId: Id<"tags">) => {
+    if (!contact) return
+    
+    setIsSaving(true)
+    try {
+      await toggleTagMutation({
+        contactId: contact._id,
+        tagId,
+      })
+    } catch (error) {
+      console.error('Failed to toggle tag:', error)
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
   const handleToggleIntimateConnection = async (checked: boolean) => {
     if (!contact) return
     
@@ -298,6 +326,28 @@ export function ContactPanel({ contact, isLoading, searchedUsername, searchedPho
     } finally {
       setIsSaving(false)
     }
+  }
+
+  const handleCreateAndSelectTag = async (name: string) => {
+    if (!name.trim()) return
+    
+    setIsSaving(true)
+    try {
+      const { tagId } = await createTagMutation({
+        name: name.trim(),
+      })
+      // Auto-select the newly created tag
+      await handleToggleTag(tagId)
+      setTagSearch("")
+    } catch (error) {
+      console.error('Failed to create tag:', error)
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const handleRemoveTag = async (tagId: Id<"tags">) => {
+    await handleToggleTag(tagId)
   }
 
   const handleRemoveLocation = (locationId: Id<"locations">) => {
@@ -397,6 +447,7 @@ export function ContactPanel({ contact, isLoading, searchedUsername, searchedPho
 
   const selectedConnections = contact.connections || []
   const selectedSex = contact.sex || []
+  const selectedTags = contact.tagIds || []
   const selectedLocations = contact.locationIds || []
 
   return (
@@ -424,6 +475,21 @@ export function ContactPanel({ contact, isLoading, searchedUsername, searchedPho
               <p className="text-sm text-gray-500">@{contact.instagram}</p>
             )}
           </div>
+          
+          {/* Kebab Menu */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                <MoreVertical className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => setShowMergeDialog(true)}>
+                <Merge className="h-4 w-4 mr-2" />
+                Merge with another contact
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
 
         {/* Duplicate Warning */}
@@ -570,6 +636,83 @@ export function ContactPanel({ contact, isLoading, searchedUsername, searchedPho
                 )
               })}
             </div>
+          </div>
+
+          {/* Tags - Autocomplete dropdown */}
+          <div>
+            <Label className="text-xs text-gray-600 mb-2 block">Tags</Label>
+            <Popover open={isTagPopoverOpen} onOpenChange={setIsTagPopoverOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className="w-full justify-start h-auto min-h-[40px] p-2"
+                  disabled={isSaving}
+                >
+                  <div className="flex flex-wrap gap-1">
+                    {selectedTags.length > 0 ? (
+                      selectedTags.map((tagId) => {
+                        const tag = tags?.find(t => t._id === tagId)
+                        return tag ? (
+                          <Badge key={tagId} variant="secondary" className="gap-1">
+                            {tag.name}
+                            <X
+                              className="w-3 h-3 cursor-pointer hover:text-destructive"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleRemoveTag(tagId)
+                              }}
+                            />
+                          </Badge>
+                        ) : null
+                      })
+                    ) : (
+                      <span className="text-muted-foreground text-sm">Select tags...</span>
+                    )}
+                  </div>
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-full p-0 bg-white" align="start">
+                <Command>
+                  <CommandInput 
+                    placeholder="Search or create tag..." 
+                    value={tagSearch}
+                    onValueChange={setTagSearch}
+                  />
+                  <CommandList>
+                    <CommandEmpty>
+                      <Button
+                        variant="ghost"
+                        className="w-full justify-start text-sm"
+                        onClick={() => {
+                          handleCreateAndSelectTag(tagSearch)
+                          setIsTagPopoverOpen(false)
+                        }}
+                        disabled={!tagSearch.trim()}
+                      >
+                        Create "{tagSearch}"
+                      </Button>
+                    </CommandEmpty>
+                    <CommandGroup>
+                      {tags?.map((tag) => {
+                        const isSelected = selectedTags.includes(tag._id)
+                        return (
+                          <CommandItem
+                            key={tag._id}
+                            onSelect={() => {
+                              handleToggleTag(tag._id)
+                            }}
+                            className="cursor-pointer"
+                          >
+                            <span className="flex-1">{tag.name}</span>
+                            {isSelected && <Check className="w-4 h-4 text-blue-600" />}
+                          </CommandItem>
+                        )
+                      })}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
           </div>
 
           {/* Location Tags - Autocomplete dropdown */}

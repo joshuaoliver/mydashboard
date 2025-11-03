@@ -35,6 +35,8 @@ import type * as locationMutations from "../locationMutations.js";
 import type * as locationQueries from "../locationQueries.js";
 import type * as myFunctions from "../myFunctions.js";
 import type * as prompts from "../prompts.js";
+import type * as tagMutations from "../tagMutations.js";
+import type * as tagQueries from "../tagQueries.js";
 
 import type {
   ApiFromModules,
@@ -78,6 +80,8 @@ declare const fullApi: ApiFromModules<{
   locationQueries: typeof locationQueries;
   myFunctions: typeof myFunctions;
   prompts: typeof prompts;
+  tagMutations: typeof tagMutations;
+  tagQueries: typeof tagQueries;
 }>;
 declare const fullApiWithMounts: typeof fullApi;
 

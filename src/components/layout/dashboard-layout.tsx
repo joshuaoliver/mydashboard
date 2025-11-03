@@ -21,6 +21,7 @@ import {
   MessageSquare,
   LayoutDashboard,
   Users,
+  HeartHandshake,
   LogOut,
   MessageCircle,
   MapPin
@@ -100,6 +101,23 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                   >
                     <Users className="h-4 w-4" />
                     Contacts
+                  </Link>
+                </NavigationMenuItem>
+                <NavigationMenuItem>
+                  <Link 
+                    to="/sales"
+                    className={cn(
+                      "inline-flex items-center gap-2 px-4 py-2 rounded-md",
+                      "text-sm font-medium transition-all",
+                      "text-slate-300 hover:text-white hover:bg-slate-800/80",
+                      "[&.active]:bg-slate-800 [&.active]:text-white"
+                    )}
+                    activeProps={{
+                      className: "active"
+                    }}
+                  >
+                    <HeartHandshake className="h-4 w-4" />
+                    Sales
                   </Link>
                 </NavigationMenuItem>
                 <NavigationMenuItem>
