@@ -94,10 +94,15 @@ export const loadFullConversation = action({
   args: {
     chatId: v.string(),
   },
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<{
+    success: boolean;
+    error?: string;
+    messagesLoaded: number;
+    totalFetched?: number;
+  }> => {
     try {
       // Get the chat details
-      const chat = await ctx.runQuery(internal.beeperQueries.getChatByIdInternal, {
+      const chat: any = await ctx.runQuery(internal.beeperQueries.getChatByIdInternal, {
         chatId: args.chatId,
       });
 
@@ -158,7 +163,7 @@ export const loadFullConversation = action({
       transformedMessages.sort((a, b) => a.timestamp - b.timestamp);
 
       // Store messages using the existing syncChatMessages mutation
-      const storedCount = await ctx.runMutation(
+      const storedCount: number = await ctx.runMutation(
         internal.beeperSync.syncChatMessages,
         {
           chatId: args.chatId,

@@ -340,7 +340,7 @@ export const generateReplySuggestions = action({
         // Connection types with descriptions
         if (contact.connections && contact.connections.length > 0) {
           contactContext += `\n<connection_types>`;
-          contact.connections.forEach(conn => {
+          contact.connections.forEach((conn: string) => {
             contactContext += `\n  <connection type="${conn}">${getConnectionDescription(conn)}</connection>`;
           });
           contactContext += `\n</connection_types>`;
