@@ -937,9 +937,9 @@ function Messages() {
         {/* Mobile Sheet - Chat detail slides over */}
         {isMobile && (
           <Sheet open={sheetOpen} onOpenChange={(open) => !open && handleCloseSheet()}>
-          <SheetContent side="right" className="w-full sm:max-w-2xl p-0 flex flex-col overflow-hidden">
+          <SheetContent side="right" className="w-full sm:max-w-2xl p-0 flex flex-col overflow-hidden [&>button]:hidden">
             <SheetHeader className="px-4 py-3 border-b flex-shrink-0">
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
                   <Button
                     variant="ghost"
                     size="sm"
@@ -951,12 +951,22 @@ function Messages() {
                   <SheetTitle className="text-lg font-semibold truncate flex-1 min-w-0">
                     {selectedChat?.name || 'Conversation'}
                   </SheetTitle>
-                  {/* Contact Info Button - Mobile Only */}
+                  {/* Action Buttons - Mobile */}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => selectedChatId && handleOpenInBeeper(selectedChatId)}
+                    className="h-8 w-8 p-0 flex-shrink-0"
+                    title="Open in Beeper Desktop"
+                  >
+                    <ExternalLink className="h-4 w-4" />
+                  </Button>
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={() => setContactPanelOpen(true)}
-                    className="h-8 w-8 p-0 flex-shrink-0 sm:hidden"
+                    className="h-8 w-8 p-0 flex-shrink-0"
+                    title="Contact Info"
                   >
                     <UserIcon className="h-4 w-4" />
                   </Button>
@@ -965,18 +975,6 @@ function Messages() {
 
               {selectedChatId && selectedChat && (
                 <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-                  {/* Open in Beeper Button */}
-                  <div className="flex-shrink-0 border-b border-gray-200 px-4 py-2 bg-gray-50">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleOpenInBeeper(selectedChatId)}
-                      className="gap-2 w-full"
-                    >
-                      <ExternalLink className="w-4 h-4" />
-                      Open in Beeper Desktop
-                    </Button>
-                  </div>
 
                   {isLoadingMessages ? (
                     <div className="flex-1 flex items-center justify-center bg-white">
@@ -1024,7 +1022,6 @@ function Messages() {
                                 AI
                               </PromptInputButton>
                               <div className="flex gap-1">
-                                <PromptInputSubmit disabled={isSendingMessage} />
                                 <DropdownMenu>
                                   <DropdownMenuTrigger asChild>
                                     <Button variant="ghost" size="icon" className="h-9 w-9 flex-shrink-0">
@@ -1040,6 +1037,7 @@ function Messages() {
                                     </DropdownMenuItem>
                                   </DropdownMenuContent>
                                 </DropdownMenu>
+                                <PromptInputSubmit disabled={isSendingMessage} />
                               </div>
                             </PromptInputToolbar>
                         </PromptInput>
@@ -1077,7 +1075,7 @@ function Messages() {
         {/* Mobile Contact Panel Sheet */}
         {isMobile && (
           <Sheet open={contactPanelOpen} onOpenChange={setContactPanelOpen}>
-            <SheetContent side="right" className="w-full sm:max-w-md p-0">
+            <SheetContent side="right" className="w-full sm:max-w-md p-0 [&>button]:hidden">
               <SheetHeader className="px-4 py-3 border-b">
                 <div className="flex items-center gap-3">
                   <Button
