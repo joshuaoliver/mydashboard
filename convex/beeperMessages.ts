@@ -1,4 +1,5 @@
 import { action } from "./_generated/server";
+import { internal } from "./_generated/api";
 import { v } from "convex/values";
 import BeeperDesktop from '@beeper/desktop-api';
 
@@ -79,6 +80,107 @@ export const sendMessage = action({
       return {
         success: false,
         error: `Failed to send message: ${errorMsg}`,
+      };
+    }
+  },
+});
+
+/**
+ * Load full conversation history for a specific chat
+ * Uses the Beeper SDK with auto-pagination to fetch all messages from the last year
+ * Reuses existing syncChatMessages mutation for storage
+ */
+export const loadFullConversation = action({
+  args: {
+    chatId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    try {
+      // Get the chat details
+      const chat = await ctx.runQuery(internal.beeperQueries.getChatByIdInternal, {
+        chatId: args.chatId,
+      });
+
+      if (!chat) {
+        return {
+          success: false,
+          error: "Chat not found",
+          messagesLoaded: 0,
+        };
+      }
+
+      const roomId = chat.localChatID || args.chatId;
+      
+      // Calculate timestamp for 1 year ago
+      const oneYearAgo = new Date();
+      oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+
+      console.log(`📥 Loading full conversation for ${chat.title} (${roomId})`);
+      console.log(`   Fetching messages from ${oneYearAgo.toISOString()}`);
+
+      // Initialize Beeper SDK client
+      const client = createBeeperClient();
+
+      // Use SDK auto-pagination to fetch ALL messages since one year ago
+      const allMessages: any[] = [];
+      for await (const message of client.messages.list({
+        chatID: roomId,
+        dateAfter: oneYearAgo.toISOString(),
+        limit: 100, // Fetch 100 per page
+      } as any)) {
+        allMessages.push(message);
+      }
+
+      console.log(`✅ Fetched ${allMessages.length} messages from Beeper SDK`);
+
+      // Transform messages to match our schema
+      const transformedMessages = allMessages.map((msg: any) => ({
+        messageId: msg.id,
+        text: msg.text || "",
+        timestamp: new Date(msg.timestamp).getTime(),
+        senderId: msg.sender?.id || "unknown",
+        senderName: msg.sender?.displayName || msg.sender?.name || "Unknown",
+        isFromUser: msg.sender?.isSelf || false,
+        attachments: msg.attachments?.map((att: any) => ({
+          type: att.type || "unknown",
+          srcURL: att.url || att.srcURL || "",
+          mimeType: att.mimeType,
+          fileName: att.fileName,
+          fileSize: att.fileSize,
+          isGif: att.isGif,
+          isSticker: att.isSticker,
+          width: att.width,
+          height: att.height,
+        })),
+      }));
+
+      // Sort messages by timestamp (oldest first) for proper storage
+      transformedMessages.sort((a, b) => a.timestamp - b.timestamp);
+
+      // Store messages using the existing syncChatMessages mutation
+      const storedCount = await ctx.runMutation(
+        internal.beeperSync.syncChatMessages,
+        {
+          chatId: args.chatId,
+          messages: transformedMessages,
+          chatDocId: chat._id,
+          lastMessagesSyncedAt: Date.now(),
+        }
+      );
+
+      console.log(`✅ Stored ${storedCount} new messages`);
+
+      return {
+        success: true,
+        messagesLoaded: storedCount,
+        totalFetched: allMessages.length,
+      };
+    } catch (error) {
+      console.error("❌ Error loading full conversation:", error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : "Unknown error",
+        messagesLoaded: 0,
       };
     }
   },

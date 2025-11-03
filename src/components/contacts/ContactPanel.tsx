@@ -375,6 +375,7 @@ export function ContactPanel({ contact, isLoading, searchedUsername, searchedPho
       await createContactMutation({
         instagram: searchedUsername,
         whatsapp: searchedPhoneNumber,
+        phoneNumber: searchedPhoneNumber, // For iMessage contacts
       })
       // Contact will be refetched automatically via Convex reactivity
     } catch (error) {
@@ -402,12 +403,12 @@ export function ContactPanel({ contact, isLoading, searchedUsername, searchedPho
                   </div>
                 )}
                 {searchedPhoneNumber && (
-                  <div>
-                    <span className="text-gray-500">WhatsApp: </span>
+                  <div className="mb-1">
+                    <span className="text-gray-500">Phone: </span>
                     <code className="text-green-600">{searchedPhoneNumber}</code>
                   </div>
                 )}
-                <p className="mt-1 text-gray-500">Not found in Dex contacts</p>
+                <p className="mt-1 text-gray-500">Not found in contacts</p>
               </div>
               <Button
                 onClick={handleCreateContact}
@@ -417,11 +418,14 @@ export function ContactPanel({ contact, isLoading, searchedUsername, searchedPho
                 {isSaving ? 'Creating...' : 'Create Contact'}
               </Button>
               <p className="text-xs text-gray-400 mt-2">
-                Create now, sync later. When Dex syncs, matching contacts will be linked automatically.
+                {searchedPhoneNumber && !searchedUsername 
+                  ? "Create contact for iMessage. Won't sync to Dex."
+                  : "Create now, sync later. When Dex syncs, matching contacts will be linked automatically."
+                }
               </p>
             </div>
           ) : (
-            <p className="text-xs text-gray-400 mt-1">No contact identifier available</p>
+            <p className="text-xs text-gray-400 mt-1">Select a chat to view contact details</p>
         )}
       </div>
     </div>

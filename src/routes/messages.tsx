@@ -94,6 +94,7 @@ function Messages() {
   const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false)
   const [isSyncing, setIsSyncing] = useState(false)
   const [isSendingMessage, setIsSendingMessage] = useState(false)
+  const [isLoadingFullConversation, setIsLoadingFullConversation] = useState(false)
   const [error, setError] = useState<string | null>(null)
   // Removed unused conversation context/caching state
   const [tabFilter, setTabFilter] = useState<TabFilter>('unreplied')
@@ -139,6 +140,7 @@ function Messages() {
   const archiveChat = useAction(api.chatActions.archiveChat)
   const markChatAsRead = useAction(api.chatActions.markChatAsRead)
   const markChatAsUnread = useAction(api.chatActions.markChatAsUnread)
+  const loadFullConversation = useAction(api.beeperMessages.loadFullConversation)
 
   // Chats are now filtered server-side
   const chats = allLoadedChats
@@ -400,6 +402,31 @@ function Messages() {
     }
   }
 
+  // Handle loading full conversation history
+  const handleLoadFullConversation = async () => {
+    if (!selectedChatId) return
+
+    setIsLoadingFullConversation(true)
+    setError(null)
+
+    try {
+      console.log('📥 Loading full conversation history...')
+      const result = await loadFullConversation({ chatId: selectedChatId })
+
+      if (result.success) {
+        console.log(`✅ Loaded ${result.messagesLoaded} messages (total fetched: ${result.totalFetched})`)
+      } else {
+        console.error('❌ Failed to load full conversation:', result.error)
+        setError(result.error || 'Failed to load full conversation')
+      }
+    } catch (err) {
+      console.error('Error loading full conversation:', err)
+      setError(err instanceof Error ? err.message : 'Failed to load full conversation')
+    } finally {
+      setIsLoadingFullConversation(false)
+    }
+  }
+
   // Handle sending a reply via PromptInput
   const handlePromptSubmit = async (
     message: { text?: string },
@@ -582,35 +609,37 @@ function Messages() {
                     <p className="text-sm">No pending messages to reply to</p>
                   </div>
                 ) : (
-                  <div 
+                  <ScrollArea 
                     ref={chatListRef}
-                    className="divide-y divide-gray-100 overflow-y-auto flex-1"
+                    className="flex-1"
                     onScroll={handleScroll}
                   >
-                    {chats.map((chat) => (
-                      <ChatListItem
-                        key={chat.id}
-                        id={chat.id}
-                        name={chat.name}
-                        network={chat.network}
-                        username={chat.username}
-                        phoneNumber={chat.phoneNumber}
-                        lastMessage={chat.lastMessage}
-                        lastMessageTime={chat.lastMessageTime}
-                        unreadCount={chat.unreadCount}
-                        isSelected={selectedChatId === chat.id}
-                        onClick={() => handleChatSelect(chat.id)}
-                        onArchive={handleArchiveChat}
-                        contactImageUrl={chat.contactImageUrl}
-                      />
-                    ))}
-                    {status === "LoadingMore" && (
-                      <div className="py-4 text-center">
-                        <RefreshCw className="w-5 h-5 text-gray-400 animate-spin mx-auto" />
-                        <p className="text-xs text-gray-500 mt-1">Loading more...</p>
-                      </div>
-                    )}
-                  </div>
+                    <div className="divide-y divide-gray-100">
+                      {chats.map((chat) => (
+                        <ChatListItem
+                          key={chat.id}
+                          id={chat.id}
+                          name={chat.name}
+                          network={chat.network}
+                          username={chat.username}
+                          phoneNumber={chat.phoneNumber}
+                          lastMessage={chat.lastMessage}
+                          lastMessageTime={chat.lastMessageTime}
+                          unreadCount={chat.unreadCount}
+                          isSelected={selectedChatId === chat.id}
+                          onClick={() => handleChatSelect(chat.id)}
+                          onArchive={handleArchiveChat}
+                          contactImageUrl={chat.contactImageUrl}
+                        />
+                      ))}
+                      {status === "LoadingMore" && (
+                        <div className="py-4 text-center">
+                          <RefreshCw className="w-5 h-5 text-gray-400 animate-spin mx-auto" />
+                          <p className="text-xs text-gray-500 mt-1">Loading more...</p>
+                        </div>
+                      )}
+                    </div>
+                  </ScrollArea>
                 )}
               </div>
             </ResizablePanel>
@@ -646,21 +675,36 @@ function Messages() {
                         </div>
                       </div>
                       <div className="flex gap-2">
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={handleLoadFullConversation}
+                                disabled={isLoadingFullConversation}
+                                title="Load full conversation history"
+                              >
+                                <RefreshCw className={`w-4 h-4 ${isLoadingFullConversation ? 'animate-spin' : ''}`} />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Load full conversation history (1 year)</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
                         <Button
                           variant="ghost"
                           size="sm"
                           onClick={() => handleOpenInBeeper(selectedChatId)}
-                          className="gap-2"
                           title="Open in Beeper Desktop"
                         >
                           <ExternalLink className="w-4 h-4" />
-                          Open in Beeper
                         </Button>
                         <Button
                           variant="ghost"
                           size="sm"
                           onClick={() => selectedChat.unreadCount > 0 ? handleMarkAsRead(selectedChatId) : handleMarkAsUnread(selectedChatId)}
-                          className="gap-2"
                           title={selectedChat.unreadCount > 0 ? "Mark as read" : "Mark as unread"}
                         >
                           {selectedChat.unreadCount > 0 ? (
@@ -869,31 +913,33 @@ function Messages() {
                   <p className="text-sm">No pending messages to reply to</p>
                 </div>
               ) : (
-                <div className="divide-y divide-gray-100 overflow-y-auto">
-                  {chats.map((chat) => (
-                    <ChatListItem
-                      key={chat.id}
-                      id={chat.id}
-                      name={chat.name}
-                      network={chat.network}
-                      username={chat.username}
-                      phoneNumber={chat.phoneNumber}
-                      lastMessage={chat.lastMessage}
-                      lastMessageTime={chat.lastMessageTime}
-                      unreadCount={chat.unreadCount}
-                      isSelected={selectedChatId === chat.id}
-                      onClick={() => handleChatSelect(chat.id)}
-                      onArchive={handleArchiveChat}
-                      contactImageUrl={chat.contactImageUrl}
-                    />
-                  ))}
-                  {status === "LoadingMore" && (
-                    <div className="py-4 text-center">
-                      <RefreshCw className="w-5 h-5 text-gray-400 animate-spin mx-auto" />
-                      <p className="text-xs text-gray-500 mt-1">Loading more...</p>
-                    </div>
-                  )}
-                </div>
+                <ScrollArea className="flex-1">
+                  <div className="divide-y divide-gray-100">
+                    {chats.map((chat) => (
+                      <ChatListItem
+                        key={chat.id}
+                        id={chat.id}
+                        name={chat.name}
+                        network={chat.network}
+                        username={chat.username}
+                        phoneNumber={chat.phoneNumber}
+                        lastMessage={chat.lastMessage}
+                        lastMessageTime={chat.lastMessageTime}
+                        unreadCount={chat.unreadCount}
+                        isSelected={selectedChatId === chat.id}
+                        onClick={() => handleChatSelect(chat.id)}
+                        onArchive={handleArchiveChat}
+                        contactImageUrl={chat.contactImageUrl}
+                      />
+                    ))}
+                    {status === "LoadingMore" && (
+                      <div className="py-4 text-center">
+                        <RefreshCw className="w-5 h-5 text-gray-400 animate-spin mx-auto" />
+                        <p className="text-xs text-gray-500 mt-1">Loading more...</p>
+                      </div>
+                    )}
+                  </div>
+                </ScrollArea>
               )}
             </Sidebar>
           </>

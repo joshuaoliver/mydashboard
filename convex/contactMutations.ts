@@ -316,11 +316,13 @@ export const updateIntimateConnection = mutation({
 /**
  * Create a new contact (user-initiated, no dexId yet)
  * When Dex sync runs later, it will match by Instagram username or phone and adopt this contact
+ * For iMessage-only contacts (phone number only), sets doNotSyncToDex flag
  */
 export const createContact = mutation({
   args: {
     instagram: v.optional(v.string()),
     whatsapp: v.optional(v.string()),
+    phoneNumber: v.optional(v.string()), // iMessage phone number
     firstName: v.optional(v.string()),
     lastName: v.optional(v.string()),
     description: v.optional(v.string()),
@@ -354,13 +356,51 @@ export const createContact = mutation({
       }
     }
 
+    // Check if contact with this phone number already exists (for iMessage)
+    if (args.phoneNumber) {
+      // Normalize phone number for comparison
+      const normalizePhone = (phone: string) => phone.replace(/[\s\-\(\)]/g, '');
+      const searchPhone = normalizePhone(args.phoneNumber);
+
+      // Check whatsapp field
+      const existingWhatsapp = await ctx.db
+        .query("contacts")
+        .withIndex("by_whatsapp", (q) => q.eq("whatsapp", args.phoneNumber))
+        .first();
+
+      if (existingWhatsapp) {
+        return { contactId: existingWhatsapp._id, existed: true };
+      }
+
+      // Check phones array
+      const allContactsWithPhones = await ctx.db
+        .query("contacts")
+        .filter((q) => q.neq(q.field("phones"), undefined))
+        .collect();
+
+      const existingPhone = allContactsWithPhones.find((c) => {
+        if (!c.phones) return false;
+        return c.phones.some((p) => normalizePhone(p.phone) === searchPhone);
+      });
+
+      if (existingPhone) {
+        return { contactId: existingPhone._id, existed: true };
+      }
+    }
+
+    // Determine if this should sync to Dex
+    // If only a phone number is provided (iMessage), don't sync to Dex
+    const doNotSyncToDex = !args.instagram && !args.whatsapp && !!args.phoneNumber;
+
     // Create new contact (no dexId - will be added when Dex sync finds a match)
     const contactId = await ctx.db.insert("contacts", {
       instagram: args.instagram,
       whatsapp: args.whatsapp,
+      phones: args.phoneNumber ? [{ phone: args.phoneNumber }] : undefined,
       firstName: args.firstName,
       lastName: args.lastName,
       description: args.description,
+      doNotSyncToDex: doNotSyncToDex || undefined,
       lastSyncedAt: now,
       lastModifiedAt: now,
     });

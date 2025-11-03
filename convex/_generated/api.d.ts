@@ -12,6 +12,7 @@ import type * as aiSuggestions from "../aiSuggestions.js";
 import type * as auth from "../auth.js";
 import type * as beeperActions from "../beeperActions.js";
 import type * as beeperActions_improved from "../beeperActions_improved.js";
+import type * as beeperFullSync from "../beeperFullSync.js";
 import type * as beeperGlobalSync from "../beeperGlobalSync.js";
 import type * as beeperMessages from "../beeperMessages.js";
 import type * as beeperMutations from "../beeperMutations.js";
@@ -57,6 +58,7 @@ declare const fullApi: ApiFromModules<{
   auth: typeof auth;
   beeperActions: typeof beeperActions;
   beeperActions_improved: typeof beeperActions_improved;
+  beeperFullSync: typeof beeperFullSync;
   beeperGlobalSync: typeof beeperGlobalSync;
   beeperMessages: typeof beeperMessages;
   beeperMutations: typeof beeperMutations;

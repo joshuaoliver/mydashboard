@@ -144,6 +144,7 @@ export default defineSchema({
       addedAt: v.number(),      // Timestamp when added
     }))), // Historical and alternate social media handles
     mergedFrom: v.optional(v.array(v.id("contacts"))), // IDs of contacts merged into this one
+    doNotSyncToDex: v.optional(v.boolean()), // Flag for contacts that should not sync to Dex (e.g., iMessage-only contacts)
   })
     .index("by_dex_id", ["dexId"])
     .index("by_instagram", ["instagram"]) // For matching with Beeper Instagram chats
