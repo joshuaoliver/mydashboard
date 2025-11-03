@@ -27,11 +27,11 @@ export default defineConfig({
   },
   plugins: [
     tailwindcss(),
+    tanstackStart(), // Must come before viteReact()
     viteReact(),
     tsConfigPaths({
       projects: ['./tsconfig.json'],
     }),
-    tanstackStart(),
     nitro({
       config: {
         preset: 'bun',

@@ -165,27 +165,66 @@ export const syncChatMessages = internalMutation({
       `[syncChatMessages] Chat ${args.chatId}: inserted ${insertedCount}, skipped ${skippedCount} (already cached)`
     );
 
-    // Calculate reply tracking from messages
+    // Calculate reply tracking from NEW messages (if any)
+    // OR query database to find the actual last message
     let lastMessageFrom: "user" | "them" | undefined;
-    let needsReply = false;
+    let needsReply: boolean | undefined;
     let lastMessageText: string | undefined;
 
     if (args.messages.length > 0) {
+      // We have new messages - use the most recent one from the API
       // Messages MUST be sorted by timestamp (oldest to newest) before calling this function
-      // Get the MOST RECENT message (last item in sorted array)
       const lastMessage = args.messages[args.messages.length - 1];
       lastMessageFrom = lastMessage.isFromUser ? "user" : "them";
       needsReply = !lastMessage.isFromUser; // Need to reply if they sent last message
       lastMessageText = lastMessage.text;
+      
+      console.log(
+        `[syncChatMessages] Updated reply tracking from NEW messages: ` +
+        `lastFrom=${lastMessageFrom}, needsReply=${needsReply}`
+      );
+    } else {
+      // No new messages - query database to find the actual last message
+      // This ensures we don't overwrite existing tracking data with undefined
+      const existingMessages = await ctx.db
+        .query("beeperMessages")
+        .withIndex("by_chat", (q) => q.eq("chatId", args.chatId))
+        .order("desc") // Newest first
+        .take(1);
+      
+      if (existingMessages.length > 0) {
+        const lastMsg = existingMessages[0];
+        lastMessageFrom = lastMsg.isFromUser ? "user" : "them";
+        needsReply = !lastMsg.isFromUser;
+        lastMessageText = lastMsg.text;
+        
+        console.log(
+          `[syncChatMessages] Preserved reply tracking from DB (no new messages): ` +
+          `lastFrom=${lastMessageFrom}, needsReply=${needsReply}`
+        );
+      } else {
+        // No messages at all for this chat - leave as undefined
+        console.log(`[syncChatMessages] No messages found for chat ${args.chatId}`);
+      }
     }
 
     // Update chat with lastMessagesSyncedAt and reply tracking
-    await ctx.db.patch(args.chatDocId, {
+    // CRITICAL: Only include fields that have values to avoid overwriting with undefined
+    const chatUpdate: any = {
       lastMessagesSyncedAt: args.lastMessagesSyncedAt,
-      lastMessageFrom,
-      needsReply,
-      lastMessage: lastMessageText,
-    });
+    };
+    
+    if (lastMessageFrom !== undefined) {
+      chatUpdate.lastMessageFrom = lastMessageFrom;
+    }
+    if (needsReply !== undefined) {
+      chatUpdate.needsReply = needsReply;
+    }
+    if (lastMessageText !== undefined) {
+      chatUpdate.lastMessage = lastMessageText;
+    }
+    
+    await ctx.db.patch(args.chatDocId, chatUpdate);
 
     return insertedCount;
   },

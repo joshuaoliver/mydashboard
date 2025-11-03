@@ -2,14 +2,28 @@
 
 ## 🎯 Objectives Completed
 
-1. ✅ Fixed wasteful sync operations (100 unnecessary upserts)
-2. ✅ Updated Beeper SDK from v0.1.5 to v4.2.2
-3. ✅ Implemented improved error handling
-4. ✅ Added debug logging support
+1. ✅ **CRITICAL:** Fixed chat metadata bug (reply tracking being overwritten)
+2. ✅ Fixed wasteful sync operations (100 unnecessary upserts)
+3. ✅ Removed 100-item limits with auto-pagination
+4. ✅ Updated Beeper SDK from v0.1.5 to v4.2.2
+5. ✅ Implemented improved error handling
+6. ✅ Added debug logging support
 
 ## 🔧 Changes Made
 
-### 1. Sync Optimization (96-99% Reduction in Wasteful Operations)
+### 1. Critical Bug Fix: Chat Metadata Preservation
+
+**Problem:** Reply tracking data (`lastMessage`, `lastMessageFrom`, `needsReply`) was being **overwritten with undefined** during incremental syncs with no new messages.
+
+**Solution:**
+- Query database to find actual last message when no new messages
+- Only update fields that have values (don't overwrite with undefined)
+- Preserve existing tracking data correctly
+
+**Files Modified:**
+- `convex/beeperSync.ts` - Fixed `syncChatMessages` mutation
+
+### 2. Sync Optimization (96-99% Reduction in Wasteful Operations)
 
 **Problem:** Every sync was fetching 100 messages and upserting all of them, even when there were no new messages.
 
@@ -45,6 +59,8 @@
 ## 📚 Documentation
 
 **New Documents:**
+- `docs/CHAT_METADATA_BUG_FIX.md` - Critical bug fix documentation
+- `docs/AUTO_PAGINATION_FIX.md` - Auto-pagination implementation
 - `docs/BEEPER_SYNC_OPTIMIZATION.md` - Detailed sync optimization guide
 - `docs/BEEPER_SDK_UPDATE_V4.md` - SDK update details and new features
 

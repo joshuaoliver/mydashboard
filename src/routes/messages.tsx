@@ -31,7 +31,7 @@ import { ContactPanel } from '@/components/contacts/ContactPanel'
 import { useAction, useQuery, useMutation, usePaginatedQuery } from 'convex/react'
 import { api } from '../../convex/_generated/api'
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { RefreshCw, AlertCircle, MessageCircle, ArrowLeft, Sparkles, Archive, Mail, MailOpen, ExternalLink, MoreVertical } from 'lucide-react'
+import { RefreshCw, AlertCircle, MessageCircle, ArrowLeft, Sparkles, Archive, Mail, MailOpen, ExternalLink, MoreVertical, User as UserIcon } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import {
   ResizableHandle,
@@ -104,6 +104,7 @@ function Messages() {
   // Mobile detection and sheet state
   const isMobile = useIsMobile()
   const [sheetOpen, setSheetOpen] = useState(false)
+  const [contactPanelOpen, setContactPanelOpen] = useState(false)
   
   // Track previous contact data to detect changes
   const prevContactDataRef = useRef<{ connection?: string[] | string; notes?: string } | null>(null)
@@ -141,6 +142,7 @@ function Messages() {
   const markChatAsRead = useAction(api.chatActions.markChatAsRead)
   const markChatAsUnread = useAction(api.chatActions.markChatAsUnread)
   const loadFullConversation = useAction(api.beeperMessages.loadFullConversation)
+  const focusChat = useAction(api.beeperMessages.focusChat)
 
   // Chats are now filtered server-side
   const chats = allLoadedChats
@@ -191,13 +193,13 @@ function Messages() {
     syncOnLoad()
   }, [pageLoadSync])
 
-  // Auto-select most recent chat if no chat is selected
+  // Auto-select most recent chat if no chat is selected (desktop only)
   useEffect(() => {
-    if (!selectedChatId && chats.length > 0) {
+    if (!selectedChatId && chats.length > 0 && !isMobile) {
       const mostRecentChat = chats[0] // Chats are already sorted by most recent
       navigate({ search: { chatId: mostRecentChat.id } })
     }
-  }, [chats, selectedChatId, navigate])
+  }, [chats, selectedChatId, navigate, isMobile])
 
   // Update messages when cached data changes (automatic via Convex reactivity!)
   useEffect(() => {
@@ -375,26 +377,13 @@ function Messages() {
   // Handle opening chat in Beeper Desktop
   const handleOpenInBeeper = async (chatId: string, draftText?: string) => {
     try {
-      const beeperApiUrl = 'http://localhost:23373'
-      
-      const response = await fetch(`${beeperApiUrl}/v1/focus`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ 
-          chatID: chatId,
-          ...(draftText && { draftText }),
-        }),
+      const result = await focusChat({ 
+        chatId,
+        draftText,
       })
 
-      if (!response.ok) {
-        throw new Error(`Failed to open Beeper: ${response.status}`)
-      }
-
-      const data = await response.json()
-      if (!data.success) {
-        throw new Error('Beeper did not confirm successful focus')
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to open chat in Beeper')
       }
     } catch (err) {
       console.error('Failed to open in Beeper:', err)
@@ -948,106 +937,127 @@ function Messages() {
         {/* Mobile Sheet - Chat detail slides over */}
         {isMobile && (
           <Sheet open={sheetOpen} onOpenChange={(open) => !open && handleCloseSheet()}>
-          <SheetContent side="right" className="w-full sm:max-w-2xl p-0 flex flex-col">
+          <SheetContent side="right" className="w-full sm:max-w-2xl p-0 flex flex-col overflow-hidden">
             <SheetHeader className="px-4 py-3 border-b flex-shrink-0">
               <div className="flex items-center gap-3">
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={handleCloseSheet}
-                    className="h-8 w-8 p-0"
+                    className="h-8 w-8 p-0 flex-shrink-0"
                   >
                     <ArrowLeft className="h-4 w-4" />
                   </Button>
-                  <SheetTitle className="text-lg font-semibold">
+                  <SheetTitle className="text-lg font-semibold truncate flex-1 min-w-0">
                     {selectedChat?.name || 'Conversation'}
                   </SheetTitle>
+                  {/* Contact Info Button - Mobile Only */}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setContactPanelOpen(true)}
+                    className="h-8 w-8 p-0 flex-shrink-0 sm:hidden"
+                  >
+                    <UserIcon className="h-4 w-4" />
+                  </Button>
                 </div>
               </SheetHeader>
 
               {selectedChatId && selectedChat && (
-                <div className="flex-1 flex flex-col sm:flex-row overflow-hidden">
-                  {/* Chat Messages with Input and AI Suggestions */}
-                  <div className="flex-1 bg-white flex flex-col overflow-hidden">
-                    {/* Open in Beeper Button */}
-                    <div className="border-b border-gray-200 px-4 py-2 bg-gray-50">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleOpenInBeeper(selectedChatId)}
-                        className="gap-2 w-full"
-                      >
-                        <ExternalLink className="w-4 h-4" />
-                        Open in Beeper Desktop
-                      </Button>
-                    </div>
+                <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+                  {/* Open in Beeper Button */}
+                  <div className="flex-shrink-0 border-b border-gray-200 px-4 py-2 bg-gray-50">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleOpenInBeeper(selectedChatId)}
+                      className="gap-2 w-full"
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                      Open in Beeper Desktop
+                    </Button>
+                  </div>
 
-                    {isLoadingMessages ? (
-                      <div className="flex items-center justify-center h-full">
-                        <div className="text-center">
-                          <RefreshCw className="w-8 h-8 text-blue-500 animate-spin mx-auto mb-2" />
-                          <p className="text-sm text-gray-600">Loading conversation...</p>
-                        </div>
+                  {isLoadingMessages ? (
+                    <div className="flex-1 flex items-center justify-center bg-white">
+                      <div className="text-center">
+                        <RefreshCw className="w-8 h-8 text-blue-500 animate-spin mx-auto mb-2" />
+                        <p className="text-sm text-gray-600">Loading conversation...</p>
                       </div>
-                    ) : (
-                      <>
-                        {/* Messages */}
+                    </div>
+                  ) : (
+                    <>
+                      {/* Messages - Takes remaining space */}
+                      <div className="flex-1 overflow-hidden min-w-0">
                         <ChatDetail 
                           messages={chatMessages} 
                           isSingleChat={selectedChat?.type === 'single' || selectedChat?.type === undefined}
                           messagesStatus={messagesStatus}
                           onLoadMore={loadMoreMessages}
                         />
-                        
-                        {/* Reply Input Area */}
-                        <div className="flex-shrink-0 border-t-2 border-gray-300 p-4 bg-white shadow-sm">
-                          <PromptInput onSubmit={handlePromptSubmit} className="w-full border-2 border-gray-300 rounded-lg shadow-sm hover:border-blue-400 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-200 transition-all">
-                            <PromptInputBody>
-                              <PromptInputTextarea
-                                placeholder="Type your reply..."
-                                value={messageInputValue}
-                                onChange={(e) => setMessageInputValue(e.target.value)}
-                                className="text-gray-900 placeholder:text-gray-500"
-                              />
-                            </PromptInputBody>
-                              <PromptInputToolbar>
-                                <div />
-                                <div className="flex gap-1">
-                                  <PromptInputSubmit disabled={isSendingMessage} />
-                                  <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                      <Button variant="ghost" size="icon" className="h-9 w-9">
-                                        <MoreVertical className="h-4 w-4" />
-                                      </Button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end">
-                                      <DropdownMenuItem
-                                        onClick={() => handleOpenInBeeper(selectedChatId, messageInputValue)}
-                                      >
-                                        <ExternalLink className="mr-2 h-4 w-4" />
-                                        Send with Beeper
-                                      </DropdownMenuItem>
-                                    </DropdownMenuContent>
-                                  </DropdownMenu>
-                                </div>
-                              </PromptInputToolbar>
-                          </PromptInput>
-                        </div>
+                      </div>
+                      
+                      {/* Reply Input Area */}
+                      <div className="flex-shrink-0 border-t-2 border-gray-300 p-2 sm:p-4 bg-white shadow-sm">
+                        <PromptInput onSubmit={handlePromptSubmit} className="w-full min-w-0 border-2 border-gray-300 rounded-lg shadow-sm hover:border-blue-400 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-200 transition-all">
+                          <PromptInputBody>
+                            <PromptInputTextarea
+                              placeholder="Type your reply..."
+                              value={messageInputValue}
+                              onChange={(e) => setMessageInputValue(e.target.value)}
+                              className="text-gray-900 placeholder:text-gray-500 min-w-0"
+                            />
+                          </PromptInputBody>
+                            <PromptInputToolbar>
+                              <PromptInputButton
+                                onClick={() => {
+                                  if (messageInputValue.trim()) {
+                                    handleGenerateAISuggestions(messageInputValue)
+                                  } else {
+                                    handleGenerateAISuggestions()
+                                  }
+                                }}
+                                disabled={isLoadingSuggestions || isSendingMessage}
+                                className="gap-1.5"
+                              >
+                                <Sparkles className="w-4 h-4" />
+                                AI
+                              </PromptInputButton>
+                              <div className="flex gap-1">
+                                <PromptInputSubmit disabled={isSendingMessage} />
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" size="icon" className="h-9 w-9 flex-shrink-0">
+                                      <MoreVertical className="h-4 w-4" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                    <DropdownMenuItem
+                                      onClick={() => handleOpenInBeeper(selectedChatId, messageInputValue)}
+                                    >
+                                      <ExternalLink className="mr-2 h-4 w-4" />
+                                      Send with Beeper
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              </div>
+                            </PromptInputToolbar>
+                        </PromptInput>
+                      </div>
 
-                        {/* AI Reply Suggestions - Below Input */}
-                        <div className="flex-shrink-0 border-t-2 border-gray-300 bg-gray-50">
-                          <ReplySuggestions
-                            suggestions={replySuggestions}
-                            isLoading={isLoadingSuggestions}
-                            error={error || undefined}
-                            onGenerateClick={handleGenerateAISuggestions}
-                            selectedIndex={selectedSuggestionIndex}
-                            onSuggestionSelect={handleSuggestionSelect}
-                          />
-                        </div>
-                      </>
-                    )}
-                  </div>
+                      {/* AI Reply Suggestions - Below Input */}
+                      <div className="flex-shrink-0 border-t-2 border-gray-300 bg-gray-50 min-w-0 max-h-[35vh] overflow-auto">
+                        <ReplySuggestions
+                          suggestions={replySuggestions}
+                          isLoading={isLoadingSuggestions}
+                          error={error || undefined}
+                          onGenerateClick={handleGenerateAISuggestions}
+                          selectedIndex={selectedSuggestionIndex}
+                          onSuggestionSelect={handleSuggestionSelect}
+                        />
+                      </div>
+                    </>
+                  )}
 
                   {/* Contact Panel - Hidden on very small screens */}
                   <div className="hidden sm:block sm:w-[300px] bg-white border-l overflow-hidden">
@@ -1059,6 +1069,35 @@ function Messages() {
                     />
                   </div>
                 </div>
+              )}
+            </SheetContent>
+          </Sheet>
+        )}
+
+        {/* Mobile Contact Panel Sheet */}
+        {isMobile && (
+          <Sheet open={contactPanelOpen} onOpenChange={setContactPanelOpen}>
+            <SheetContent side="right" className="w-full sm:max-w-md p-0">
+              <SheetHeader className="px-4 py-3 border-b">
+                <div className="flex items-center gap-3">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setContactPanelOpen(false)}
+                    className="h-8 w-8 p-0 flex-shrink-0"
+                  >
+                    <ArrowLeft className="h-4 w-4" />
+                  </Button>
+                  <SheetTitle className="text-lg font-semibold">Contact Info</SheetTitle>
+                </div>
+              </SheetHeader>
+              {selectedChat && (
+                <ContactPanel 
+                  contact={contactData || null} 
+                  isLoading={contactData === undefined && (!!selectedChat?.username || !!selectedChat?.phoneNumber)}
+                  searchedUsername={selectedChat?.username}
+                  searchedPhoneNumber={selectedChat?.phoneNumber}
+                />
               )}
             </SheetContent>
           </Sheet>

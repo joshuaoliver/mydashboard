@@ -24,6 +24,64 @@ function createBeeperClient() {
 }
 
 /**
+ * Focus/open a chat in Beeper Desktop
+ * Optionally sets draft text
+ */
+export const focusChat = action({
+  args: {
+    chatId: v.string(),
+    draftText: v.optional(v.string()),
+  },
+  handler: async (_ctx, args): Promise<{
+    success: boolean;
+    error?: string;
+  }> => {
+    try {
+      console.log(`[Focus Chat] Opening chat ${args.chatId} in Beeper Desktop`);
+
+      // Initialize Beeper SDK client
+      const client = createBeeperClient();
+
+      // Build request body
+      const requestBody: {
+        chatID: string;
+        draftText?: string;
+      } = {
+        chatID: args.chatId,
+      };
+
+      if (args.draftText) {
+        requestBody.draftText = args.draftText;
+        console.log(`[Focus Chat] Setting draft text: "${args.draftText.slice(0, 50)}..."`);
+      }
+
+      // Call focus endpoint
+      const response = await client.post(`/v1/focus`, {
+        body: requestBody,
+      }) as any;
+
+      if (!response.success) {
+        throw new Error('Beeper did not confirm successful focus');
+      }
+
+      console.log(`[Focus Chat] Successfully focused chat ${args.chatId}`);
+
+      return {
+        success: true,
+      };
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : "Unknown error";
+      console.error(`[Focus Chat] Error: ${errorMsg}`);
+
+      return {
+        success: false,
+        error: `Failed to open chat: ${errorMsg}`,
+      };
+    }
+  },
+});
+
+/**
  * Send a message to a Beeper chat
  * Supports replying to specific messages
  */

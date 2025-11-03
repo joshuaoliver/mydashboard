@@ -3,7 +3,6 @@ import { Copy, Check, Sparkles } from 'lucide-react'
 import { useState } from 'react'
 import { Loader } from '@/components/ai-elements/loader'
 import { Response } from '@/components/ai-elements/response'
-import { ScrollArea } from '@/components/ui/scroll-area'
 
 interface ReplySuggestion {
   reply: string
@@ -86,59 +85,57 @@ export function ReplySuggestions({
   }
 
   return (
-    <ScrollArea className="max-h-[400px]">
-      <div className="p-4">
-        {/* Suggestion Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {suggestions.map((suggestion, index) => {
-            const isSelected = index === selectedIndex
-            return (
-              <div
-                key={index}
-                onClick={() => onSuggestionSelect?.(index)}
-                className={`p-3 rounded-lg transition-all cursor-pointer group ${
-                  isSelected
-                    ? 'bg-blue-50 border-2 border-blue-500 shadow-sm'
-                    : 'bg-white border-2 border-gray-300 hover:border-blue-400 hover:shadow-sm'
-                }`}
-              >
-                {/* Reply text with markdown support */}
-                <div className="text-sm text-gray-900 leading-relaxed">
-                  <Response>{suggestion.reply}</Response>
-                </div>
-
-                {/* Copy button - only show for selected */}
-                {isSelected && (
-                  <div className="flex items-center justify-end gap-2 mt-3">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        handleCopy(suggestion.reply, index)
-                      }}
-                      className="h-7 text-xs opacity-0 group-hover:opacity-100 transition-opacity"
-                    >
-                      {copiedIndex === index ? (
-                        <>
-                          <Check className="w-3 h-3 mr-1 text-green-600" />
-                          <span className="text-green-600">Copied</span>
-                        </>
-                      ) : (
-                        <>
-                          <Copy className="w-3 h-3 mr-1" />
-                          Copy
-                        </>
-                      )}
-                    </Button>
-                  </div>
-                )}
+    <div className="p-2 sm:p-4 min-w-0">
+      {/* Suggestion Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3 min-w-0">
+        {suggestions.map((suggestion, index) => {
+          const isSelected = index === selectedIndex
+          return (
+            <div
+              key={index}
+              onClick={() => onSuggestionSelect?.(index)}
+              className={`p-2 sm:p-3 rounded-lg transition-all cursor-pointer group min-w-0 ${
+                isSelected
+                  ? 'bg-blue-50 border-2 border-blue-500 shadow-sm'
+                  : 'bg-white border-2 border-gray-300 hover:border-blue-400 hover:shadow-sm'
+              }`}
+            >
+              {/* Reply text with markdown support */}
+              <div className="text-sm text-gray-900 leading-relaxed break-words overflow-hidden">
+                <Response>{suggestion.reply}</Response>
               </div>
-            )
-          })}
-        </div>
+
+              {/* Copy button - only show for selected */}
+              {isSelected && (
+                <div className="flex items-center justify-end gap-2 mt-2 sm:mt-3">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleCopy(suggestion.reply, index)
+                    }}
+                    className="h-7 text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                  >
+                    {copiedIndex === index ? (
+                      <>
+                        <Check className="w-3 h-3 mr-1 text-green-600" />
+                        <span className="text-green-600">Copied</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-3 h-3 mr-1" />
+                        Copy
+                      </>
+                    )}
+                  </Button>
+                </div>
+              )}
+            </div>
+          )
+        })}
       </div>
-    </ScrollArea>
+    </div>
   )
 }
 
