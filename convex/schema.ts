@@ -46,7 +46,7 @@ export default defineSchema({
     title: v.string(),               // Contact/group name
     network: v.string(),             // "WhatsApp", "Instagram", etc.
     accountID: v.string(),           // "whatsapp", "instagram", etc.
-    type: v.string(),                // "single" or "group"
+    type: v.union(v.literal("single"), v.literal("group")),  // "single" or "group"
     
     // Contact identifiers (for the other person in single chats)
     username: v.optional(v.string()),        // Instagram/Twitter username

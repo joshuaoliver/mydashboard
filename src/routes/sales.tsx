@@ -276,7 +276,7 @@ function SalesPage() {
                 onDragEnd={handleDragEnd}
                 onDragOver={handleDragOver}
               >
-                {(column) => {
+                {(column: typeof LEAD_STATUS_METADATA[number]) => {
                   const columnContacts = kanbanData.filter(
                     (item) => item.column === column.id
                   )
@@ -299,7 +299,7 @@ function SalesPage() {
                       </KanbanHeader>
                       <KanbanCards id={column.id}>
                         {(item: typeof kanbanData[number]) => {
-                          const contact = item.contact
+                          const contact: ContactRecord = item.contact as ContactRecord
                           return (
                             <KanbanCard
                               column={column.id}

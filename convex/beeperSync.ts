@@ -42,7 +42,7 @@ export const upsertChat = internalMutation({
       title: v.string(),
       network: v.string(),
       accountID: v.string(),
-      type: v.string(),
+      type: v.union(v.literal("single"), v.literal("group")),
       username: v.optional(v.string()),
       phoneNumber: v.optional(v.string()),
       email: v.optional(v.string()),
@@ -268,13 +268,16 @@ export const syncBeeperChatsInternal = internalAction({
 
         const lastActivity = new Date(chat.lastActivity).getTime();
 
+        // Ensure type is properly typed as "single" | "group"
+        const chatType = (chat.type === "single" || chat.type === "group") ? chat.type : "single" as const;
+
         const chatData = {
           chatId: chat.id,
           localChatID: chat.localChatID || chat.id,
           title: chat.title || "Unknown",
           network: chat.network || chat.accountID || "Unknown",
           accountID: chat.accountID || "",
-          type: chat.type || "single",
+          type: chatType,
           username,
           phoneNumber,
           email,
