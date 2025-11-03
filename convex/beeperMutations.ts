@@ -47,3 +47,30 @@ export const saveUserMessage = internalMutation({
   },
 });
 
+/**
+ * Archive or unarchive a chat
+ * This removes it from the main chat list without deleting it
+ */
+export const toggleArchiveChat = internalMutation({
+  args: {
+    chatId: v.string(),
+    isArchived: v.boolean(),
+  },
+  handler: async (ctx, args) => {
+    const chat = await ctx.db
+      .query("beeperChats")
+      .withIndex("by_chat_id", (q) => q.eq("chatId", args.chatId))
+      .first();
+    
+    if (!chat) {
+      throw new Error(`Chat ${args.chatId} not found`);
+    }
+
+    await ctx.db.patch(chat._id, {
+      isArchived: args.isArchived,
+    });
+
+    return { success: true, chatId: args.chatId, isArchived: args.isArchived };
+  },
+});
+

@@ -21,12 +21,17 @@ import {
 import { ChatListItem } from '@/components/messages/ChatListItem'
 import { ChatDetail } from '@/components/messages/ChatDetail'
 import { ReplySuggestions } from '@/components/messages/ReplySuggestions'
-import { ContactPanel } from '@/components/messages/ContactPanel'
-import { useAction, useQuery, useMutation } from 'convex/react'
+import { ContactPanel } from '@/components/contacts/ContactPanel'
+import { useAction, useQuery, useMutation, usePaginatedQuery } from 'convex/react'
 import { api } from '../../convex/_generated/api'
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { RefreshCw, AlertCircle, MessageCircle, ArrowLeft, Sparkles } from 'lucide-react'
+import { RefreshCw, AlertCircle, MessageCircle, ArrowLeft, Sparkles, Archive } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import {
+  ResizableHandle,
+  ResizablePanel,
+  ResizablePanelGroup,
+} from '@/components/ui/resizable'
 import { useIsMobile } from '@/lib/hooks/use-mobile'
 import { cn } from '~/lib/utils'
 
@@ -82,10 +87,9 @@ interface Message {
 interface ReplySuggestion {
   reply: string
   style: string  // Conversation pathway label (e.g., "Ask deeper question", "Shift to plans")
-  reasoning: string
 }
 
-type TabFilter = 'unreplied' | 'unread' | 'all'
+type TabFilter = 'unreplied' | 'unread' | 'all' | 'archived'
 
 function Messages() {
   const navigate = useNavigate({ from: '/messages' })
@@ -110,20 +114,20 @@ function Messages() {
   const [sheetOpen, setSheetOpen] = useState(false)
   
   // Track previous contact data to detect changes
-  const prevContactDataRef = useRef<{ connection?: string; notes?: string } | null>(null)
+  const prevContactDataRef = useRef<{ connection?: string[] | string; notes?: string } | null>(null)
+  
+  // Track current chat being generated for (prevent race conditions)
+  const generatingForChatIdRef = useRef<string | null>(null)
   
   // Infinite scroll state
-  const [allLoadedChats, setAllLoadedChats] = useState<Chat[]>([])
-  const [nextCursor, setNextCursor] = useState<number | undefined>(undefined)
-  const [hasMoreChats, setHasMoreChats] = useState(true)
-  const [isLoadingMore, setIsLoadingMore] = useState(false)
   const chatListRef = useRef<HTMLDivElement>(null)
 
-  // Query cached chats from database (instant, reactive) with pagination
-  const chatsData = useQuery(api.beeperQueries.listCachedChats, { 
-    limit: 30,
-    cursor: nextCursor 
-  })
+  // Query cached chats from database using Convex pagination (instant, reactive, smooth loading)
+  const { results: allLoadedChats, status, loadMore } = usePaginatedQuery(
+    api.beeperQueries.listCachedChats,
+    {},
+    { initialNumItems: 30 }
+  )
   const syncInfo = useQuery(api.beeperQueries.getChatInfo)
   
   // Query cached messages for selected chat (instant, reactive)
@@ -136,63 +140,38 @@ function Messages() {
   const pageLoadSync = useAction(api.beeperSync.pageLoadSync)
   const manualSync = useAction(api.beeperSync.manualSync)
   const generateReplySuggestions = useAction(api.beeperActions.generateReplySuggestions)
+  const archiveChat = useAction(api.chatActions.archiveChat)
 
-  // Merge new chats with existing ones
-  useEffect(() => {
-    if (chatsData?.chats) {
-      setAllLoadedChats(prev => {
-        // If this is the first load (no cursor was set), replace all
-        if (nextCursor === undefined && prev.length === 0) {
-          return chatsData.chats
-        }
-        // Otherwise, append new chats
-        const existingIds = new Set(prev.map(c => c.id))
-        const newChats = chatsData.chats.filter(c => !existingIds.has(c.id))
-        return [...prev, ...newChats]
-      })
-      setHasMoreChats(chatsData.hasMore || false)
-      setIsLoadingMore(false)
-    }
-  }, [chatsData, nextCursor])
-  
-  // Reset pagination when tab filter changes
-  useEffect(() => {
-    setAllLoadedChats([])
-    setNextCursor(undefined)
-    setHasMoreChats(true)
-  }, [tabFilter])
-  
   // Apply tab filtering to all loaded chats
   const chats = allLoadedChats.filter((chat) => {
+    // Archived tab - for now shows nothing since archived chats are filtered at query level
+    // TODO: Add separate query for archived chats
+    if (tabFilter === 'archived') {
+      return false
+    }
+    
+    // Other tabs filter non-archived chats
     if (tabFilter === 'unreplied') {
       return chat.needsReply === true
     } else if (tabFilter === 'unread') {
       return chat.unreadCount > 0
     }
-    return true // 'all' tab shows everything
+    return true // 'all' tab shows everything (non-archived)
   })
   
-  // Load more chats when scrolling
-  const loadMoreChats = useCallback(() => {
-    if (hasMoreChats && chatsData?.nextCursor && !isLoadingMore) {
-      console.log('📜 Loading more chats from Convex DB...')
-      setIsLoadingMore(true)
-      setNextCursor(chatsData.nextCursor)
-    }
-  }, [hasMoreChats, chatsData?.nextCursor, isLoadingMore])
-  
-  // Infinite scroll handler
+  // Infinite scroll handler - Load more when scrolling
   const handleScroll = useCallback(() => {
-    if (!chatListRef.current || !hasMoreChats || isLoadingMore) return
+    if (!chatListRef.current || status !== "CanLoadMore") return
     
     const { scrollTop, scrollHeight, clientHeight } = chatListRef.current
     const scrollPercentage = (scrollTop + clientHeight) / scrollHeight
     
     // Load more when scrolled 80% down
     if (scrollPercentage > 0.8) {
-      loadMoreChats()
+      console.log('📜 Loading more chats from Convex DB...')
+      loadMore(30) // Load 30 more chats
     }
-  }, [hasMoreChats, isLoadingMore, loadMoreChats])
+  }, [status, loadMore])
   
   const selectedChat = allLoadedChats.find((chat: Chat) => chat.id === selectedChatId)
   
@@ -285,14 +264,14 @@ function Messages() {
       return
     }
 
-    // Check if connection or notes have changed
-    const connectionChanged = prevContactDataRef.current.connection !== currentConnection
+    // Check if connection or notes have changed (connections is an array now)
+    const connectionChanged = JSON.stringify(prevContactDataRef.current.connection) !== JSON.stringify(currentConnection)
     const notesChanged = prevContactDataRef.current.notes !== currentNotes
 
     if (connectionChanged || notesChanged) {
       console.log('🔄 Contact data changed, regenerating AI suggestions...')
       if (connectionChanged) {
-        console.log(`  Connection: ${prevContactDataRef.current.connection} → ${currentConnection}`)
+        console.log(`  Connection: ${JSON.stringify(prevContactDataRef.current.connection)} → ${JSON.stringify(currentConnection)}`)
       }
       if (notesChanged) {
         console.log(`  Notes changed`)
@@ -315,6 +294,10 @@ function Messages() {
   const handleGenerateAISuggestions = async (customContext?: string) => {
     if (!selectedChatId || !selectedChat) return
 
+    // Track which chat we're generating for (prevent race conditions)
+    const chatIdBeingGenerated = selectedChatId
+    generatingForChatIdRef.current = chatIdBeingGenerated
+
     setIsLoadingSuggestions(true)
     setError(null)
 
@@ -326,6 +309,12 @@ function Messages() {
         customContext: customContext || undefined, // Pass custom context if provided
       })
 
+      // Verify we're still on the same chat before updating state
+      if (generatingForChatIdRef.current !== chatIdBeingGenerated) {
+        console.log(`⚠️ Chat switched during generation, discarding suggestions for ${selectedChat.name}`)
+        return
+      }
+
       const suggestions = suggestionsResult.suggestions || []
       setReplySuggestions(suggestions)
       
@@ -336,11 +325,17 @@ function Messages() {
         console.log(`🔄 Generated fresh suggestions for ${selectedChat.name}`)
       }
     } catch (err) {
-      console.error('Error generating suggestions:', err)
-      const errorMessage = err instanceof Error ? err.message : 'Failed to generate suggestions'
-      setError(errorMessage)
+      // Only show error if we're still on the same chat
+      if (generatingForChatIdRef.current === chatIdBeingGenerated) {
+        console.error('Error generating suggestions:', err)
+        const errorMessage = err instanceof Error ? err.message : 'Failed to generate suggestions'
+        setError(errorMessage)
+      }
     } finally {
-      setIsLoadingSuggestions(false)
+      // Only clear loading if we're still on the same chat
+      if (generatingForChatIdRef.current === chatIdBeingGenerated) {
+        setIsLoadingSuggestions(false)
+      }
     }
   }
   
@@ -355,6 +350,20 @@ function Messages() {
   // Handle chat selection
   const handleChatSelect = (chatId: string) => {
     navigate({ search: { chatId } })
+  }
+
+  // Handle archive chat
+  const handleArchiveChat = async (chatId: string) => {
+    try {
+      await archiveChat({ chatId })
+      // If the archived chat was selected, clear selection
+      if (selectedChatId === chatId) {
+        navigate({ search: { chatId: undefined } })
+      }
+    } catch (err) {
+      console.error('Failed to archive chat:', err)
+      setError(err instanceof Error ? err.message : 'Failed to archive chat')
+    }
   }
 
   // Handle sending a reply via PromptInput
@@ -441,16 +450,14 @@ function Messages() {
   return (
     <DashboardLayout>
       <FullWidthContent>
-        {/* Left Sidebar - Chat List */}
-        <Sidebar
-          width="w-full md:w-96"
-          className={cn(isMobile && sheetOpen && "hidden")}
-          header={
-            <SidebarHeader
-              title=""
-              subtitle=""
-              actions={
-                <div className="flex items-center gap-2">
+        {!isMobile ? (
+          <ResizablePanelGroup direction="horizontal" className="flex-1">
+            {/* Left Sidebar - Chat List */}
+            <ResizablePanel defaultSize={25} minSize={20} maxSize={40}>
+              <div className="h-full flex flex-col bg-white border-r border-gray-200">
+                {/* Sidebar Header */}
+                <div className="flex-shrink-0 px-4 py-3 border-b border-gray-200">
+                  <div className="flex items-center gap-2">
                   {/* Tab Filter */}
                   <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
                     <button
@@ -483,6 +490,16 @@ function Messages() {
                     >
                       All
                     </button>
+                    <button
+                      onClick={() => setTabFilter('archived')}
+                      className={`px-3 py-1 text-xs font-medium rounded transition-colors ${
+                        tabFilter === 'archived'
+                          ? 'bg-white text-gray-900 shadow-sm'
+                          : 'text-gray-600 hover:text-gray-900'
+                      }`}
+                    >
+                      Archived
+                    </button>
                   </div>
                   
                   {/* Refresh Button */}
@@ -504,90 +521,124 @@ function Messages() {
                       </TooltipContent>
                     </Tooltip>
                   </TooltipProvider>
+                  </div>
                 </div>
-              }
-            />
-          }
-        >
-          {/* Error Banner */}
-          {error && (
-            <div className="mx-4 mt-3 bg-red-50 border border-red-200 rounded-lg p-3 flex-shrink-0">
-              <div className="flex items-start gap-2">
-                <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
-                <div className="flex-1 min-w-0">
-                  <h3 className="text-xs font-medium text-red-900">Sync Error</h3>
-                  <p className="text-xs text-red-700 mt-1">{error}</p>
-                </div>
+
+                {/* Error Banner */}
+                {error && (
+                  <div className="mx-4 mt-3 bg-red-50 border border-red-200 rounded-lg p-3 flex-shrink-0">
+                    <div className="flex items-start gap-2">
+                      <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
+                      <div className="flex-1 min-w-0">
+                        <h3 className="text-xs font-medium text-red-900">Sync Error</h3>
+                        <p className="text-xs text-red-700 mt-1">{error}</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Chat List Content */}
+                {status === "LoadingFirstPage" ? (
+                  <div className="flex items-center justify-center py-12">
+                    <RefreshCw className="w-8 h-8 text-blue-500 animate-spin" />
+                  </div>
+                ) : chats.length === 0 ? (
+                  <div className="text-center py-12 px-4 text-gray-500">
+                    <p className="mb-2">🎉 All caught up!</p>
+                    <p className="text-sm">No pending messages to reply to</p>
+                  </div>
+                ) : (
+                  <div 
+                    ref={chatListRef}
+                    className="divide-y divide-gray-100 overflow-y-auto flex-1"
+                    onScroll={handleScroll}
+                  >
+                    {chats.map((chat: Chat) => (
+                      <ChatListItem
+                        key={chat.id}
+                        id={chat.id}
+                        name={chat.name}
+                        network={chat.network}
+                        username={chat.username}
+                        phoneNumber={chat.phoneNumber}
+                        lastMessage={chat.lastMessage}
+                        lastMessageTime={chat.lastMessageTime}
+                        unreadCount={chat.unreadCount}
+                        isSelected={selectedChatId === chat.id}
+                        onClick={() => handleChatSelect(chat.id)}
+                        onArchive={handleArchiveChat}
+                        contactImageUrl={chat.contactImageUrl}
+                      />
+                    ))}
+                    {status === "LoadingMore" && (
+                      <div className="py-4 text-center">
+                        <RefreshCw className="w-5 h-5 text-gray-400 animate-spin mx-auto" />
+                        <p className="text-xs text-gray-500 mt-1">Loading more...</p>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
-            </div>
-          )}
+            </ResizablePanel>
 
-          {/* Chat List Content */}
-          {!chatsData ? (
-            <div className="flex items-center justify-center py-12">
-              <RefreshCw className="w-8 h-8 text-blue-500 animate-spin" />
-            </div>
-          ) : chats.length === 0 ? (
-            <div className="text-center py-12 px-4 text-gray-500">
-              <p className="mb-2">🎉 All caught up!</p>
-              <p className="text-sm">No pending messages to reply to</p>
-            </div>
-          ) : (
-            <div 
-              ref={chatListRef}
-              className="divide-y divide-gray-100 overflow-y-auto"
-              onScroll={handleScroll}
-            >
-              {chats.map((chat: Chat) => (
-                <ChatListItem
-                  key={chat.id}
-                  id={chat.id}
-                  name={chat.name}
-                  network={chat.network}
-                  username={chat.username}
-                  phoneNumber={chat.phoneNumber}
-                  lastMessage={chat.lastMessage}
-                  lastMessageTime={chat.lastMessageTime}
-                  unreadCount={chat.unreadCount}
-                  isSelected={selectedChatId === chat.id}
-                  onClick={() => handleChatSelect(chat.id)}
-                  contactImageUrl={chat.contactImageUrl}
-                />
-              ))}
-              {isLoadingMore && (
-                <div className="py-4 text-center">
-                  <RefreshCw className="w-5 h-5 text-gray-400 animate-spin mx-auto" />
-                  <p className="text-xs text-gray-500 mt-1">Loading more from database...</p>
-                </div>
-              )}
-            </div>
-          )}
-        </Sidebar>
+            {/* Resizable Handle */}
+            <ResizableHandle withHandle />
 
-        {/* Main Content Area - Desktop only, hidden on mobile */}
-        {!isMobile && (
-          <div className="flex-1 flex bg-gray-50 overflow-hidden">
+            {/* Main Content Area - Chat and Contact Panels */}
             {selectedChatId && selectedChat ? (
               <>
                 {/* Chat Messages with Input and AI Suggestions */}
-                <div className="flex-1 bg-white border-r border-gray-200 flex flex-col overflow-hidden">
-                  {isLoadingMessages ? (
-                    <div className="flex items-center justify-center h-full">
-                      <div className="text-center">
-                        <RefreshCw className="w-8 h-8 text-blue-500 animate-spin mx-auto mb-2" />
-                        <p className="text-sm text-gray-600">Loading conversation...</p>
+                <ResizablePanel defaultSize={60} minSize={30}>
+                  <div className="h-full bg-white flex flex-col overflow-hidden">
+                    {/* Chat Header with Archive Button */}
+                    <div className="flex-shrink-0 px-4 py-3 border-b border-gray-200 flex items-center justify-between bg-white">
+                      <div className="flex items-center gap-3 min-w-0 flex-1">
+                        {selectedChat.contactImageUrl ? (
+                          <img
+                            src={selectedChat.contactImageUrl}
+                            alt={selectedChat.name}
+                            className="w-8 h-8 rounded-full object-cover flex-shrink-0"
+                          />
+                        ) : (
+                          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center text-white font-semibold text-sm flex-shrink-0">
+                            {selectedChat.name.charAt(0).toUpperCase()}
+                          </div>
+                        )}
+                        <div className="min-w-0 flex-1">
+                          <h2 className="font-semibold text-gray-900 truncate">{selectedChat.name}</h2>
+                          {selectedChat.username && (
+                            <p className="text-xs text-gray-500">@{selectedChat.username}</p>
+                          )}
+                        </div>
                       </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleArchiveChat(selectedChatId)}
+                        className="gap-2"
+                      >
+                        <Archive className="w-4 h-4" />
+                        Archive
+                      </Button>
                     </div>
-                  ) : (
-                    <>
-                      {/* Messages */}
-                      <ChatDetail 
-                        messages={chatMessages} 
-                        isSingleChat={selectedChat?.type === 'single' || selectedChat?.type === undefined}
-                      />
-                      
-                      {/* Reply Input Area */}
-                      <div className="flex-shrink-0 border-t-2 border-gray-300 p-4 bg-white shadow-sm">
+
+                    {isLoadingMessages ? (
+                      <div className="flex items-center justify-center h-full">
+                        <div className="text-center">
+                          <RefreshCw className="w-8 h-8 text-blue-500 animate-spin mx-auto mb-2" />
+                          <p className="text-sm text-gray-600">Loading conversation...</p>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        {/* Messages */}
+                        <ChatDetail 
+                          messages={chatMessages} 
+                          isSingleChat={selectedChat?.type === 'single' || selectedChat?.type === undefined}
+                        />
+                        
+                        {/* Reply Input Area */}
+                        <div className="flex-shrink-0 border-t-2 border-gray-300 p-4 bg-white shadow-sm">
                         <PromptInput onSubmit={handlePromptSubmit} className="w-full border-2 border-gray-300 rounded-lg shadow-sm hover:border-blue-400 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-200 transition-all">
                           <PromptInputBody>
                             <PromptInputTextarea
@@ -627,40 +678,156 @@ function Messages() {
                           selectedIndex={selectedSuggestionIndex}
                           onSuggestionSelect={handleSuggestionSelect}
                         />
-                      </div>
-                    </>
-                  )}
-                </div>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </ResizablePanel>
 
-                {/* Right Sidebar - Contact Panel Only */}
-                <div className="w-[400px] bg-white overflow-hidden">
+                {/* Resizable Handle */}
+                <ResizableHandle withHandle />
+
+                {/* Right Sidebar - Contact Panel */}
+                <ResizablePanel defaultSize={40} minSize={25} maxSize={50}>
                   <ContactPanel 
                     contact={contactData || null} 
-                    isLoading={contactData === undefined && !!selectedChat?.username}
+                    isLoading={contactData === undefined && (!!selectedChat?.username || !!selectedChat?.phoneNumber)}
                     searchedUsername={selectedChat?.username}
+                    searchedPhoneNumber={selectedChat?.phoneNumber}
                   />
-                </div>
+                </ResizablePanel>
               </>
             ) : (
-              <div className="flex-1 flex items-center justify-center bg-white">
-                <div className="text-center text-gray-500">
-                  <MessageCircle className="w-16 h-16 mx-auto mb-4 text-gray-300" />
-                  <p className="text-lg font-medium mb-2">👈 Select a conversation</p>
-                  <p className="text-sm">
-                    Choose a chat from the left to view messages and get AI-powered reply suggestions
-                  </p>
+              <ResizablePanel>
+                <div className="h-full flex items-center justify-center bg-white">
+                  <div className="text-center text-gray-500">
+                    <MessageCircle className="w-16 h-16 mx-auto mb-4 text-gray-300" />
+                    <p className="text-lg font-medium mb-2">👈 Select a conversation</p>
+                    <p className="text-sm">
+                      Choose a chat from the left to view messages and get AI-powered reply suggestions
+                    </p>
+                  </div>
                 </div>
-              </div>
+              </ResizablePanel>
             )}
-          </div>
+          </ResizablePanelGroup>
+        ) : (
+          /* Mobile - Use Sidebar component */
+          <>
+            <Sidebar
+              width="w-full"
+              className={cn(sheetOpen && "hidden")}
+              header={
+                <SidebarHeader
+                  title=""
+                  subtitle=""
+                  actions={
+                    <div className="flex items-center gap-2">
+                      {/* Tab Filter */}
+                      <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
+                        <button
+                          onClick={() => setTabFilter('unreplied')}
+                          className={`px-3 py-1 text-xs font-medium rounded transition-colors ${
+                            tabFilter === 'unreplied'
+                              ? 'bg-white text-gray-900 shadow-sm'
+                              : 'text-gray-600 hover:text-gray-900'
+                          }`}
+                        >
+                          Unreplied
+                        </button>
+                        <button
+                          onClick={() => setTabFilter('unread')}
+                          className={`px-3 py-1 text-xs font-medium rounded transition-colors ${
+                            tabFilter === 'unread'
+                              ? 'bg-white text-gray-900 shadow-sm'
+                              : 'text-gray-600 hover:text-gray-900'
+                          }`}
+                        >
+                          Unread
+                        </button>
+                        <button
+                          onClick={() => setTabFilter('all')}
+                          className={`px-3 py-1 text-xs font-medium rounded transition-colors ${
+                            tabFilter === 'all'
+                              ? 'bg-white text-gray-900 shadow-sm'
+                              : 'text-gray-600 hover:text-gray-900'
+                          }`}
+                        >
+                          All
+                        </button>
+                      </div>
+                      
+                      {/* Refresh Button */}
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button 
+                              onClick={handleRefresh} 
+                              variant="ghost" 
+                              size="sm"
+                              disabled={isSyncing}
+                              className="h-8"
+                            >
+                              <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>{subtitle}</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </div>
+                  }
+                />
+              }
+            >
+              {/* Chat List Content */}
+              {status === "LoadingFirstPage" ? (
+                <div className="flex items-center justify-center py-12">
+                  <RefreshCw className="w-8 h-8 text-blue-500 animate-spin" />
+                </div>
+              ) : chats.length === 0 ? (
+                <div className="text-center py-12 px-4 text-gray-500">
+                  <p className="mb-2">🎉 All caught up!</p>
+                  <p className="text-sm">No pending messages to reply to</p>
+                </div>
+              ) : (
+                <div className="divide-y divide-gray-100 overflow-y-auto">
+                  {chats.map((chat: Chat) => (
+                    <ChatListItem
+                      key={chat.id}
+                      id={chat.id}
+                      name={chat.name}
+                      network={chat.network}
+                      username={chat.username}
+                      phoneNumber={chat.phoneNumber}
+                      lastMessage={chat.lastMessage}
+                      lastMessageTime={chat.lastMessageTime}
+                      unreadCount={chat.unreadCount}
+                      isSelected={selectedChatId === chat.id}
+                      onClick={() => handleChatSelect(chat.id)}
+                      onArchive={handleArchiveChat}
+                      contactImageUrl={chat.contactImageUrl}
+                    />
+                  ))}
+                  {status === "LoadingMore" && (
+                    <div className="py-4 text-center">
+                      <RefreshCw className="w-5 h-5 text-gray-400 animate-spin mx-auto" />
+                      <p className="text-xs text-gray-500 mt-1">Loading more...</p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </Sidebar>
+          </>
         )}
 
         {/* Mobile Sheet - Chat detail slides over */}
         {isMobile && (
           <Sheet open={sheetOpen} onOpenChange={(open) => !open && handleCloseSheet()}>
-            <SheetContent side="right" className="w-full sm:max-w-2xl p-0 flex flex-col">
-              <SheetHeader className="px-4 py-3 border-b flex-shrink-0">
-                <div className="flex items-center gap-3">
+          <SheetContent side="right" className="w-full sm:max-w-2xl p-0 flex flex-col">
+            <SheetHeader className="px-4 py-3 border-b flex-shrink-0">
+              <div className="flex items-center gap-3">
                   <Button
                     variant="ghost"
                     size="sm"
@@ -731,8 +898,9 @@ function Messages() {
                   <div className="hidden sm:block sm:w-[300px] bg-white border-l overflow-hidden">
                     <ContactPanel 
                       contact={contactData || null} 
-                      isLoading={contactData === undefined && !!selectedChat?.username}
+                      isLoading={contactData === undefined && (!!selectedChat?.username || !!selectedChat?.phoneNumber)}
                       searchedUsername={selectedChat?.username}
+                      searchedPhoneNumber={selectedChat?.phoneNumber}
                     />
                   </div>
                 </div>

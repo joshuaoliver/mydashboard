@@ -5,11 +5,12 @@ import { Switch } from '@/components/ui/switch'
 import { Badge } from '@/components/ui/badge'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
-import { User, Save, Lock, Unlock, X, Check } from 'lucide-react'
+import { User, Save, Lock, Unlock, X, Check, AlertCircle } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { useMutation, useQuery } from 'convex/react'
 import { api } from '../../../convex/_generated/api'
 import type { Id } from '../../../convex/_generated/dataModel'
+import { MergeDuplicatesDialog } from '../contacts/MergeDuplicatesDialog'
 import {
   InputOTP,
   InputOTPGroup,
@@ -32,13 +33,14 @@ interface Contact {
   privateNotes?: string
   locationIds?: Id<"locations">[]
   intimateConnection?: boolean
-  leadStatus?: "Talking" | "Planning" | "Dated" | "Connected"
+  leadStatus?: "Talking" | "Planning" | "Dated" | "Connected" | "Former"
 }
 
 interface ContactPanelProps {
   contact: Contact | null
   isLoading?: boolean
   searchedUsername?: string
+  searchedPhoneNumber?: string // WhatsApp phone number
 }
 
 const connectionOptions = [
@@ -60,9 +62,10 @@ const leadStatusOptions = [
   { value: "Planning", label: "Planning" },
   { value: "Dated", label: "Dated" },
   { value: "Connected", label: "Connected" },
+  { value: "Former", label: "Former" },
 ] as const
 
-export function ContactPanel({ contact, isLoading, searchedUsername }: ContactPanelProps) {
+export function ContactPanel({ contact, isLoading, searchedUsername, searchedPhoneNumber }: ContactPanelProps) {
   const [notes, setNotes] = useState(contact?.notes || "")
   const [objective, setObjective] = useState(contact?.objective || "")
   const [isSaving, setIsSaving] = useState(false)
@@ -80,6 +83,9 @@ export function ContactPanel({ contact, isLoading, searchedUsername }: ContactPa
   const [intimateConnection, setIntimateConnection] = useState(contact?.intimateConnection || false)
   const [leadStatus, setLeadStatus] = useState<string | undefined>(contact?.leadStatus)
   
+  // Duplicate detection state
+  const [showMergeDialog, setShowMergeDialog] = useState(false)
+  
   // Mutations
   const toggleConnection = useMutation(api.contactMutations.toggleConnectionType)
   const toggleSexMutation = useMutation(api.contactMutations.toggleSex)
@@ -91,9 +97,14 @@ export function ContactPanel({ contact, isLoading, searchedUsername }: ContactPa
   const updateLeadStatusMutation = useMutation(api.contactMutations.updateLeadStatus)
   const createContactMutation = useMutation(api.contactMutations.createContact)
   const createLocationMutation = useMutation(api.locationMutations.createLocation)
+  const mergeContactsMutation = useMutation(api.contactMerge.mergeContacts)
   
-  // Query locations
+  // Query locations and duplicates
   const locations = useQuery(api.locationQueries.listLocations)
+  const duplicates = useQuery(
+    api.contactDuplicates.findDuplicates,
+    contact?._id ? { contactId: contact._id } : "skip"
+  )
 
   // Reset hover and PIN states when contact changes
   useEffect(() => {
@@ -307,12 +318,13 @@ export function ContactPanel({ contact, isLoading, searchedUsername }: ContactPa
   }
 
   const handleCreateContact = async () => {
-    if (!searchedUsername) return
+    if (!searchedUsername && !searchedPhoneNumber) return
     
     setIsSaving(true)
     try {
       await createContactMutation({
         instagram: searchedUsername,
+        whatsapp: searchedPhoneNumber,
       })
       // Contact will be refetched automatically via Convex reactivity
     } catch (error) {
@@ -329,11 +341,22 @@ export function ContactPanel({ contact, isLoading, searchedUsername }: ContactPa
         <div className="text-center">
           <User className="w-12 h-12 mx-auto mb-3 text-gray-300" />
           <p className="text-sm text-gray-500">No contact matched</p>
-          {searchedUsername ? (
+          {(searchedUsername || searchedPhoneNumber) ? (
             <div className="mt-4 space-y-3">
               <div className="text-xs text-gray-600 bg-gray-100 px-3 py-2 rounded-lg inline-block">
                 <p className="font-medium mb-1">Searched for:</p>
-                <code className="text-blue-600">@{searchedUsername}</code>
+                {searchedUsername && (
+                  <div className="mb-1">
+                    <span className="text-gray-500">Instagram: </span>
+                    <code className="text-blue-600">@{searchedUsername}</code>
+                  </div>
+                )}
+                {searchedPhoneNumber && (
+                  <div>
+                    <span className="text-gray-500">WhatsApp: </span>
+                    <code className="text-green-600">{searchedPhoneNumber}</code>
+                  </div>
+                )}
                 <p className="mt-1 text-gray-500">Not found in Dex contacts</p>
               </div>
               <Button
@@ -348,12 +371,12 @@ export function ContactPanel({ contact, isLoading, searchedUsername }: ContactPa
               </p>
             </div>
           ) : (
-            <p className="text-xs text-gray-400 mt-1">No Instagram username available</p>
-          )}
-        </div>
+            <p className="text-xs text-gray-400 mt-1">No contact identifier available</p>
+        )}
       </div>
-    )
-  }
+    </div>
+  )
+}
 
   // Loading state
   if (isLoading || !contact) {
@@ -402,6 +425,31 @@ export function ContactPanel({ contact, isLoading, searchedUsername }: ContactPa
             )}
           </div>
         </div>
+
+        {/* Duplicate Warning */}
+        {duplicates && duplicates.length > 0 && (
+          <div className="bg-orange-50 border border-orange-200 rounded-lg p-3">
+            <div className="flex items-start gap-2">
+              <AlertCircle className="w-4 h-4 text-orange-600 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <p className="text-xs font-medium text-orange-800">
+                  {duplicates.length} potential duplicate{duplicates.length > 1 ? 's' : ''} found
+                </p>
+                <p className="text-xs text-orange-600 mt-1">
+                  This contact may be the same as {duplicates.length} other{duplicates.length > 1 ? 's' : ''} in your database
+                </p>
+              </div>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowMergeDialog(true)}
+              className="w-full mt-2 text-xs border-orange-300 hover:bg-orange-100"
+            >
+              Review & Merge Duplicates
+            </Button>
+          </div>
+        )}
 
         {/* Local Notes Field - Always visible at top, no title */}
         <div>
@@ -700,6 +748,19 @@ export function ContactPanel({ contact, isLoading, searchedUsername }: ContactPa
           </div>
         </div>
       </div>
+
+      {/* Merge Duplicates Dialog */}
+      {duplicates && duplicates.length > 0 && (
+        <MergeDuplicatesDialog
+          open={showMergeDialog}
+          onOpenChange={setShowMergeDialog}
+          currentContact={contact}
+          duplicates={duplicates}
+          onMerge={async (primaryId, duplicateId) => {
+            await mergeContactsMutation({ primaryId, duplicateId })
+          }}
+        />
+      )}
     </div>
   )
 }

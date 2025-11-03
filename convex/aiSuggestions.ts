@@ -18,7 +18,6 @@ export const getCachedSuggestions = internalQuery({
       suggestions: v.array(v.object({
         reply: v.string(),
         style: v.string(),
-        reasoning: v.string(),
       })),
       conversationContext: v.object({
         lastMessage: v.string(),
@@ -65,7 +64,6 @@ export const saveSuggestionsToCache = internalMutation({
     suggestions: v.array(v.object({
       reply: v.string(),
       style: v.string(),
-      reasoning: v.string(),
     })),
     conversationContext: v.object({
       lastMessage: v.string(),
@@ -132,25 +130,71 @@ export const hasCachedSuggestions = query({
 /**
  * Mutation to clear cached suggestions for a chat
  * Useful if user wants to force regeneration
+ * If chatId is not provided, clears ALL cached suggestions (for schema migrations)
  */
 export const clearCachedSuggestions = mutation({
   args: {
-    chatId: v.string(),
+    chatId: v.optional(v.string()),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    // Find all cached suggestions for this chat
-    const cached = await ctx.db
-      .query("aiReplySuggestions")
-      .withIndex("by_chat_id", (q) => q.eq("chatId", args.chatId))
-      .collect();
-
-    // Delete them all
-    for (const entry of cached) {
-      await ctx.db.delete(entry._id);
+    let cached;
+    
+    if (args.chatId !== undefined) {
+      // Clear suggestions for specific chat
+      const chatId = args.chatId; // TypeScript type narrowing
+      cached = await ctx.db
+        .query("aiReplySuggestions")
+        .withIndex("by_chat_id", (q) => q.eq("chatId", chatId))
+        .collect();
+    } else {
+      // Clear ALL cached suggestions (for migrations/schema changes)
+      cached = await ctx.db
+        .query("aiReplySuggestions")
+        .collect();
     }
 
+    // Delete them all
+    let deleteCount = 0;
+    for (const entry of cached) {
+      await ctx.db.delete(entry._id);
+      deleteCount++;
+    }
+
+    console.log(`✅ Cleared ${deleteCount} cached AI suggestions${args.chatId ? ` for chat ${args.chatId}` : ' (all chats)'}`);
+
     return null;
+  },
+});
+
+/**
+ * Migration mutation to clear ALL cached suggestions
+ * Use this to clear old cached data after schema changes
+ */
+export const clearAllSuggestionsCache = mutation({
+  args: {},
+  returns: v.object({
+    deletedCount: v.number(),
+    message: v.string(),
+  }),
+  handler: async (ctx) => {
+    const cached = await ctx.db
+      .query("aiReplySuggestions")
+      .collect();
+
+    let deleteCount = 0;
+    for (const entry of cached) {
+      await ctx.db.delete(entry._id);
+      deleteCount++;
+    }
+
+    const message = `✅ Cleared ${deleteCount} cached AI suggestions (all chats)`;
+    console.log(message);
+
+    return {
+      deletedCount: deleteCount,
+      message: message,
+    };
   },
 });
 

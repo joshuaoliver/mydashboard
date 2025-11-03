@@ -190,7 +190,6 @@ export const generateReplySuggestions = action({
     suggestions: v.array(v.object({
       reply: v.string(),
       style: v.string(),
-      reasoning: v.string(),
     })),
     conversationContext: v.object({
       lastMessage: v.string(),
@@ -203,7 +202,6 @@ export const generateReplySuggestions = action({
     suggestions: Array<{
       reply: string;
       style: string;
-      reasoning: string;
     }>;
     conversationContext: {
       lastMessage: string;
@@ -252,7 +250,6 @@ export const generateReplySuggestions = action({
           suggestions: Array<{
             reply: string;
             style: string;
-            reasoning: string;
           }>;
           conversationContext: {
             lastMessage: string;
@@ -289,36 +286,92 @@ export const generateReplySuggestions = action({
       // Get last message for context
       const lastMessageText = lastMessage.text;
 
-      // Build contact context if available
-      let contactContext = "";
+      // Build contact context with XML structure if available
+      let contactContext = "No contact information available";
       if (contact) {
         const contactName = [contact.firstName, contact.lastName].filter(Boolean).join(" ");
-        contactContext = `\n\nContact Information:`;
-        if (contactName) contactContext += `\n- Name: ${contactName}`;
-        if (contact.connections && contact.connections.length > 0) {
-          contactContext += `\n- Connection types: ${contact.connections.join(", ")}`;
+        const isRomantic = contact.connections?.includes("Romantic");
+        
+        // Infer gender for romantic connections
+        let gender = "";
+        if (contact.sex && contact.sex.length > 0) {
+          gender = contact.sex.join(", ");
+        } else if (isRomantic) {
+          gender = "Female (inferred from romantic connection)";
         }
-        if (contact.description) contactContext += `\n- Description: ${contact.description}`;
-        if (contact.notes) contactContext += `\n- Notes: ${contact.notes}`;
-      }
-
-      // Add Ultimate Man Project principles for romantic connections
-      let guidanceNotes = "";
-      if (contact?.connections?.includes("Romantic")) {
-        guidanceNotes = `\n\nIMPORTANT: This is a romantic connection. Follow Ultimate Man Project principles for texting:
-- Match the length and energy of their messages
-- Be authentic and genuine
-- Don't over-invest or chase
-- Lead with confidence
-- Keep it light and playful when appropriate`;
+        
+        // Get connection type description
+        const getConnectionDescription = (type: string): string => {
+          switch (type) {
+            case "Professional":
+            case "Business":
+              return "Business-related: Work or business contact. Joshua typically seeks to provide advice or close a deal.";
+            case "Friend":
+              return "Friend: Someone Joshua has met in person and considers a friend.";
+            case "Good friend":
+            case "Close Friend":
+              return "Close Friend: Someone valuable to Joshua.";
+            case "Romantic":
+              return "Romantic: Someone Joshua is looking to have an intimate relationship with (casual or serious). Ultimate Man Project principles apply.";
+            default:
+              return type;
+          }
+        };
+        
+        contactContext = `<name>${contactName || "Unknown"}</name>`;
+        
+        if (gender) {
+          contactContext += `\n<gender>${gender}</gender>`;
+        }
+        
+        if (contact.connections && contact.connections.length > 0) {
+          contactContext += `\n<connection_types>`;
+          contact.connections.forEach(conn => {
+            contactContext += `\n  <connection type="${conn}">${getConnectionDescription(conn)}</connection>`;
+          });
+          contactContext += `\n</connection_types>`;
+        }
+        
+        // Add objective
+        if (contact.objective) {
+          contactContext += `\n<objective>${contact.objective}</objective>`;
+        } else if (isRomantic) {
+          contactContext += `\n<objective>Go on a date (default romantic objective)</objective>`;
+        }
+        
+        // Add lead status for romantic connections
+        if (isRomantic && contact.leadStatus) {
+          const leadStatusDescriptions: Record<string, string> = {
+            "Talking": "Still in talking stage, possibly met through dating app or in person. No formal ask yet.",
+            "Planning": "Some reciprocation of interest (e.g., asking to have a drink), but nothing organized yet.",
+            "Dated": "Have gone on a one-on-one date.",
+            "Connected": "Have gone on a date and hooked up.",
+            "Former": "Dated and hooked up but no longer actively seeing each other."
+          };
+          const description = leadStatusDescriptions[contact.leadStatus] || contact.leadStatus;
+          contactContext += `\n<lead_status>${contact.leadStatus}: ${description}</lead_status>`;
+        }
+        
+        if (contact.description) {
+          contactContext += `\n<description>${contact.description}</description>`;
+        }
+        
+        if (contact.notes) {
+          contactContext += `\n<notes>${contact.notes}</notes>`;
+        }
       }
 
       // Add custom context if provided
       let customContextSection = "";
       if (args.customContext) {
-        customContextSection = `\n\nADDITIONAL CONTEXT/INSTRUCTIONS:
-${args.customContext}`;
+        customContextSection = `<additional_context>
+${args.customContext}
+</additional_context>`;
       }
+
+      // Determine platform from chat network
+      const chat = await ctx.runQuery(api.beeperQueries.getChatById, { chatId: args.chatId });
+      const platform = chat?.network === "instagram" ? "Instagram" : chat?.network === "whatsapp" ? "WhatsApp" : "Unknown";
 
       // Fetch the prompt template from the database
       const promptTemplate = await ctx.runQuery(internal.prompts.getPromptByName, {
@@ -334,40 +387,36 @@ ${args.customContext}`;
           .replace(/\{\{conversationHistory\}\}/g, conversationHistory)
           .replace(/\{\{lastMessageText\}\}/g, lastMessageText)
           .replace(/\{\{contactContext\}\}/g, contactContext)
-          .replace(/\{\{guidanceNotes\}\}/g, guidanceNotes)
-          .replace(/\{\{customContext\}\}/g, customContextSection);
+          .replace(/\{\{customContext\}\}/g, customContextSection)
+          .replace(/\{\{platform\}\}/g, platform)
+          .replace(/\{\{messageCount\}\}/g, messages.length.toString());
         
         console.log(`[generateReplySuggestions] Using configured prompt template from database`);
       } else {
         // Fallback to hardcoded prompt if template not found
         console.warn(`[generateReplySuggestions] Prompt template 'reply-suggestions' not found, using fallback`);
-        prompt = `You are a helpful assistant that suggests thoughtful, contextually appropriate replies to messages.
+        prompt = `You are an AI assistant helping Joshua Oliver (26, male, Sydney) craft contextually appropriate replies.
 
-Given the following conversation history with ${args.chatName}, suggest 3-4 different reply options that represent DIFFERENT CONVERSATION PATHWAYS - not just style variations, but different directions the conversation could take:
-
-- Each suggestion should take the conversation in a meaningfully different direction
-- Consider different topics, tones, levels of engagement, or types of responses
-- Think about: asking questions vs. making statements, being playful vs. serious, shifting topics vs. staying on topic, ending vs. continuing the conversation
-- Match the conversation's context and relationship
-- Be natural and authentic${contactContext}${guidanceNotes}${customContextSection}
+Contact: ${args.chatName}
+Platform: ${platform}
+${contactContext}
+${customContextSection}
 
 Conversation history:
 ${conversationHistory}
 
-The most recent message from ${args.chatName} was: "${lastMessageText}"
+Latest message from ${args.chatName}: "${lastMessageText}"
 
-For each suggestion, provide:
-1. The suggested reply text
-2. A brief label describing what pathway this represents (e.g., "Ask deeper question", "Shift to plans", "Playful tease", "Share personal story", "End conversation warmly")
-3. Brief reasoning for why this pathway makes sense
+Suggest 3-4 different reply options representing DIFFERENT conversation pathways. Match the relationship context and be natural.
 
-Format your response as JSON with this structure:
+IMPORTANT: DO NOT use em dashes (—) or en dashes (–). Use regular hyphens (-) or split into separate sentences. Write like a real person texting with standard keyboard characters only.
+
+Format as JSON:
 {
   "suggestions": [
     {
-      "reply": "The actual reply text here",
-      "style": "Label for this conversation pathway",
-      "reasoning": "Brief explanation of why this pathway works"
+      "reply": "The actual reply text",
+      "style": "Pathway label"
     }
   ]
 }`;
@@ -395,7 +444,12 @@ Format your response as JSON with this structure:
         }
         
         const aiResponse = JSON.parse(cleanedText);
-        suggestions = aiResponse.suggestions || [];
+        // Map suggestions and ensure they don't have reasoning field
+        // Also strip em dashes (—) and en dashes (–) from replies
+        suggestions = (aiResponse.suggestions || []).map((s: any) => ({
+          reply: s.reply.replace(/—/g, '-').replace(/–/g, '-'),
+          style: s.style,
+        }));
       } catch (parseError) {
         // If JSON parsing fails, use a fallback
         console.error("Error parsing AI response:", parseError);
@@ -404,7 +458,6 @@ Format your response as JSON with this structure:
           {
             reply: "Thanks for your message! I'll get back to you soon.",
             style: "Polite acknowledgment",
-            reasoning: "A safe, professional response while you consider a more detailed reply",
           },
         ];
       }

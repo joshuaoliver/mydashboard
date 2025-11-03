@@ -1,4 +1,4 @@
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { DashboardLayout } from '@/components/layout/dashboard-layout'
 import { PageHeader } from '@/components/layout/page-header'
 import { Card, CardContent } from '@/components/ui/card'
@@ -16,6 +16,7 @@ export const Route = createFileRoute('/contacts/')({
 })
 
 function ContactsListPage() {
+  const navigate = useNavigate()
   const [searchTerm, setSearchTerm] = useState('')
   const { data: { contacts, total } } = useSuspenseQuery(
     convexQuery(api.dexQueries.listContacts, { 
@@ -99,7 +100,7 @@ function ContactsListPage() {
                       key={contact._id}
                       className="cursor-pointer"
                       onClick={() => {
-                        window.location.href = `/contacts/${contact._id}`
+                        navigate({ to: '/contacts/$contactId', params: { contactId: contact._id } })
                       }}
                     >
                       <TableCell>

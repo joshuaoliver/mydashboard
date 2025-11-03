@@ -7,7 +7,6 @@ import { Response } from '@/components/ai-elements/response'
 interface ReplySuggestion {
   reply: string
   style: string  // Conversation pathway label (e.g., "Ask deeper question", "Shift to plans")
-  reasoning: string
 }
 
 interface ReplySuggestionsProps {
@@ -89,7 +88,7 @@ export function ReplySuggestions({
   return (
     <div className="p-4">
       {/* Suggestion Cards */}
-      <div className="space-y-3">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         {suggestions.map((suggestion, index) => {
           const isSelected = index === selectedIndex
           return (
@@ -107,7 +106,7 @@ export function ReplySuggestions({
                 <Response>{suggestion.reply}</Response>
               </div>
 
-              {/* Style badge, reasoning, and copy button - only show for selected */}
+              {/* Style badge and copy button - only show for selected */}
               {isSelected && (
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2 flex-1 min-w-0">
@@ -115,12 +114,6 @@ export function ReplySuggestions({
                     <span className="text-xs font-medium px-2 py-0.5 rounded flex-shrink-0 text-blue-700 bg-blue-100">
                       {suggestion.style}
                     </span>
-                    {suggestion.reasoning && (
-                      <p className="text-xs text-gray-600 truncate">
-                        <span className="font-medium">Why:</span>{' '}
-                        {suggestion.reasoning}
-                      </p>
-                    )}
                   </div>
                   <Button
                     variant="ghost"

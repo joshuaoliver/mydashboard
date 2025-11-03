@@ -101,6 +101,21 @@ function RootComponent() {
   const [isMounted, setIsMounted] = React.useState(false)
   const [isAppUnlocked, setIsAppUnlocked] = React.useState(false)
   
+  // Public routes that don't require authentication
+  const publicRoutes = ['/sign-in', '/sign-up']
+  const isPublicRoute = publicRoutes.includes(location.pathname)
+
+  // Only check auth on client-side (not during SSR)
+  const { data: user, isLoading } = useQuery({
+    ...convexQuery(api.auth.currentUser, {}),
+    enabled: isMounted && isAppUnlocked, // Only run on client after PIN unlock
+  })
+
+  // Set mounted flag after hydration
+  React.useEffect(() => {
+    setIsMounted(true)
+  }, [])
+
   // Check if app is unlocked (PIN entered)
   React.useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -108,35 +123,6 @@ function RootComponent() {
       setIsAppUnlocked(unlocked)
     }
   }, [])
-  
-  // Only check auth on client-side (not during SSR)
-  const { data: user, isLoading } = useQuery({
-    ...convexQuery(api.auth.currentUser, {}),
-    enabled: isMounted && isAppUnlocked, // Only run on client after PIN unlock
-  })
-
-  // Public routes that don't require authentication
-  const publicRoutes = ['/sign-in', '/sign-up']
-  const isPublicRoute = publicRoutes.includes(location.pathname)
-
-  // Set mounted flag after hydration
-  React.useEffect(() => {
-    setIsMounted(true)
-  }, [])
-
-  // Handle PIN unlock
-  const handlePinUnlock = () => {
-    setIsAppUnlocked(true)
-  }
-
-  // Show PIN entry if not unlocked (before everything else)
-  if (isMounted && !isAppUnlocked) {
-    return (
-      <RootDocument>
-        <PinEntry onUnlock={handlePinUnlock} />
-      </RootDocument>
-    )
-  }
 
   // Register service worker for PWA support
   React.useEffect(() => {
@@ -181,6 +167,21 @@ function RootComponent() {
       navigate({ to: '/' })
     }
   }, [user, isPublicRoute, navigate, isMounted, isLoading])
+
+  // Handle PIN unlock
+  const handlePinUnlock = () => {
+    setIsAppUnlocked(true)
+  }
+
+  // Show PIN entry if not unlocked (before everything else)
+  // This is AFTER all hooks, so it's safe
+  if (isMounted && !isAppUnlocked) {
+    return (
+      <RootDocument>
+        <PinEntry onUnlock={handlePinUnlock} />
+      </RootDocument>
+    )
+  }
 
   // Show loading spinner during SSR and initial client load
   if (!isMounted || isLoading) {

@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from '@tanstack/react-router'
+import { createFileRoute, useNavigate, Link } from '@tanstack/react-router'
 import { useAuthActions } from '@convex-dev/auth/react'
 import { useState, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
@@ -132,9 +132,9 @@ function SignInPage() {
         <div className="border-t pt-4 text-center text-sm text-gray-500">
           <p>
             Need to create an account?{' '}
-            <a href="/sign-up" className="text-blue-600 hover:underline font-medium">
+            <Link to="/sign-up" className="text-blue-600 hover:underline font-medium">
               Sign up here
-            </a>
+            </Link>
           </p>
         </div>
 

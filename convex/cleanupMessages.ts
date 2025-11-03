@@ -52,3 +52,25 @@ export const clearAllChats = mutation({
   },
 });
 
+export const clearAllAISuggestions = mutation({
+  args: {},
+  returns: v.object({
+    deleted: v.number(),
+    message: v.string(),
+  }),
+  handler: async (ctx) => {
+    const suggestions = await ctx.db.query("aiReplySuggestions").collect();
+    
+    for (const suggestion of suggestions) {
+      await ctx.db.delete(suggestion._id);
+    }
+    
+    console.log(`[cleanupMessages] Deleted ${suggestions.length} cached AI suggestions`);
+    
+    return {
+      deleted: suggestions.length,
+      message: "AI suggestions cache cleared. They will regenerate with the new schema format.",
+    };
+  },
+});
+

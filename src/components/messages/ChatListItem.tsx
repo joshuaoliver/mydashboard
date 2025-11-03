@@ -1,4 +1,6 @@
 import { cn } from '@/lib/utils'
+import { Archive, ArchiveRestore } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 
 interface ChatListItemProps {
   id: string
@@ -11,10 +13,13 @@ interface ChatListItemProps {
   unreadCount?: number
   isSelected: boolean
   onClick: () => void
+  onArchive?: (chatId: string) => void
+  isArchived?: boolean
   contactImageUrl?: string // From DEX integration
 }
 
 export function ChatListItem({
+  id,
   name,
   network,
   username,
@@ -24,6 +29,8 @@ export function ChatListItem({
   unreadCount = 0,
   isSelected,
   onClick,
+  onArchive,
+  isArchived = false,
   contactImageUrl,
 }: ChatListItemProps) {
   // Format timestamp
@@ -50,16 +57,22 @@ export function ChatListItem({
 
   const hasUnread = unreadCount > 0
 
+  const handleArchiveClick = (e: React.MouseEvent) => {
+    e.stopPropagation() // Prevent selecting the chat
+    onArchive?.(id)
+  }
+
   return (
-    <button
-      onClick={onClick}
-      className={cn(
-        'w-full text-left px-4 py-3 transition-colors',
-        'hover:bg-gray-50',
-        isSelected && 'bg-blue-50 border-l-4 border-l-blue-500',
-        hasUnread && !isSelected && 'bg-blue-50/30'
-      )}
-    >
+    <div className="relative group">
+      <button
+        onClick={onClick}
+        className={cn(
+          'w-full text-left px-4 py-3 transition-colors',
+          'hover:bg-gray-50',
+          isSelected && 'bg-blue-50 border-l-4 border-l-blue-500',
+          hasUnread && !isSelected && 'bg-blue-50/30'
+        )}
+      >
       <div className="flex items-start gap-3">
         {/* Avatar with unread indicator - Use contact image if available */}
         <div className="flex-shrink-0 relative">
@@ -135,7 +148,27 @@ export function ChatListItem({
           </div>
         </div>
       </div>
-    </button>
+      </button>
+      
+      {/* Archive button - shown on hover */}
+      {onArchive && (
+        <div className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleArchiveClick}
+            className="h-8 w-8 p-0"
+            title={isArchived ? "Unarchive chat" : "Archive chat"}
+          >
+            {isArchived ? (
+              <ArchiveRestore className="h-4 w-4" />
+            ) : (
+              <Archive className="h-4 w-4" />
+            )}
+          </Button>
+        </div>
+      )}
+    </div>
   )
 }
 

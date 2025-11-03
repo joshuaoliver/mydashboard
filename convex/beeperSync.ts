@@ -311,25 +311,13 @@ export const syncBeeperChatsInternal = internalAction({
           try {
             console.log(`[Beeper Sync] Fetching messages for chat ${chat.id} (${chat.title})...`);
             
-            // Fetch messages using direct fetch (SDK doesn't handle array parameters correctly)
-            // The API expects chatIDs[] (with brackets) for array notation
-            const messagesUrl = `${BEEPER_API_URL}/v0/search-messages?chatIDs[]=${encodeURIComponent(chat.id)}&limit=20`;
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 15000);
+            // Use the better /v1/chats/{chatID}/messages endpoint
+            // This endpoint supports proper pagination and higher limits
+            const messagesResponse = await client.get(`/v1/chats/${encodeURIComponent(chat.id)}/messages`, {
+              query: {} // No cursor = get most recent messages
+            }) as any;
 
-            const messagesResponse = await fetch(messagesUrl, {
-              method: "GET",
-              headers: { "Authorization": `Bearer ${BEEPER_TOKEN}` },
-              signal: controller.signal,
-            });
-            clearTimeout(timeoutId);
-
-            if (!messagesResponse.ok) {
-              throw new Error(`HTTP ${messagesResponse.status}: ${await messagesResponse.text()}`);
-            }
-
-            const messagesData = await messagesResponse.json() as any;
-            const messages = messagesData.items || [];
+            const messages = messagesResponse.items || [];
             console.log(`[Beeper Sync] Received ${messages.length} messages from API for chat ${chat.id} (${chat.title})`);
 
             // Prepare messages for mutation

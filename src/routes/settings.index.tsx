@@ -1,4 +1,4 @@
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, Link } from '@tanstack/react-router'
 import { DashboardLayout } from '@/components/layout/dashboard-layout'
 import { PageHeader } from '@/components/layout/page-header'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -331,7 +331,7 @@ function SettingsPage() {
           <CardContent>
             <div className="space-y-3">
               <Button variant="outline" asChild>
-                <a href="/settings/prompts">Manage AI Prompts</a>
+                <Link to="/settings/prompts">Manage AI Prompts</Link>
               </Button>
             </div>
           </CardContent>

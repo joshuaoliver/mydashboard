@@ -128,14 +128,25 @@ export default defineSchema({
       v.literal("Talking"),
       v.literal("Planning"),
       v.literal("Dated"),
-      v.literal("Connected")
+      v.literal("Connected"),
+      v.literal("Former")
     )), // Lead status for relationship tracking
     // PIN-protected fields
     privateNotes: v.optional(v.string()), // PIN-protected notes
     intimateConnection: v.optional(v.boolean()), // PIN-protected yes/no
+    // Deduplication and cross-platform tracking
+    whatsapp: v.optional(v.string()), // Primary WhatsApp phone number for matching
+    socialHandles: v.optional(v.array(v.object({
+      platform: v.string(),    // "instagram", "whatsapp", "facebook", "phone"
+      handle: v.string(),       // Username or phone number
+      isPrimary: v.boolean(),   // Current/preferred handle
+      addedAt: v.number(),      // Timestamp when added
+    }))), // Historical and alternate social media handles
+    mergedFrom: v.optional(v.array(v.id("contacts"))), // IDs of contacts merged into this one
   })
     .index("by_dex_id", ["dexId"])
-    .index("by_instagram", ["instagram"]), // For matching with Beeper Instagram chats
+    .index("by_instagram", ["instagram"]) // For matching with Beeper Instagram chats
+    .index("by_whatsapp", ["whatsapp"]), // For matching with Beeper WhatsApp chats
 
   // Locations - user-defined locations for contacts
   locations: defineTable({
@@ -161,7 +172,6 @@ export default defineSchema({
     suggestions: v.array(v.object({        // The AI-generated suggestions
       reply: v.string(),
       style: v.string(),
-      reasoning: v.string(),
     })),
     conversationContext: v.object({        // Context when generated
       lastMessage: v.string(),

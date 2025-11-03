@@ -13,6 +13,7 @@ import {
   NavigationMenuList,
   NavigationMenuTrigger,
   NavigationMenuContent,
+  NavigationMenuLink,
 } from "@/components/ui/navigation-menu"
 import { 
   Settings, 
@@ -111,34 +112,40 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                     <Settings className="h-4 w-4" />
                     Settings
                   </NavigationMenuTrigger>
-                  <NavigationMenuContent className="bg-slate-800 border-slate-700">
+                  <NavigationMenuContent className="!bg-slate-800 !border-slate-700 !text-slate-300 z-[100] !mt-0">
                     <ul className="grid w-[200px] gap-1 p-2">
                       <li>
-                        <Link 
-                          to="/settings/prompts"
-                          className="flex items-center gap-2 px-3 py-2 rounded-md text-sm text-slate-300 hover:text-white hover:bg-slate-700 transition-colors"
-                        >
-                          <MessageCircle className="h-4 w-4" />
-                          Prompts
-                        </Link>
+                        <NavigationMenuLink asChild>
+                          <Link 
+                            to="/settings/prompts"
+                            className="flex items-center gap-2 px-3 py-2 rounded-md text-sm !text-slate-300 hover:!text-white hover:!bg-slate-700 transition-colors w-full"
+                          >
+                            <MessageCircle className="h-4 w-4" />
+                            Prompts
+                          </Link>
+                        </NavigationMenuLink>
                       </li>
                       <li>
-                        <Link 
-                          to="/settings/locations"
-                          className="flex items-center gap-2 px-3 py-2 rounded-md text-sm text-slate-300 hover:text-white hover:bg-slate-700 transition-colors"
-                        >
-                          <MapPin className="h-4 w-4" />
-                          Locations
-                        </Link>
+                        <NavigationMenuLink asChild>
+                          <Link 
+                            to="/settings/locations"
+                            className="flex items-center gap-2 px-3 py-2 rounded-md text-sm !text-slate-300 hover:!text-white hover:!bg-slate-700 transition-colors w-full"
+                          >
+                            <MapPin className="h-4 w-4" />
+                            Locations
+                          </Link>
+                        </NavigationMenuLink>
                       </li>
                       <li>
-                        <Link 
-                          to="/settings"
-                          className="flex items-center gap-2 px-3 py-2 rounded-md text-sm text-slate-300 hover:text-white hover:bg-slate-700 transition-colors"
-                        >
-                          <Settings className="h-4 w-4" />
-                          Settings
-                        </Link>
+                        <NavigationMenuLink asChild>
+                          <Link 
+                            to="/settings"
+                            className="flex items-center gap-2 px-3 py-2 rounded-md text-sm !text-slate-300 hover:!text-white hover:!bg-slate-700 transition-colors w-full"
+                          >
+                            <Settings className="h-4 w-4" />
+                            Settings
+                          </Link>
+                        </NavigationMenuLink>
                       </li>
                     </ul>
                   </NavigationMenuContent>

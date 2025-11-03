@@ -1,22 +1,21 @@
 import { query } from "./_generated/server";
 import { v } from "convex/values";
+import { paginationOptsValidator } from "convex/server";
 
 /**
- * Query cached chats from database
+ * Query cached chats from database with Convex pagination
  * Fast, reactive, real-time updates
  * Replaces direct API calls from frontend
  * Includes contact images from DEX integration
- * Supports pagination for infinite scroll
+ * Uses built-in Convex pagination for smooth infinite scroll
  */
 export const listCachedChats = query({
   args: {
-    limit: v.optional(v.number()),
-    cursor: v.optional(v.number()), // lastActivity timestamp as cursor
+    paginationOpts: paginationOptsValidator,
   },
   handler: async (ctx, args) => {
-    const limit = args.limit || 50;
-    
-    let queryBuilder = ctx.db
+    // Query chats with pagination
+    const result = await ctx.db
       .query("beeperChats")
       .withIndex("by_activity")
       .order("desc")
@@ -25,37 +24,55 @@ export const listCachedChats = query({
           q.eq(q.field("type"), "single"), // Direct messages only
           q.eq(q.field("isArchived"), false) // Not archived
         )
-      );
-    
-    // If cursor provided, only get chats older than cursor
-    if (args.cursor !== undefined) {
-      queryBuilder = queryBuilder.filter((q) =>
-        q.lt(q.field("lastActivity"), args.cursor!)
-      );
-    }
-    
-    const chats = await queryBuilder.take(limit);
+      )
+      .paginate(args.paginationOpts);
 
     // Fetch contact images and names for chats with Instagram usernames
-    const chatsWithContacts = await Promise.all(
-      chats.map(async (chat) => {
+    const pageWithContacts = await Promise.all(
+      result.page.map(async (chat) => {
         let contactImageUrl: string | undefined = undefined;
         let contactName: string | undefined = undefined;
+        let contact = null;
         
-        // If chat has Instagram username, look up contact
+        // Match contact by Instagram username
         if (chat.username) {
-          const contact = await ctx.db
+          contact = await ctx.db
             .query("contacts")
             .withIndex("by_instagram", (q) => q.eq("instagram", chat.username))
             .first();
+        }
+        
+        // Match contact by WhatsApp phone number (if Instagram didn't match)
+        if (!contact && chat.phoneNumber) {
+          // Try whatsapp field first
+          contact = await ctx.db
+            .query("contacts")
+            .withIndex("by_whatsapp", (q) => q.eq("whatsapp", chat.phoneNumber))
+            .first();
           
-          if (contact) {
-            contactImageUrl = contact.imageUrl;
-            // Build contact name from firstName and lastName
-            const nameParts = [contact.firstName, contact.lastName].filter(Boolean);
-            if (nameParts.length > 0) {
-              contactName = nameParts.join(" ");
-            }
+          // If not found, search in phones array
+          if (!contact) {
+            const normalizePhone = (phone: string) => phone.replace(/[\s\-\(\)]/g, '');
+            const searchPhone = normalizePhone(chat.phoneNumber);
+            
+            const allContactsWithPhones = await ctx.db
+              .query("contacts")
+              .filter((q) => q.neq(q.field("phones"), undefined))
+              .collect();
+
+            contact = allContactsWithPhones.find((c) => {
+              if (!c.phones) return false;
+              return c.phones.some((p) => normalizePhone(p.phone) === searchPhone);
+            }) || null;
+          }
+        }
+        
+        // Extract contact data if found
+        if (contact) {
+          contactImageUrl = contact.imageUrl;
+          const nameParts = [contact.firstName, contact.lastName].filter(Boolean);
+          if (nameParts.length > 0) {
+            contactName = nameParts.join(" ");
           }
         }
         
@@ -79,16 +96,10 @@ export const listCachedChats = query({
       })
     );
 
-    // Determine if there are more chats to load
-    const hasMore = chats.length === limit;
-    const nextCursor = chats.length > 0 ? chats[chats.length - 1].lastActivity : null;
-
+    // Return paginated result with transformed data
     return {
-      chats: chatsWithContacts,
-      lastSync: chats[0]?.lastSyncedAt || null,
-      count: chats.length,
-      hasMore,
-      nextCursor,
+      ...result,
+      page: pageWithContacts,
     };
   },
 });
@@ -129,24 +140,55 @@ export const getChatInfo = query({
 });
 
 /**
+ * Get a specific chat by ID
+ */
+export const getChatById = query({
+  args: { chatId: v.string() },
+  handler: async (ctx, args) => {
+    const chat = await ctx.db
+      .query("beeperChats")
+      .withIndex("by_chat_id", (q) => q.eq("chatId", args.chatId))
+      .first();
+
+    return chat;
+  },
+});
+
+/**
  * Get cached messages for a specific chat
  * Fast, reactive, no API call needed!
+ * Supports pagination for loading older messages
  */
 export const getCachedMessages = query({
-  args: { chatId: v.string() },
+  args: { 
+    chatId: v.string(),
+    limit: v.optional(v.number()),
+    oldestTimestamp: v.optional(v.number()), // Cursor for pagination - timestamp of oldest message already loaded
+  },
   handler: async (ctx, args) => {
     console.log(`[getCachedMessages] Querying for chatId: ${args.chatId}`);
     
+    // Default limit to all messages if not specified (for existing behavior)
+    const limit = args.limit;
+    
     // Query with compound index - filters by chatId and sorts by timestamp
-    const messages = await ctx.db
+    let queryBuilder = ctx.db
       .query("beeperMessages")
       .withIndex("by_chat", (q) => 
         q.eq("chatId", args.chatId)
-      )
-      .collect();
+      );
+
+    // If pagination cursor provided, only get messages older than cursor
+    if (args.oldestTimestamp !== undefined) {
+      queryBuilder = queryBuilder.filter((q) =>
+        q.lt(q.field("timestamp"), args.oldestTimestamp!)
+      );
+    }
+
+    // Collect all or limited messages
+    const messages = limit ? await queryBuilder.take(limit) : await queryBuilder.collect();
 
     console.log(`[getCachedMessages] Found ${messages.length} messages for chatId: ${args.chatId}`);
-    console.log(`[getCachedMessages] Sample chatIds in results:`, messages.slice(0, 3).map(m => m.chatId));
 
     // Sort by timestamp manually (oldest to newest)
     const sortedMessages = messages.sort((a, b) => a.timestamp - b.timestamp);
@@ -161,6 +203,7 @@ export const getCachedMessages = query({
         isFromUser: msg.isFromUser,
         attachments: msg.attachments,
       })),
+      hasMore: limit ? messages.length === limit : false,
     };
   },
 });

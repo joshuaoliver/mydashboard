@@ -46,6 +46,64 @@ export const findContactByInstagram = query({
 });
 
 /**
+ * Query to find a contact by WhatsApp phone number
+ * Used for matching Beeper WhatsApp chats to Dex contacts
+ */
+export const findContactByPhone = query({
+  args: {
+    phoneNumber: v.string(),
+  },
+  handler: async (ctx, args) => {
+    if (!args.phoneNumber) {
+      return null;
+    }
+
+    // Normalize phone number (remove spaces, dashes, etc.)
+    const normalizePhone = (phone: string) => {
+      return phone.replace(/[\s\-\(\)]/g, '');
+    };
+
+    const searchPhone = normalizePhone(args.phoneNumber);
+
+    // Try exact match on whatsapp field first
+    let contact = await ctx.db
+      .query("contacts")
+      .withIndex("by_whatsapp", (q) => q.eq("whatsapp", args.phoneNumber))
+      .first();
+
+    // If not found, search in phones array
+    if (!contact) {
+      const allContacts = await ctx.db
+        .query("contacts")
+        .filter((q) => q.neq(q.field("phones"), undefined))
+        .collect();
+
+      contact = allContacts.find((c) => {
+        if (!c.phones) return false;
+        return c.phones.some((p) => normalizePhone(p.phone) === searchPhone);
+      }) || null;
+    }
+
+    // If still not found, check socialHandles for whatsapp platform
+    if (!contact) {
+      const allContacts = await ctx.db
+        .query("contacts")
+        .filter((q) => q.neq(q.field("socialHandles"), undefined))
+        .collect();
+
+      contact = allContacts.find((c) => {
+        if (!c.socialHandles) return false;
+        return c.socialHandles.some((h) => 
+          h.platform === "whatsapp" && normalizePhone(h.handle) === searchPhone
+        );
+      }) || null;
+    }
+
+    return contact;
+  },
+});
+
+/**
  * Update contact connection types - multi-select (local-only, doesn't sync to Dex)
  */
 export const updateContactConnections = mutation({
@@ -257,11 +315,12 @@ export const updateIntimateConnection = mutation({
 
 /**
  * Create a new contact (user-initiated, no dexId yet)
- * When Dex sync runs later, it will match by Instagram username and adopt this contact
+ * When Dex sync runs later, it will match by Instagram username or phone and adopt this contact
  */
 export const createContact = mutation({
   args: {
     instagram: v.optional(v.string()),
+    whatsapp: v.optional(v.string()),
     firstName: v.optional(v.string()),
     lastName: v.optional(v.string()),
     description: v.optional(v.string()),
@@ -282,9 +341,23 @@ export const createContact = mutation({
       }
     }
 
+    // Check if contact with this WhatsApp already exists
+    if (args.whatsapp) {
+      const existing = await ctx.db
+        .query("contacts")
+        .withIndex("by_whatsapp", (q) => q.eq("whatsapp", args.whatsapp))
+        .first();
+
+      if (existing) {
+        // Return the existing contact instead of creating duplicate
+        return { contactId: existing._id, existed: true };
+      }
+    }
+
     // Create new contact (no dexId - will be added when Dex sync finds a match)
     const contactId = await ctx.db.insert("contacts", {
       instagram: args.instagram,
+      whatsapp: args.whatsapp,
       firstName: args.firstName,
       lastName: args.lastName,
       description: args.description,
@@ -307,6 +380,7 @@ export const updateLeadStatus = mutation({
       v.literal("Planning"),
       v.literal("Dated"),
       v.literal("Connected"),
+      v.literal("Former"),
       v.null()
     ),
   },
