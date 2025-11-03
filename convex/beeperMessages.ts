@@ -32,7 +32,7 @@ export const sendMessage = action({
     text: v.string(),
     replyToMessageId: v.optional(v.string()),
   },
-  handler: async (ctx, args): Promise<{
+  handler: async (_ctx, args): Promise<{
     success: boolean;
     chatId?: string;
     pendingMessageId?: string;

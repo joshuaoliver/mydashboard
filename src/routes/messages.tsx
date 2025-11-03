@@ -45,6 +45,7 @@ interface Chat {
   name: string
   network: string
   accountID: string
+  type?: 'single' | 'group' // Chat type from Beeper
   username?: string        // Instagram handle, etc.
   phoneNumber?: string     // WhatsApp number, etc.
   lastMessage: string
@@ -275,7 +276,7 @@ function Messages() {
       return
     }
 
-    const currentConnection = contactData.connection
+    const currentConnection = contactData.connections
     const currentNotes = contactData.notes
 
     // Check if this is the first time we're seeing this contact data
@@ -307,7 +308,7 @@ function Messages() {
       }
       regenerate()
     }
-  }, [contactData?.connection, contactData?.notes, selectedChatId])
+  }, [contactData?.connections, contactData?.notes, selectedChatId])
 
   // Auto/Manual AI suggestion generation
   // Automatically checks cache first, only generates if conversation changed

@@ -65,6 +65,7 @@ export const listCachedChats = query({
           name: contactName || chat.title, // Use contact name from Dex if available, otherwise fall back to Beeper title
           network: chat.network,
           accountID: chat.accountID,
+          type: chat.type, // 'single' or 'group'
           username: chat.username, // Instagram handle, etc.
           phoneNumber: chat.phoneNumber, // WhatsApp number, etc.
           lastMessage: chat.lastMessage || "Recent activity",

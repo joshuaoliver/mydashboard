@@ -20,7 +20,7 @@ auth.addHttpRoutes(http);
 http.route({
   path: "/image-proxy",
   method: "GET",
-  handler: httpAction(async (ctx, request) => {
+  handler: httpAction(async (_ctx, request) => {
     const url = new URL(request.url);
     const srcURL = url.searchParams.get("url");
 
