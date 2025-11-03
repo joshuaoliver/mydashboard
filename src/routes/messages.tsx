@@ -50,23 +50,8 @@ export const Route = createFileRoute('/messages')({
   },
 })
 
-interface Chat {
-  id: string
-  roomId: string
-  name: string
-  network: string
-  accountID: string
-  type?: 'single' | 'group' // Chat type from Beeper
-  username?: string        // Instagram handle, etc.
-  phoneNumber?: string     // WhatsApp number, etc.
-  lastMessage: string
-  lastMessageTime: number
-  unreadCount: number
-  lastSyncedAt?: number
-  needsReply?: boolean
-  lastMessageFrom?: string
-  contactImageUrl?: string // From DEX integration
-}
+// Chat data structure is inferred from the query result
+// No need for explicit interface since TypeScript infers it from the data
 
 interface Attachment {
   type: string
@@ -185,7 +170,7 @@ function Messages() {
     }
   }, [status, loadMore])
   
-  const selectedChat = allLoadedChats.find((chat: Chat) => chat.id === selectedChatId)
+  const selectedChat = allLoadedChats.find((chat) => chat.id === selectedChatId)
   
   // Query contact by Instagram username if available
   const contactData = useQuery(
@@ -615,7 +600,7 @@ function Messages() {
                     className="divide-y divide-gray-100 overflow-y-auto flex-1"
                     onScroll={handleScroll}
                   >
-                    {chats.map((chat: Chat) => (
+                    {chats.map((chat) => (
                       <ChatListItem
                         key={chat.id}
                         id={chat.id}
@@ -908,7 +893,7 @@ function Messages() {
                 </div>
               ) : (
                 <div className="divide-y divide-gray-100 overflow-y-auto">
-                  {chats.map((chat: Chat) => (
+                  {chats.map((chat) => (
                     <ChatListItem
                       key={chat.id}
                       id={chat.id}

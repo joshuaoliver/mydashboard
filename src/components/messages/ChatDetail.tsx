@@ -86,8 +86,8 @@ export function ChatDetail({ messages, isSingleChat = true, messagesStatus, onLo
   }
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden bg-gray-50">
-      <Conversation className="flex-1" ref={conversationRef}>
+    <div className="flex-1 flex flex-col overflow-hidden bg-gray-50" ref={conversationRef}>
+      <Conversation className="flex-1">
         <ConversationContent>
           {messages.length === 0 ? (
             <ConversationEmptyState 

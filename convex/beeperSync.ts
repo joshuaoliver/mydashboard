@@ -181,7 +181,7 @@ export const syncChatMessages = internalMutation({
       lastMessage: lastMessageText,
     });
 
-    return insertedCount + updatedCount;
+    return insertedCount;
   },
 });
 

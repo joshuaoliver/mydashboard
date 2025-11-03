@@ -40,6 +40,7 @@ interface ContactRecord {
 
 const LEAD_STATUS_METADATA: Array<{
   id: string
+  name: string
   key: LeadStatusKey
   label: string
   accent: string
@@ -47,6 +48,7 @@ const LEAD_STATUS_METADATA: Array<{
 }> = [
   {
     id: 'Talking',
+    name: 'Talking',
     key: 'Talking',
     label: 'Talking',
     accent: 'bg-sky-100 text-sky-700',
@@ -54,6 +56,7 @@ const LEAD_STATUS_METADATA: Array<{
   },
   {
     id: 'Planning',
+    name: 'Planning',
     key: 'Planning',
     label: 'Planning',
     accent: 'bg-amber-100 text-amber-700',
@@ -61,6 +64,7 @@ const LEAD_STATUS_METADATA: Array<{
   },
   {
     id: 'Dated',
+    name: 'Drinks',
     key: 'Dated',
     label: 'Drinks',
     accent: 'bg-rose-100 text-rose-700',
@@ -68,6 +72,7 @@ const LEAD_STATUS_METADATA: Array<{
   },
   {
     id: 'Connected',
+    name: 'Connected',
     key: 'Connected',
     label: 'Connected',
     accent: 'bg-emerald-100 text-emerald-700',
@@ -75,6 +80,7 @@ const LEAD_STATUS_METADATA: Array<{
   },
   {
     id: 'Former',
+    name: 'Former',
     key: 'Former',
     label: 'Former',
     accent: 'bg-slate-200 text-slate-700',
@@ -82,6 +88,7 @@ const LEAD_STATUS_METADATA: Array<{
   },
   {
     id: 'NoStatus',
+    name: 'Unassigned',
     key: 'NoStatus',
     label: 'Unassigned',
     accent: 'bg-gray-100 text-gray-700',
@@ -123,7 +130,12 @@ function SalesPage() {
   }, [data.contacts])
 
   // Transform contacts into kanban data format
-  const kanbanData = useMemo(() => {
+  const kanbanData: Array<{
+    id: Id<'contacts'>
+    name: string
+    column: string
+    contact: ContactRecord
+  }> = useMemo(() => {
     return romanticContacts.map((contact) => {
       const statusKey = resolveLeadStatusKey(contact.leadStatus)
       const column = LEAD_STATUS_METADATA.find((col) => col.key === statusKey)
@@ -286,7 +298,7 @@ function SalesPage() {
                         </div>
                       </KanbanHeader>
                       <KanbanCards id={column.id}>
-                        {(item) => {
+                        {(item: typeof kanbanData[number]) => {
                           const contact = item.contact
                           return (
                             <KanbanCard
