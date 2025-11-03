@@ -12,20 +12,57 @@ import { paginationOptsValidator } from "convex/server";
 export const listCachedChats = query({
   args: {
     paginationOpts: paginationOptsValidator,
+    filter: v.optional(v.union(
+      v.literal("unreplied"),
+      v.literal("unread"),
+      v.literal("all"),
+      v.literal("archived")
+    )),
   },
   handler: async (ctx, args) => {
+    const filter = args.filter || "all";
+    
     // Query chats with pagination
-    const result = await ctx.db
+    let queryBuilder = ctx.db
       .query("beeperChats")
       .withIndex("by_activity")
-      .order("desc")
-      .filter((q) =>
+      .order("desc");
+    
+    // Apply filters based on the requested filter type
+    if (filter === "archived") {
+      queryBuilder = queryBuilder.filter((q) =>
         q.and(
-          q.eq(q.field("type"), "single"), // Direct messages only
-          q.eq(q.field("isArchived"), false) // Not archived
+          q.eq(q.field("type"), "single"),
+          q.eq(q.field("isArchived"), true)
         )
-      )
-      .paginate(args.paginationOpts);
+      );
+    } else if (filter === "unreplied") {
+      queryBuilder = queryBuilder.filter((q) =>
+        q.and(
+          q.eq(q.field("type"), "single"),
+          q.eq(q.field("isArchived"), false),
+          q.eq(q.field("needsReply"), true)
+        )
+      );
+    } else if (filter === "unread") {
+      queryBuilder = queryBuilder.filter((q) =>
+        q.and(
+          q.eq(q.field("type"), "single"),
+          q.eq(q.field("isArchived"), false),
+          q.gt(q.field("unreadCount"), 0)
+        )
+      );
+    } else {
+      // "all" - just non-archived
+      queryBuilder = queryBuilder.filter((q) =>
+        q.and(
+          q.eq(q.field("type"), "single"),
+          q.eq(q.field("isArchived"), false)
+        )
+      );
+    }
+    
+    const result = await queryBuilder.paginate(args.paginationOpts);
 
     // Fetch contact images and names for chats with Instagram usernames
     const pageWithContacts = await Promise.all(

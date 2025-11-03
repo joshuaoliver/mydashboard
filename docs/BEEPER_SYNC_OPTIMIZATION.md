@@ -47,11 +47,36 @@ if (existingMessage) {
 }
 ```
 
-### 2. Only Fetch New Messages from API
+### 2. Only Fetch New Chats from API (with Auto-Pagination)
 
 **File:** `convex/beeperSync.ts` - `syncBeeperChatsInternal` action
 
-**Change:** Use timestamp filtering to only fetch messages since last sync:
+**Change:** Use timestamp filtering AND auto-pagination to fetch ALL chats with recent activity:
+
+```typescript
+// Build query params
+const queryParams: any = {
+  limit: 100, // Per-page limit
+};
+
+// Add filter if we have a previous sync timestamp
+if (useFilter && lastSyncTimestamp) {
+  queryParams.lastActivityAfter = new Date(lastSyncTimestamp).toISOString();
+}
+
+// Use auto-pagination to fetch ALL chats (not limited to 100!)
+const chats: any[] = [];
+for await (const chat of client.chats.search(queryParams)) {
+  chats.push(chat);
+}
+// Result: Gets ALL chats with recent activity, even if there are 500+ active chats!
+```
+
+### 3. Only Fetch New Messages from API (with Auto-Pagination)
+
+**File:** `convex/beeperSync.ts` - `syncBeeperChatsInternal` action
+
+**Change:** Use timestamp filtering AND auto-pagination to fetch ALL messages since last sync:
 
 ```typescript
 // Check when we last synced messages for this chat
@@ -60,26 +85,41 @@ const existingChat = await ctx.runQuery(
   { chatId: chat.id }
 );
 
-// Build query params - only fetch NEW messages
-const messageQueryParams: any = {};
+// Build query params
+const messageQueryParams: any = {
+  limit: 200, // Fetch up to 200 per page
+};
+
+let messages: any[] = [];
 
 if (existingChat?.lastMessagesSyncedAt && !args.forceMessageSync) {
-  // Incremental sync - only fetch messages since last sync
+  // Incremental sync - fetch ALL messages since last sync using auto-pagination
   messageQueryParams.dateAfter = new Date(existingChat.lastMessagesSyncedAt).toISOString();
-  console.log(`Fetching NEW messages since ${messageQueryParams.dateAfter}...`);
+  console.log(`Fetching ALL NEW messages since ${messageQueryParams.dateAfter} (auto-paginating)...`);
+  
+  // Use SDK v4.2.2+ auto-pagination to get ALL new messages (not limited to 100!)
+  const allMessages: any[] = [];
+  for await (const message of client.messages.list({
+    chatID: chat.id,
+    ...messageQueryParams
+  })) {
+    allMessages.push(message);
+  }
+  messages = allMessages;
 } else {
-  // Full sync - fetch all recent messages (first sync or manual refresh)
-  console.log(`Fetching ALL messages (full sync)...`);
+  // Full sync - fetch last 200 messages (limited to avoid overload on first sync)
+  messageQueryParams.limit = 200;
+  console.log(`Fetching last 200 messages (full sync)...`);
+  
+  const messagesResponse = await client.get(
+    `/v1/chats/${encodeURIComponent(chat.id)}/messages`,
+    { query: messageQueryParams }
+  );
+  messages = messagesResponse.items || [];
 }
-
-// Fetch with filter
-const messagesResponse = await client.get(
-  `/v1/chats/${encodeURIComponent(chat.id)}/messages`,
-  { query: messageQueryParams }
-);
 ```
 
-### 3. Added Internal Query Helper
+### 4. Added Internal Query Helper
 
 **File:** `convex/beeperQueries.ts`
 
@@ -101,23 +141,37 @@ export const getChatByIdInternal = internalQuery({
 ## Benefits
 
 ### Optimized Flow (After)
+
+### Scenario 1: No New Activity
 ```
-Chat has 100 cached messages, no new activity:
-1. Check lastMessagesSyncedAt timestamp ✅
-2. Fetch 0 messages from API (dateAfter filter) ✅
-3. Skip message sync entirely ✅
-Total: 0 API requests + 1 database query (just checking the chat timestamp)
+No chats with new activity:
+1. Fetch chats with activity after lastSyncTimestamp ✅
+2. API returns 0 chats (nothing new) ✅
+3. Skip everything ✅
+Total: 1 API request (chats list), 0 database operations
 ```
 
-### When There ARE New Messages (e.g., 3 new messages)
+### Scenario 2: Few New Messages
 ```
-Chat has 100 cached messages, 3 new messages since last sync:
-1. Check lastMessagesSyncedAt timestamp ✅
-2. Fetch 3 NEW messages from API (dateAfter filter) ✅
-3. For each of 3 messages:
-   - Check if exists (won't, they're new) ✅
-   - Insert new message ✅
-Total: 1 API request + 7 database operations (1 chat query + 3 existence checks + 3 inserts)
+5 chats with new activity, 3 new messages total:
+1. Fetch 5 chats with activity (auto-paginated) ✅
+2. For each of 5 chats:
+   - Check lastMessagesSyncedAt timestamp ✅
+   - Fetch NEW messages since last sync (auto-paginated) ✅
+   - Only 3 messages total across all chats ✅
+3. Insert 3 new messages, skip 0 existing ✅
+Total: 1 API request (chats) + 5 API requests (messages) + ~15 DB ops
+```
+
+### Scenario 3: High Volume
+```
+150 chats with new activity, 500 new messages total:
+1. Fetch ALL 150 chats (auto-paginated, not limited to 100!) ✅
+2. For each chat with new messages:
+   - Fetch ALL new messages (auto-paginated, not limited to 100!) ✅
+   - Gets all 500 new messages across all chats ✅
+3. Insert 500 new messages, skip existing ✅
+Total: Multiple API requests (auto-paginated) + database ops only for NEW data
 ```
 
 ### Performance Impact
@@ -175,12 +229,18 @@ Messages in chat systems are **immutable** - once sent, they never change. This 
 - We only need to INSERT new messages
 - Patching existing messages is always wasteful
 
-### Timestamp Filtering
+### Timestamp Filtering + Auto-Pagination
 
 The Beeper API `/v1/chats/{chatId}/messages` endpoint supports:
 - `dateAfter` parameter to filter by timestamp
 - Returns only messages sent after the specified date
 - Reduces API payload and processing time
+
+**SDK v4.2.2+ Auto-Pagination:**
+- Uses `for await...of` syntax to automatically fetch ALL pages
+- No longer limited to 100 messages
+- Ensures we get ALL new messages since last sync, even if there are 500+
+- Per-page limit of 200 (fetches multiple pages if needed)
 
 ### Index Optimization
 
@@ -204,7 +264,7 @@ To:
 Potential further optimizations:
 
 1. **Batch existence checks** - Check all message IDs at once instead of one-by-one
-2. **Cursor-based pagination** - Use API cursors for very active chats (>100 new messages)
+2. ~~**Cursor-based pagination** - Use API cursors for very active chats (>100 new messages)~~ ✅ **IMPLEMENTED** via auto-pagination
 3. **Smart refresh** - Only sync chats that user is viewing/interacting with
 4. **Message deduplication** - Filter out duplicate messages before calling mutation
 
@@ -221,9 +281,12 @@ To verify the optimization is working:
 
 ## Files Modified
 
-- ✅ `convex/beeperSync.ts` - Message sync optimization
+- ✅ `convex/beeperSync.ts` - Message sync optimization + SDK v4.2.2 updates
+- ✅ `convex/beeperGlobalSync.ts` - SDK v4.2.2 error handling
 - ✅ `convex/beeperQueries.ts` - Added internal query helper
+- ✅ `package.json` - Updated @beeper/desktop-api to v4.2.2
 - 📄 `docs/BEEPER_SYNC_OPTIMIZATION.md` - This document
+- 📄 `docs/BEEPER_SDK_UPDATE_V4.md` - SDK update details
 
 ## Summary
 
@@ -232,4 +295,14 @@ This optimization **eliminates 96-99% of wasteful database operations** during n
 - 💰 **Cheaper** - Fewer database operations
 - 🎯 **Smarter** - Incremental updates instead of full re-sync
 - 📊 **Scalable** - Performance doesn't degrade as message history grows
+
+## Related Updates
+
+This optimization was implemented alongside the **Beeper SDK v4.2.2 update**, which provides:
+- Better error handling with specific error types (RateLimitError, AuthenticationError, etc.)
+- Debug logging support via `BEEPER_LOG_LEVEL` environment variable
+- Automatic retry logic for transient errors
+- Full TypeScript type definitions
+
+See [BEEPER_SDK_UPDATE_V4.md](./BEEPER_SDK_UPDATE_V4.md) for details on the SDK update.
 

@@ -69,7 +69,7 @@ export function ChatListItem({
         className={cn(
           'w-full text-left px-4 py-3 transition-colors',
           'hover:bg-gray-50',
-          isSelected && 'bg-blue-50 border-l-4 border-l-blue-500',
+          isSelected && 'border-l-4 border-l-blue-500',
           hasUnread && !isSelected && 'bg-blue-50/30'
         )}
       >
@@ -94,7 +94,7 @@ export function ChatListItem({
               }}
             />
           ) : (
-            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center text-white font-semibold">
+            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-slate-300 to-slate-400 flex items-center justify-center text-white font-semibold">
               {name.charAt(0).toUpperCase()}
             </div>
           )}
@@ -112,7 +112,7 @@ export function ChatListItem({
               <h3 
                 className={cn(
                   "truncate text-sm",
-                  hasUnread ? "font-bold text-gray-900" : "font-medium text-gray-700"
+                  hasUnread ? "font-bold text-gray-900" : "font-normal text-gray-700"
                 )}
                 title={username ? `@${username}` : phoneNumber || undefined}
               >
@@ -141,7 +141,7 @@ export function ChatListItem({
               {truncatedMessage}
             </p>
             {hasUnread && (
-              <span className="px-1.5 py-0.5 text-xs font-bold bg-blue-500 text-white rounded-full flex-shrink-0 min-w-[20px] text-center">
+              <span className="px-1.5 py-0.5 text-xs font-bold bg-blue-600/90 text-white rounded-full flex-shrink-0 min-w-[20px] text-center">
                 {unreadCount}
               </span>
             )}

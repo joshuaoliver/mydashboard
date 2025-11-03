@@ -38,6 +38,7 @@ import {
   ResizablePanel,
   ResizablePanelGroup,
 } from '@/components/ui/resizable'
+import { ScrollArea } from '@/components/ui/scroll-area'
 import { useIsMobile } from '@/lib/hooks/use-mobile'
 import { cn } from '~/lib/utils'
 
@@ -115,8 +116,8 @@ function Messages() {
   // Query cached chats from database using Convex pagination (instant, reactive, smooth loading)
   const { results: allLoadedChats, status, loadMore } = usePaginatedQuery(
     api.beeperQueries.listCachedChats,
-    {},
-    { initialNumItems: 30 }
+    { filter: tabFilter },
+    { initialNumItems: 100 }
   )
   const syncInfo = useQuery(api.beeperQueries.getChatInfo)
   
@@ -139,22 +140,8 @@ function Messages() {
   const markChatAsRead = useAction(api.chatActions.markChatAsRead)
   const markChatAsUnread = useAction(api.chatActions.markChatAsUnread)
 
-  // Apply tab filtering to all loaded chats
-  const chats = allLoadedChats.filter((chat) => {
-    // Archived tab - for now shows nothing since archived chats are filtered at query level
-    // TODO: Add separate query for archived chats
-    if (tabFilter === 'archived') {
-      return false
-    }
-    
-    // Other tabs filter non-archived chats
-    if (tabFilter === 'unreplied') {
-      return chat.needsReply === true
-    } else if (tabFilter === 'unread') {
-      return chat.unreadCount > 0
-    }
-    return true // 'all' tab shows everything (non-archived)
-  })
+  // Chats are now filtered server-side
+  const chats = allLoadedChats
   
   // Infinite scroll handler - Load more when scrolling
   const handleScroll = useCallback(() => {
@@ -637,7 +624,7 @@ function Messages() {
                 {/* Chat Messages with Input and AI Suggestions */}
                 <ResizablePanel defaultSize={60} minSize={30}>
                   <div className="h-full bg-white flex flex-col overflow-hidden">
-                    {/* Chat Header with Archive Button */}
+                    {/* Chat Header with Actions */}
                     <div className="flex-shrink-0 px-4 py-3 border-b border-gray-200 flex items-center justify-between bg-white">
                       <div className="flex items-center gap-3 min-w-0 flex-1">
                         {selectedChat.contactImageUrl ? (
@@ -647,7 +634,7 @@ function Messages() {
                             className="w-8 h-8 rounded-full object-cover flex-shrink-0"
                           />
                         ) : (
-                          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center text-white font-semibold text-sm flex-shrink-0">
+                          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-slate-300 to-slate-400 flex items-center justify-center text-white font-semibold text-sm flex-shrink-0">
                             {selectedChat.name.charAt(0).toUpperCase()}
                           </div>
                         )}
@@ -662,45 +649,35 @@ function Messages() {
                         <Button
                           variant="ghost"
                           size="sm"
+                          onClick={() => handleOpenInBeeper(selectedChatId)}
+                          className="gap-2"
+                          title="Open in Beeper Desktop"
+                        >
+                          <ExternalLink className="w-4 h-4" />
+                          Open in Beeper
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
                           onClick={() => selectedChat.unreadCount > 0 ? handleMarkAsRead(selectedChatId) : handleMarkAsUnread(selectedChatId)}
                           className="gap-2"
                           title={selectedChat.unreadCount > 0 ? "Mark as read" : "Mark as unread"}
                         >
                           {selectedChat.unreadCount > 0 ? (
-                            <>
-                              <MailOpen className="w-4 h-4" />
-                              Mark read
-                            </>
+                            <MailOpen className="w-4 h-4" />
                           ) : (
-                            <>
-                              <Mail className="w-4 h-4" />
-                              Mark unread
-                            </>
+                            <Mail className="w-4 h-4" />
                           )}
                         </Button>
                         <Button
                           variant="ghost"
                           size="sm"
                           onClick={() => handleArchiveChat(selectedChatId)}
-                          className="gap-2"
+                          title="Archive chat"
                         >
                           <Archive className="w-4 h-4" />
-                          Archive
                         </Button>
                       </div>
-                    </div>
-
-                    {/* Open in Beeper Button */}
-                    <div className="border-b border-gray-200 px-4 py-2 bg-gray-50">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleOpenInBeeper(selectedChatId)}
-                        className="gap-2 w-full"
-                      >
-                        <ExternalLink className="w-4 h-4" />
-                        Open in Beeper Desktop
-                      </Button>
                     </div>
 
                     {isLoadingMessages ? (
@@ -769,7 +746,7 @@ function Messages() {
                       </div>
 
                       {/* AI Reply Suggestions - Below Input */}
-                      <div className="flex-shrink-0 border-t-2 border-gray-300 bg-gray-50 overflow-y-auto max-h-[400px]">
+                      <div className="flex-shrink-0 border-t-2 border-gray-300 bg-gray-50">
                         <ReplySuggestions
                           suggestions={replySuggestions}
                           isLoading={isLoadingSuggestions}
@@ -778,7 +755,7 @@ function Messages() {
                           selectedIndex={selectedSuggestionIndex}
                           onSuggestionSelect={handleSuggestionSelect}
                         />
-                        </div>
+                      </div>
                       </>
                     )}
                   </div>
@@ -1012,7 +989,7 @@ function Messages() {
                         </div>
 
                         {/* AI Reply Suggestions - Below Input */}
-                        <div className="flex-shrink-0 border-t-2 border-gray-300 bg-gray-50 overflow-y-auto max-h-[200px]">
+                        <div className="flex-shrink-0 border-t-2 border-gray-300 bg-gray-50">
                           <ReplySuggestions
                             suggestions={replySuggestions}
                             isLoading={isLoadingSuggestions}

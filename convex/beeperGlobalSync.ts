@@ -14,7 +14,13 @@ const BEEPER_TOKEN = process.env.BEEPER_TOKEN;
 let lastMessageSyncTimestamp: number | null = null;
 
 /**
- * Initialize Beeper SDK client
+ * Initialize Beeper SDK client (v4.2.2+)
+ * Configured for your custom endpoint server
+ * 
+ * Features:
+ * - Auto-retry on connection errors, timeouts, and rate limits
+ * - Debug logging in development mode
+ * - Proper error types for better error handling
  */
 function createBeeperClient() {
   if (!BEEPER_TOKEN) {
@@ -24,8 +30,9 @@ function createBeeperClient() {
   return new BeeperDesktop({
     accessToken: BEEPER_TOKEN,
     baseURL: BEEPER_API_URL,
-    maxRetries: 2,
-    timeout: 15000,
+    maxRetries: 2, // Retry on 408, 429, 5xx errors
+    timeout: 15000, // 15 seconds
+    logLevel: process.env.BEEPER_LOG_LEVEL as any || 'warn', // 'debug', 'info', 'warn', 'error', 'off'
   });
 }
 
@@ -70,8 +77,7 @@ export const syncLatestMessagesGlobal = internalAction({
 
       // Build query parameters for global message search
       const queryParams: any = {
-        limit: 20, // Max allowed by API
-        // Note: We'll need to paginate if we want more
+        limit: 100, // Fetch up to 100 messages per page
       };
 
       // Add date filter if we have a previous sync timestamp
@@ -79,13 +85,30 @@ export const syncLatestMessagesGlobal = internalAction({
         queryParams.dateAfter = new Date(lastMessageSyncTimestamp).toISOString();
       }
 
-      // Fetch latest messages across ALL chats using global search
-      const response = await client.get('/v1/messages/search', {
-        query: queryParams
-      }) as any;
-
-      const messages = response.items || [];
-      const chats = response.chats || {}; // Map of chatID -> chat details
+      // Fetch ALL new messages across all chats using auto-pagination (SDK v4.2.2+ feature)
+      const messages: any[] = [];
+      const chatsMap: Record<string, any> = {};
+      
+      for await (const message of client.messages.search(queryParams as any)) {
+        messages.push(message);
+        // Collect chat info from message responses
+        // Note: The messages.search endpoint may include chat data
+      }
+      
+      // Also fetch chat metadata for any chats with new messages
+      const uniqueChatIds = [...new Set(messages.map(m => m.chatID))];
+      for (const chatId of uniqueChatIds) {
+        if (!chatsMap[chatId]) {
+          try {
+            const chatResponse = await client.get(`/v1/chats/${encodeURIComponent(chatId)}`) as any;
+            chatsMap[chatId] = chatResponse;
+          } catch (err) {
+            console.warn(`[Global Message Sync] Could not fetch chat ${chatId}:`, err);
+          }
+        }
+      }
+      
+      const chats = chatsMap;
       
       console.log(
         `[Global Message Sync] Received ${messages.length} messages across ${Object.keys(chats).length} chats`
@@ -225,8 +248,33 @@ export const syncLatestMessagesGlobal = internalAction({
         source: args.syncSource,
       };
     } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : "Unknown error";
-      console.error(`[Global Message Sync] Unexpected error: ${errorMsg}`);
+      // SDK v4.2.2+ provides specific error types
+      let errorMsg = "Unknown error";
+      let errorType = "UnknownError";
+      
+      if (error && typeof error === 'object' && 'constructor' in error) {
+        const errorName = error.constructor.name;
+        errorType = errorName;
+        
+        // Check for specific API error types from SDK
+        if ('status' in error && 'message' in error) {
+          const apiError = error as any;
+          errorMsg = `${errorName} (${apiError.status}): ${apiError.message}`;
+          
+          // Log specific error details for debugging
+          if (apiError.status === 429) {
+            console.error(`[Global Message Sync] Rate limited! Please wait before retrying.`);
+          } else if (apiError.status >= 500) {
+            console.error(`[Global Message Sync] Server error - Beeper API may be experiencing issues.`);
+          } else if (apiError.status === 401) {
+            console.error(`[Global Message Sync] Authentication failed - check BEEPER_TOKEN`);
+          }
+        } else if (error instanceof Error) {
+          errorMsg = error.message;
+        }
+      }
+      
+      console.error(`[Global Message Sync] ${errorType}: ${errorMsg}`);
       
       return {
         success: false,
@@ -234,7 +282,7 @@ export const syncLatestMessagesGlobal = internalAction({
         syncedMessages: 0,
         timestamp: Date.now(),
         source: args.syncSource,
-        error: `Unexpected error: ${errorMsg}`,
+        error: errorMsg,
       };
     }
   },
@@ -301,7 +349,21 @@ export const hybridSync = action({
         source: "hybrid",
       };
     } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : "Unknown error";
+      // SDK v4.2.2+ provides specific error types
+      let errorMsg = "Unknown error";
+      
+      if (error && typeof error === 'object' && 'constructor' in error) {
+        const errorName = error.constructor.name;
+        
+        // Check for specific API error types from SDK
+        if ('status' in error && 'message' in error) {
+          const apiError = error as any;
+          errorMsg = `${errorName} (${apiError.status}): ${apiError.message}`;
+        } else if (error instanceof Error) {
+          errorMsg = error.message;
+        }
+      }
+      
       console.error(`[Hybrid Sync] Error: ${errorMsg}`);
       
       return {

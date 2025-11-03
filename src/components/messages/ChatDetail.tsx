@@ -7,6 +7,7 @@ import {
 } from '@/components/ai-elements/conversation'
 import { Message as AIMessage, MessageContent } from '@/components/ai-elements/message'
 import { ProxiedImage } from './ProxiedImage'
+import { ScrollArea } from '@/components/ui/scroll-area'
 import { RefreshCw } from 'lucide-react'
 import { useRef, useEffect } from 'react'
 
@@ -86,7 +87,7 @@ export function ChatDetail({ messages, isSingleChat = true, messagesStatus, onLo
   }
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden bg-gray-50" ref={conversationRef}>
+    <ScrollArea className="flex-1 bg-gray-50" ref={conversationRef}>
       <Conversation className="flex-1">
         <ConversationContent>
           {messages.length === 0 ? (
@@ -105,14 +106,7 @@ export function ChatDetail({ messages, isSingleChat = true, messagesStatus, onLo
               )}
               
               {messages.map((message) => (
-                <div key={message.id} className={cn('flex items-end gap-1.5 group', message.isFromUser ? 'justify-end' : 'justify-start')}>
-                  {/* Timestamp - shown on hover, positioned outside bubble */}
-                  {!message.isFromUser && (
-                    <div className="text-[10px] text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity pb-1 select-none whitespace-nowrap">
-                      {formatMessageTime(message.timestamp)}
-                    </div>
-                  )}
-                  
+                <div key={message.id} className={cn('flex group', message.isFromUser ? 'justify-end' : 'justify-start')}>
                   <AIMessage from={message.isFromUser ? 'user' : 'assistant'}>
                     <MessageContent variant="contained">
                       {/* Only show sender name in group chats */}
@@ -155,21 +149,20 @@ export function ChatDetail({ messages, isSingleChat = true, messagesStatus, onLo
                         </div>
                       )}
                       
-                      {/* Render text content if present */}
-                      {message.text && (
-                        <p className="text-sm whitespace-pre-wrap break-words">
-                          {message.text}
-                        </p>
-                      )}
+                      {/* Render text content with timestamp */}
+                      <div className="flex items-end gap-2">
+                        {message.text && (
+                          <p className="text-sm whitespace-pre-wrap break-words flex-1">
+                            {message.text}
+                          </p>
+                        )}
+                        {/* Timestamp inside bubble - shown on hover */}
+                        <div className="text-[10px] text-gray-500 opacity-0 group-hover:opacity-70 transition-opacity select-none whitespace-nowrap self-end">
+                          {formatMessageTime(message.timestamp)}
+                        </div>
+                      </div>
                     </MessageContent>
                   </AIMessage>
-                  
-                  {/* Timestamp for user messages - shown on hover, positioned outside bubble */}
-                  {message.isFromUser && (
-                    <div className="text-[10px] text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity pb-1 select-none whitespace-nowrap">
-                      {formatMessageTime(message.timestamp)}
-                    </div>
-                  )}
                 </div>
               ))}
             </div>
@@ -177,7 +170,7 @@ export function ChatDetail({ messages, isSingleChat = true, messagesStatus, onLo
         </ConversationContent>
         <ConversationScrollButton />
       </Conversation>
-    </div>
+    </ScrollArea>
   )
 }
 

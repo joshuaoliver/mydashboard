@@ -14,8 +14,13 @@ const BEEPER_TOKEN = process.env.BEEPER_TOKEN;
 let lastSyncTimestamp: number | null = null;
 
 /**
- * Initialize Beeper SDK client
- * Configured for your custom V0 endpoint server
+ * Initialize Beeper SDK client (v4.2.2+)
+ * Configured for your custom endpoint server
+ * 
+ * Features:
+ * - Auto-retry on connection errors, timeouts, and rate limits
+ * - Debug logging in development mode
+ * - Proper error types for better error handling
  */
 function createBeeperClient() {
   if (!BEEPER_TOKEN) {
@@ -25,8 +30,9 @@ function createBeeperClient() {
   return new BeeperDesktop({
     accessToken: BEEPER_TOKEN,
     baseURL: BEEPER_API_URL,
-    maxRetries: 2,
+    maxRetries: 2, // Retry on 408, 429, 5xx errors
     timeout: 15000, // 15 seconds
+    logLevel: process.env.BEEPER_LOG_LEVEL as any || 'warn', // 'debug', 'info', 'warn', 'error', 'off'
   });
 }
 
@@ -187,12 +193,14 @@ export const syncChatMessages = internalMutation({
 
 /**
  * Internal action to fetch data from Beeper API and sync to database
- * NOW USING OFFICIAL BEEPER SDK! 🎉
+ * NOW USING OFFICIAL BEEPER SDK v4.2.2+! 🎉
  * 
  * Benefits:
- * - Type safety
- * - Built-in error handling & retries
- * - Cleaner code
+ * - Type safety with TypeScript definitions
+ * - Built-in error handling & retries (2x on 429, 5xx, timeouts)
+ * - Specific error types (APIError, RateLimitError, etc.)
+ * - Auto-pagination support
+ * - Debug logging in development
  * - Better timeout handling
  */
 export const syncBeeperChatsInternal = internalAction({
@@ -311,31 +319,44 @@ export const syncBeeperChatsInternal = internalAction({
               { chatId: chat.id }
             );
 
-            // Build query params - only fetch messages newer than last sync
-            const messageQueryParams: any = {};
+            // Build query params - fetch messages newer than last sync
+            const messageQueryParams: any = {
+              limit: 200, // Fetch up to 200 per page (API may have lower max)
+            };
+            
+            let messages: any[] = [];
             
             if (existingChat?.lastMessagesSyncedAt && !args.forceMessageSync) {
-              // Only fetch messages since last sync (incremental update)
+              // Incremental sync - fetch ALL messages since last sync using auto-pagination
               messageQueryParams.dateAfter = new Date(existingChat.lastMessagesSyncedAt).toISOString();
               console.log(
-                `[Beeper Sync] Fetching NEW messages for chat ${chat.id} (${chat.title}) ` +
-                `since ${new Date(existingChat.lastMessagesSyncedAt).toISOString()}...`
+                `[Beeper Sync] Fetching ALL NEW messages for chat ${chat.id} (${chat.title}) ` +
+                `since ${new Date(existingChat.lastMessagesSyncedAt).toISOString()} (auto-paginating)...`
               );
+              
+              // Use auto-pagination to get ALL new messages (SDK v4.2.2+ feature)
+              const allMessages: any[] = [];
+              for await (const message of client.messages.list({
+                chatID: chat.id,
+                ...messageQueryParams
+              } as any)) {
+                allMessages.push(message);
+              }
+              messages = allMessages;
             } else {
-              // Full sync - fetch all recent messages
-              console.log(`[Beeper Sync] Fetching ALL messages for chat ${chat.id} (${chat.title})...`);
+              // Full sync - fetch recent messages (limited to avoid overload on first sync)
+              messageQueryParams.limit = 200; // Limit to last 200 messages on full sync
+              console.log(`[Beeper Sync] Fetching last ${messageQueryParams.limit} messages for chat ${chat.id} (${chat.title}) (full sync)...`);
+              
+              const messagesResponse = await client.get(`/v1/chats/${encodeURIComponent(chat.id)}/messages`, {
+                query: messageQueryParams
+              }) as any;
+              messages = messagesResponse.items || [];
             }
-            
-            // Use the better /v1/chats/{chatID}/messages endpoint
-            // This endpoint supports proper pagination and higher limits
-            const messagesResponse = await client.get(`/v1/chats/${encodeURIComponent(chat.id)}/messages`, {
-              query: messageQueryParams
-            }) as any;
 
-            const messages = messagesResponse.items || [];
             console.log(
               `[Beeper Sync] Received ${messages.length} messages from API for chat ${chat.id} (${chat.title}) ` +
-              `${messageQueryParams.dateAfter ? '(incremental)' : '(full sync)'}`
+              `${messageQueryParams.dateAfter ? '(incremental, auto-paginated)' : '(full sync, limited)'}`
             );
 
             // Prepare messages for mutation
@@ -410,9 +431,33 @@ export const syncBeeperChatsInternal = internalAction({
         source: args.syncSource,
       };
     } catch (error) {
-      // SDK provides better error messages
-      const errorMsg = error instanceof Error ? error.message : "Unknown error";
-      console.error(`[Beeper Sync] Unexpected error: ${errorMsg}`);
+      // SDK v4.2.2+ provides specific error types
+      let errorMsg = "Unknown error";
+      let errorType = "UnknownError";
+      
+      if (error && typeof error === 'object' && 'constructor' in error) {
+        const errorName = error.constructor.name;
+        errorType = errorName;
+        
+        // Check for specific API error types from SDK
+        if ('status' in error && 'message' in error) {
+          const apiError = error as any;
+          errorMsg = `${errorName} (${apiError.status}): ${apiError.message}`;
+          
+          // Log specific error details for debugging
+          if (apiError.status === 429) {
+            console.error(`[Beeper Sync] Rate limited! Please wait before retrying.`);
+          } else if (apiError.status >= 500) {
+            console.error(`[Beeper Sync] Server error - Beeper API may be experiencing issues.`);
+          } else if (apiError.status === 401) {
+            console.error(`[Beeper Sync] Authentication failed - check BEEPER_TOKEN`);
+          }
+        } else if (error instanceof Error) {
+          errorMsg = error.message;
+        }
+      }
+      
+      console.error(`[Beeper Sync] ${errorType}: ${errorMsg}`);
       
       return {
         success: false,
@@ -420,7 +465,7 @@ export const syncBeeperChatsInternal = internalAction({
         syncedMessages: 0,
         timestamp: Date.now(),
         source: args.syncSource,
-        error: `Unexpected error: ${errorMsg}`,
+        error: errorMsg,
       };
     }
   },
