@@ -189,7 +189,6 @@ export const generateReplySuggestions = action({
   returns: v.object({
     suggestions: v.array(v.object({
       reply: v.string(),
-      style: v.string(),
     })),
     conversationContext: v.object({
       lastMessage: v.string(),
@@ -201,7 +200,6 @@ export const generateReplySuggestions = action({
   handler: async (ctx, args): Promise<{
     suggestions: Array<{
       reply: string;
-      style: string;
     }>;
     conversationContext: {
       lastMessage: string;
@@ -249,7 +247,6 @@ export const generateReplySuggestions = action({
         const cached: {
           suggestions: Array<{
             reply: string;
-            style: string;
           }>;
           conversationContext: {
             lastMessage: string;
@@ -287,6 +284,7 @@ export const generateReplySuggestions = action({
       const lastMessageText = lastMessage.text;
 
       // Build contact context with XML structure if available
+      // Only include fields that are visible/editable in the contact panel
       let contactContext = "No contact information available";
       if (contact) {
         const contactName = [contact.firstName, contact.lastName].filter(Boolean).join(" ");
@@ -313,6 +311,8 @@ export const generateReplySuggestions = action({
               return "Close Friend: Someone valuable to Joshua.";
             case "Romantic":
               return "Romantic: Someone Joshua is looking to have an intimate relationship with (casual or serious). Ultimate Man Project principles apply.";
+            case "Party":
+              return "Party: Someone Joshua knows from social/party settings.";
             default:
               return type;
           }
@@ -324,6 +324,12 @@ export const generateReplySuggestions = action({
           contactContext += `\n<gender>${gender}</gender>`;
         }
         
+        // Instagram handle if available
+        if (contact.instagram) {
+          contactContext += `\n<instagram>@${contact.instagram}</instagram>`;
+        }
+        
+        // Connection types with descriptions
         if (contact.connections && contact.connections.length > 0) {
           contactContext += `\n<connection_types>`;
           contact.connections.forEach(conn => {
@@ -332,14 +338,14 @@ export const generateReplySuggestions = action({
           contactContext += `\n</connection_types>`;
         }
         
-        // Add objective
+        // Objective - what Joshua wants to achieve with this person
         if (contact.objective) {
           contactContext += `\n<objective>${contact.objective}</objective>`;
         } else if (isRomantic) {
           contactContext += `\n<objective>Go on a date (default romantic objective)</objective>`;
         }
         
-        // Add lead status for romantic connections
+        // Lead status for romantic connections
         if (isRomantic && contact.leadStatus) {
           const leadStatusDescriptions: Record<string, string> = {
             "Talking": "Still in talking stage, possibly met through dating app or in person. No formal ask yet.",
@@ -352,12 +358,24 @@ export const generateReplySuggestions = action({
           contactContext += `\n<lead_status>${contact.leadStatus}: ${description}</lead_status>`;
         }
         
+        // Description from Dex CRM
         if (contact.description) {
-          contactContext += `\n<description>${contact.description}</description>`;
+          contactContext += `\n<dex_description>${contact.description}</dex_description>`;
         }
         
+        // Local notes (visible in contact panel)
         if (contact.notes) {
           contactContext += `\n<notes>${contact.notes}</notes>`;
+        }
+        
+        // Private notes (PIN-protected, highly sensitive)
+        if (contact.privateNotes) {
+          contactContext += `\n<private_notes>${contact.privateNotes}</private_notes>`;
+        }
+        
+        // Intimate connection flag (PIN-protected)
+        if (contact.intimateConnection) {
+          contactContext += `\n<intimate_connection>Yes</intimate_connection>`;
         }
       }
 
@@ -415,8 +433,7 @@ Format as JSON:
 {
   "suggestions": [
     {
-      "reply": "The actual reply text",
-      "style": "Pathway label"
+      "reply": "The actual reply text"
     }
   ]
 }`;
@@ -444,11 +461,9 @@ Format as JSON:
         }
         
         const aiResponse = JSON.parse(cleanedText);
-        // Map suggestions and ensure they don't have reasoning field
-        // Also strip em dashes (—) and en dashes (–) from replies
+        // Map suggestions and strip em dashes (—) and en dashes (–) from replies
         suggestions = (aiResponse.suggestions || []).map((s: any) => ({
           reply: s.reply.replace(/—/g, '-').replace(/–/g, '-'),
-          style: s.style,
         }));
       } catch (parseError) {
         // If JSON parsing fails, use a fallback
@@ -457,7 +472,6 @@ Format as JSON:
         suggestions = [
           {
             reply: "Thanks for your message! I'll get back to you soon.",
-            style: "Polite acknowledgment",
           },
         ];
       }

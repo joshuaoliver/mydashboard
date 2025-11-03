@@ -86,7 +86,6 @@ interface Message {
 
 interface ReplySuggestion {
   reply: string
-  style: string  // Conversation pathway label (e.g., "Ask deeper question", "Shift to plans")
 }
 
 type TabFilter = 'unreplied' | 'unread' | 'all' | 'archived'
@@ -130,10 +129,15 @@ function Messages() {
   )
   const syncInfo = useQuery(api.beeperQueries.getChatInfo)
   
-  // Query cached messages for selected chat (instant, reactive)
-  const cachedMessagesData = useQuery(
+  // Query cached messages for selected chat with pagination (instant, reactive)
+  const { 
+    results: cachedMessages, 
+    status: messagesStatus, 
+    loadMore: loadMoreMessages 
+  } = usePaginatedQuery(
     api.beeperQueries.getCachedMessages,
-    selectedChatId ? { chatId: selectedChatId } : "skip"
+    selectedChatId ? { chatId: selectedChatId } : "skip",
+    { initialNumItems: 50 } // Load 50 most recent messages initially
   )
 
   // Actions for syncing and AI generation
@@ -182,7 +186,7 @@ function Messages() {
   )
   
   // Derived loading state - loading if we have a selected chat but no cached data yet
-  const isLoadingMessages = selectedChatId !== null && cachedMessagesData === undefined
+  const isLoadingMessages = selectedChatId !== null && messagesStatus === "LoadingFirstPage"
 
   // Trigger sync on page load and auto-select most recent chat
   useEffect(() => {
@@ -224,8 +228,8 @@ function Messages() {
       return
     }
 
-    if (cachedMessagesData) {
-      setChatMessages(cachedMessagesData.messages || [])
+    if (cachedMessages) {
+      setChatMessages(cachedMessages || [])
       // Clear previous AI suggestions when switching chats
       setReplySuggestions([])
       // cleared along with suggestions
@@ -235,7 +239,7 @@ function Messages() {
       // Auto-generate AI suggestions when chat is selected
       handleGenerateAISuggestions()
     }
-  }, [selectedChatId, cachedMessagesData])
+  }, [selectedChatId, cachedMessages])
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
 
@@ -635,6 +639,8 @@ function Messages() {
                         <ChatDetail 
                           messages={chatMessages} 
                           isSingleChat={selectedChat?.type === 'single' || selectedChat?.type === undefined}
+                          messagesStatus={messagesStatus}
+                          onLoadMore={loadMoreMessages}
                         />
                         
                         {/* Reply Input Area */}
@@ -859,6 +865,8 @@ function Messages() {
                         <ChatDetail 
                           messages={chatMessages} 
                           isSingleChat={selectedChat?.type === 'single' || selectedChat?.type === undefined}
+                          messagesStatus={messagesStatus}
+                          onLoadMore={loadMoreMessages}
                         />
                         
                         {/* Reply Input Area */}

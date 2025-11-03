@@ -6,7 +6,6 @@ import { Response } from '@/components/ai-elements/response'
 
 interface ReplySuggestion {
   reply: string
-  style: string  // Conversation pathway label (e.g., "Ask deeper question", "Shift to plans")
 }
 
 interface ReplySuggestionsProps {
@@ -102,19 +101,13 @@ export function ReplySuggestions({
               }`}
             >
               {/* Reply text with markdown support */}
-              <div className={`text-sm text-gray-900 leading-relaxed ${isSelected ? 'mb-3' : ''}`}>
+              <div className="text-sm text-gray-900 leading-relaxed">
                 <Response>{suggestion.reply}</Response>
               </div>
 
-              {/* Style badge and copy button - only show for selected */}
+              {/* Copy button - only show for selected */}
               {isSelected && (
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2 flex-1 min-w-0">
-                    <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse flex-shrink-0" />
-                    <span className="text-xs font-medium px-2 py-0.5 rounded flex-shrink-0 text-blue-700 bg-blue-100">
-                      {suggestion.style}
-                    </span>
-                  </div>
+                <div className="flex items-center justify-end gap-2 mt-3">
                   <Button
                     variant="ghost"
                     size="sm"
@@ -122,7 +115,7 @@ export function ReplySuggestions({
                       e.stopPropagation()
                       handleCopy(suggestion.reply, index)
                     }}
-                    className="h-7 text-xs opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
+                    className="h-7 text-xs opacity-0 group-hover:opacity-100 transition-opacity"
                   >
                     {copiedIndex === index ? (
                       <>

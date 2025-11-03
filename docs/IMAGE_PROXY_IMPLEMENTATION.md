@@ -31,7 +31,7 @@ file:///Users/joshuaoliver/Library/Application%20Support/BeeperTexts/media/local
 
 ```
 ┌──────────────┐
-│   Browser    │  <img src="https://convex.cloud/image-proxy?url=mxc://..." />
+│   Browser    │  <img src="https://<deployment>.convex.site/image-proxy?url=mxc://..." />
 └──────┬───────┘
        │ 1. Request image via Convex URL
        ▼
@@ -152,7 +152,7 @@ Output:  Display immediately
 
 ### Scenario 2: MXC URL (Encrypted Matrix Content)
 ```
-Browser: <img src="https://convex.cloud/image-proxy?url=mxc://local.beeper.com/xyz" />
+Browser: <img src="https://<deployment>.convex.site/image-proxy?url=mxc://local.beeper.com/xyz" />
          ↓
 Convex:  POST beeper.bywave.com.au/v1/assets/download { url: "mxc://..." }
          ← { srcURL: "file:///.../media/local.beeper.com/xyz" }
@@ -168,7 +168,7 @@ Browser: Receives image with Content-Type: image/jpeg
 
 ### Scenario 3: File URL (Direct Local Path)
 ```
-Browser: <img src="https://convex.cloud/image-proxy?url=file:///.../media/..." />
+Browser: <img src="https://<deployment>.convex.site/image-proxy?url=file:///.../media/..." />
          ↓
 Convex:  Skip download step (already have file path)
          Extract media ID → "local.beeper.com/xyz"

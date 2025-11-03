@@ -7,6 +7,8 @@ import {
 } from '@/components/ai-elements/conversation'
 import { Message as AIMessage, MessageContent } from '@/components/ai-elements/message'
 import { ProxiedImage } from './ProxiedImage'
+import { RefreshCw } from 'lucide-react'
+import { useRef, useEffect } from 'react'
 
 interface Attachment {
   type: string
@@ -33,9 +35,50 @@ interface Message {
 interface ChatDetailProps {
   messages: Message[]
   isSingleChat?: boolean  // Whether this is a 1:1 conversation
+  messagesStatus?: "LoadingFirstPage" | "CanLoadMore" | "LoadingMore" | "Exhausted"
+  onLoadMore?: (numItems: number) => void
 }
 
-export function ChatDetail({ messages, isSingleChat = true }: ChatDetailProps) {
+export function ChatDetail({ messages, isSingleChat = true, messagesStatus, onLoadMore }: ChatDetailProps) {
+  const conversationRef = useRef<HTMLDivElement>(null)
+  const prevScrollHeightRef = useRef<number>(0)
+
+  // Handle scroll to top - load more messages
+  useEffect(() => {
+    const container = conversationRef.current
+    if (!container || !onLoadMore || messagesStatus !== "CanLoadMore") return
+
+    const handleScroll = () => {
+      const { scrollTop } = container
+      
+      // Load more when scrolled near the top (within 100px)
+      if (scrollTop < 100) {
+        console.log('📜 Loading older messages...')
+        // Store current scroll height before loading
+        prevScrollHeightRef.current = container.scrollHeight
+        onLoadMore(50) // Load 50 more messages
+      }
+    }
+
+    container.addEventListener('scroll', handleScroll)
+    return () => container.removeEventListener('scroll', handleScroll)
+  }, [messagesStatus, onLoadMore])
+
+  // Maintain scroll position when new messages are prepended
+  useEffect(() => {
+    const container = conversationRef.current
+    if (!container || messagesStatus !== "LoadingMore") return
+
+    // After new messages load, adjust scroll to maintain visual position
+    const prevScrollHeight = prevScrollHeightRef.current
+    if (prevScrollHeight > 0) {
+      const newScrollHeight = container.scrollHeight
+      const heightDifference = newScrollHeight - prevScrollHeight
+      container.scrollTop = container.scrollTop + heightDifference
+      prevScrollHeightRef.current = 0
+    }
+  }, [messages.length, messagesStatus])
+  
   // Format timestamp for messages
   const formatMessageTime = (timestamp: number) => {
     const date = new Date(timestamp)
@@ -44,7 +87,7 @@ export function ChatDetail({ messages, isSingleChat = true }: ChatDetailProps) {
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-gray-50">
-      <Conversation className="flex-1">
+      <Conversation className="flex-1" ref={conversationRef}>
         <ConversationContent>
           {messages.length === 0 ? (
             <ConversationEmptyState 
@@ -53,6 +96,14 @@ export function ChatDetail({ messages, isSingleChat = true }: ChatDetailProps) {
             />
           ) : (
             <div className="px-4 py-2 space-y-1">
+              {/* Loading indicator for older messages */}
+              {messagesStatus === "LoadingMore" && (
+                <div className="py-3 text-center">
+                  <RefreshCw className="w-4 h-4 text-gray-400 animate-spin mx-auto" />
+                  <p className="text-xs text-gray-500 mt-1">Loading older messages...</p>
+                </div>
+              )}
+              
               {messages.map((message) => (
                 <div key={message.id} className={cn('flex items-end gap-1.5 group', message.isFromUser ? 'justify-end' : 'justify-start')}>
                   {/* Timestamp - shown on hover, positioned outside bubble */}

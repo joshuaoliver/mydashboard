@@ -55,9 +55,10 @@ export function ProxiedImage({ src, alt, className }: ProxiedImageProps) {
         }
 
         // Build proxy URL
-        // Convex HTTP endpoints are at: https://<deployment>.convex.cloud/image-proxy
-        const baseUrl = convexUrl.replace('/api', '') // Remove /api suffix
-        const proxyUrl = `${baseUrl}/image-proxy?url=${encodeURIComponent(src)}`
+        // Convex HTTP endpoints are at: https://<deployment>.convex.site/image-proxy
+        // Convert: https://abc123.convex.cloud/api → https://abc123.convex.site
+        const siteUrl = convexUrl.replace('.cloud', '.site').replace('/api', '')
+        const proxyUrl = `${siteUrl}/image-proxy?url=${encodeURIComponent(src)}`
         
         setImageUrl(proxyUrl)
         setLoading(false)

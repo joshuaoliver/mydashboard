@@ -169,9 +169,8 @@ export default defineSchema({
     chatId: v.string(),                    // Which chat these suggestions are for
     lastMessageId: v.string(),             // ID of the last message when generated
     lastMessageTimestamp: v.number(),      // Timestamp of last message (for validation)
-    suggestions: v.array(v.object({        // The AI-generated suggestions
+    suggestions: v.array(v.object({        // The AI-generated suggestions (just the reply text)
       reply: v.string(),
-      style: v.string(),
     })),
     conversationContext: v.object({        // Context when generated
       lastMessage: v.string(),

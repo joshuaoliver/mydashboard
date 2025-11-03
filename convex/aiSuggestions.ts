@@ -17,7 +17,6 @@ export const getCachedSuggestions = internalQuery({
     v.object({
       suggestions: v.array(v.object({
         reply: v.string(),
-        style: v.string(),
       })),
       conversationContext: v.object({
         lastMessage: v.string(),
@@ -42,9 +41,9 @@ export const getCachedSuggestions = internalQuery({
       return null;
     }
 
-    // Return cached suggestions
+    // Return cached suggestions (map to ensure correct type)
     return {
-      suggestions: cached.suggestions,
+      suggestions: cached.suggestions.map(s => ({ reply: s.reply })),
       conversationContext: cached.conversationContext,
       isCached: true,
       generatedAt: cached.generatedAt,
@@ -63,7 +62,6 @@ export const saveSuggestionsToCache = internalMutation({
     lastMessageTimestamp: v.number(),
     suggestions: v.array(v.object({
       reply: v.string(),
-      style: v.string(),
     })),
     conversationContext: v.object({
       lastMessage: v.string(),

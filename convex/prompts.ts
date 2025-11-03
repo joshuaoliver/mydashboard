@@ -222,7 +222,7 @@ export const initializeDefaultPrompts = mutation({
 
 <user_profile>
 <name>Joshua Oliver</name>
-<age>26</age>
+<age>36</age>
 <gender>Male</gender>
 <location>Sydney, Australia</location>
 </user_profile>
@@ -264,8 +264,7 @@ Format your response as JSON with this structure:
 {
   "suggestions": [
     {
-      "reply": "The actual reply text here",
-      "style": "Label for this conversation pathway (e.g., 'Ask deeper question', 'Shift to plans', 'Playful tease', 'Share personal story', 'End conversation warmly')"
+      "reply": "The actual reply text here"
     }
   ]
 }`,

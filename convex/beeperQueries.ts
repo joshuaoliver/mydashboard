@@ -155,55 +155,44 @@ export const getChatById = query({
 });
 
 /**
- * Get cached messages for a specific chat
+ * Get cached messages for a specific chat with Convex pagination
  * Fast, reactive, no API call needed!
- * Supports pagination for loading older messages
+ * Loads recent messages first, then older messages as user scrolls up
  */
 export const getCachedMessages = query({
   args: { 
     chatId: v.string(),
-    limit: v.optional(v.number()),
-    oldestTimestamp: v.optional(v.number()), // Cursor for pagination - timestamp of oldest message already loaded
+    paginationOpts: paginationOptsValidator,
   },
   handler: async (ctx, args) => {
     console.log(`[getCachedMessages] Querying for chatId: ${args.chatId}`);
     
-    // Default limit to all messages if not specified (for existing behavior)
-    const limit = args.limit;
-    
-    // Query with compound index - filters by chatId and sorts by timestamp
-    let queryBuilder = ctx.db
+    // Query with compound index - filters by chatId and sorts by timestamp (DESC to get newest first)
+    const result = await ctx.db
       .query("beeperMessages")
       .withIndex("by_chat", (q) => 
         q.eq("chatId", args.chatId)
-      );
+      )
+      .order("desc") // Newest first for pagination
+      .paginate(args.paginationOpts);
 
-    // If pagination cursor provided, only get messages older than cursor
-    if (args.oldestTimestamp !== undefined) {
-      queryBuilder = queryBuilder.filter((q) =>
-        q.lt(q.field("timestamp"), args.oldestTimestamp!)
-      );
-    }
+    console.log(`[getCachedMessages] Found ${result.page.length} messages for chatId: ${args.chatId}`);
 
-    // Collect all or limited messages
-    const messages = limit ? await queryBuilder.take(limit) : await queryBuilder.collect();
+    // Transform messages (page is already sorted newest-first from query)
+    const transformedPage = result.page.map((msg) => ({
+      id: msg.messageId,
+      text: msg.text,
+      timestamp: msg.timestamp,
+      sender: msg.senderId,
+      senderName: msg.senderName,
+      isFromUser: msg.isFromUser,
+      attachments: msg.attachments,
+    }));
 
-    console.log(`[getCachedMessages] Found ${messages.length} messages for chatId: ${args.chatId}`);
-
-    // Sort by timestamp manually (oldest to newest)
-    const sortedMessages = messages.sort((a, b) => a.timestamp - b.timestamp);
-
+    // Return with page in reverse order (oldest-first) for display
     return {
-      messages: sortedMessages.map((msg) => ({
-        id: msg.messageId,
-        text: msg.text,
-        timestamp: msg.timestamp,
-        sender: msg.senderId,
-        senderName: msg.senderName,
-        isFromUser: msg.isFromUser,
-        attachments: msg.attachments,
-      })),
-      hasMore: limit ? messages.length === limit : false,
+      ...result,
+      page: transformedPage.reverse(),
     };
   },
 });
