@@ -1,4 +1,4 @@
-import { query, mutation } from "./_generated/server";
+import { query, mutation, internalQuery } from "./_generated/server";
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 
@@ -171,6 +171,104 @@ export const deletePrompt = mutation({
     
     await ctx.db.delete(args.id);
     return null;
+  },
+});
+
+/**
+ * Get a prompt by name (internal use only, no auth required)
+ * Used by actions to fetch prompt templates
+ */
+export const getPromptByName = internalQuery({
+  args: { name: v.string() },
+  returns: v.union(
+    v.object({
+      _id: v.id("prompts"),
+      _creationTime: v.number(),
+      name: v.string(),
+      title: v.string(),
+      description: v.string(),
+      createdAt: v.number(),
+      updatedAt: v.number(),
+    }),
+    v.null()
+  ),
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query("prompts")
+      .withIndex("by_name", (q) => q.eq("name", args.name))
+      .first();
+  },
+});
+
+/**
+ * Initialize default prompts (public mutation for setup)
+ * Creates the reply-suggestions prompt if it doesn't exist
+ */
+export const initializeDefaultPrompts = mutation({
+  args: {},
+  returns: v.object({
+    created: v.array(v.string()),
+    skipped: v.array(v.string()),
+  }),
+  handler: async (ctx) => {
+    const created: string[] = [];
+    const skipped: string[] = [];
+
+    // Default reply suggestions prompt with template variables
+    const replySuggestionsPrompt = {
+      name: "reply-suggestions",
+      title: "AI Reply Suggestions",
+      description: `You are a helpful assistant that suggests thoughtful, contextually appropriate replies to messages.
+
+Given the following conversation history with {{chatName}}, suggest 3-4 different reply options that represent DIFFERENT CONVERSATION PATHWAYS - not just style variations, but different directions the conversation could take:
+
+- Each suggestion should take the conversation in a meaningfully different direction
+- Consider different topics, tones, levels of engagement, or types of responses
+- Think about: asking questions vs. making statements, being playful vs. serious, shifting topics vs. staying on topic, ending vs. continuing the conversation
+- Match the conversation's context and relationship
+- Be natural and authentic{{contactContext}}{{guidanceNotes}}{{customContext}}
+
+Conversation history:
+{{conversationHistory}}
+
+The most recent message from {{chatName}} was: "{{lastMessageText}}"
+
+For each suggestion, provide:
+1. The suggested reply text
+2. A brief label describing what pathway this represents (e.g., "Ask deeper question", "Shift to plans", "Playful tease", "Share personal story", "End conversation warmly")
+3. Brief reasoning for why this pathway makes sense
+
+Format your response as JSON with this structure:
+{
+  "suggestions": [
+    {
+      "reply": "The actual reply text here",
+      "style": "Label for this conversation pathway",
+      "reasoning": "Brief explanation of why this pathway works"
+    }
+  ]
+}`,
+    };
+
+    // Check and create reply-suggestions prompt
+    const existingReplySuggestions = await ctx.db
+      .query("prompts")
+      .withIndex("by_name", (q) => q.eq("name", "reply-suggestions"))
+      .first();
+
+    if (!existingReplySuggestions) {
+      const now = Date.now();
+      await ctx.db.insert("prompts", {
+        ...replySuggestionsPrompt,
+        createdAt: now,
+        updatedAt: now,
+      });
+      created.push("reply-suggestions");
+    } else {
+      skipped.push("reply-suggestions");
+    }
+
+    return { created, skipped };
   },
 });
 

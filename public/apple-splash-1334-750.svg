@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 750 1334">
+  <!-- Background with gradient -->
+  <defs>
+    <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#6366f1;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#8b5cf6;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Full background -->
+  <rect width="750" height="1334" fill="url(#grad1)"/>
+  
+  <!-- Centered icon group -->
+  <g transform="translate(281.25, 573.25)">
+    <!-- Dashboard grid (2x2) -->
+    <g fill="white" opacity="0.9">
+      <rect x="0" y="0" width="31.875000000000004" height="31.875000000000004" rx="5.625"/>
+      <rect x="41.25" y="0" width="31.875000000000004" height="31.875000000000004" rx="5.625"/>
+      <rect x="0" y="41.25" width="31.875000000000004" height="31.875000000000004" rx="5.625"/>
+      <rect x="41.25" y="41.25" width="31.875000000000004" height="31.875000000000004" rx="5.625"/>
+    </g>
+    
+    <!-- Message bubble with dots -->
+    <g transform="translate(84.375, 84.375)">
+      <!-- Speech bubble -->
+      <path d="M 0,0 Q 0,-13.125000000000002 13.125000000000002,-13.125000000000002 L 67.5,-13.125000000000002 Q 80.625,-13.125000000000002 80.625,0 L 80.625,35.625 Q 80.625,48.75 67.5,48.75 L 31.875000000000004,48.75 L 13.125000000000002,67.5 L 13.125000000000002,48.75 Q 0,48.75 0,35.625 Z" 
+            fill="white" 
+            opacity="0.9"/>
+      
+      <!-- Three dots -->
+      <circle cx="24.375" cy="17.8125" r="5.25" fill="#6366f1"/>
+      <circle cx="40.3125" cy="17.8125" r="5.25" fill="#6366f1"/>
+      <circle cx="56.25" cy="17.8125" r="5.25" fill="#6366f1"/>
+    </g>
+  </g>
+  
+  <!-- App name -->
+  <text x="375" y="807.625" 
+        font-family="system-ui, -apple-system, sans-serif" 
+        font-size="33.75" 
+        font-weight="600"
+        fill="white" 
+        text-anchor="middle" 
+        opacity="0.95">Dashboard</text>
+</svg>

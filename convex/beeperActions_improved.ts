@@ -91,7 +91,7 @@ interface BeeperMessage {
  * Shared by multiple actions to avoid duplication
  */
 async function fetchChatMessages(chatId: string) {
-  const url = `${BEEPER_API_URL}/v0/search-messages?chatID=${encodeURIComponent(chatId)}&limit=30`;
+  const url = `${BEEPER_API_URL}/v0/search-messages?chatID=${encodeURIComponent(chatId)}&limit=20`;
   
   const response = await fetch(url, {
     method: "GET",

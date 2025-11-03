@@ -68,6 +68,17 @@ export function ChatListItem({
               src={contactImageUrl}
               alt={name}
               className="w-10 h-10 rounded-full object-cover"
+              loading="lazy"
+              decoding="async"
+              onError={(e) => {
+                // Fallback to initial if image fails to load
+                const target = e.currentTarget;
+                target.style.display = 'none';
+                const fallback = document.createElement('div');
+                fallback.className = 'w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center text-white font-semibold';
+                fallback.textContent = name.charAt(0).toUpperCase();
+                target.parentElement?.appendChild(fallback);
+              }}
             />
           ) : (
             <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center text-white font-semibold">

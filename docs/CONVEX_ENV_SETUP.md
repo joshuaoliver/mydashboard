@@ -113,9 +113,6 @@ After setting up the environment variables:
 
 ## FAQ
 
-**Q: Do I need a .env.local file?**  
-A: No! Since we're using Convex actions for all external API calls, the environment variables only need to be set in Convex (not in your local project). The frontend never directly accesses these secrets.
-
 **Q: What if I change the environment variables?**  
 A: You'll need to redeploy your Convex functions. If using `npx convex dev`, it should auto-reload. Otherwise, run the dev command again.
 

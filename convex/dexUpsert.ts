@@ -23,11 +23,33 @@ export const upsertContacts = internalMutation({
 
     for (const dexContact of dexContacts) {
       try {
-        // Check if contact already exists by dexId
-        const existing = await ctx.db
+        // First, try to find by dexId (for contacts already synced from Dex)
+        let existing = await ctx.db
           .query("contacts")
           .withIndex("by_dex_id", (q) => q.eq("dexId", dexContact.id))
           .first();
+
+        // If not found by dexId AND contact has Instagram, try matching by Instagram username
+        // This allows us to "adopt" user-created contacts when Dex sync finds a match
+        if (!existing && dexContact.instagram) {
+          const instagramMatch = await ctx.db
+            .query("contacts")
+            .withIndex("by_instagram", (q) => q.eq("instagram", dexContact.instagram))
+            .first();
+          
+          if (instagramMatch) {
+            // Check if this is a user-created contact (no dexId)
+            if (!instagramMatch.dexId) {
+              console.log(`✨ Adopting user-created contact via Instagram match: @${dexContact.instagram} → Dex ID ${dexContact.id}`);
+              existing = instagramMatch;
+            } else if (instagramMatch.dexId !== dexContact.id) {
+              // Instagram username matches but different dexId - this is a conflict
+              console.warn(`⚠️ Instagram conflict: @${dexContact.instagram} matches multiple Dex contacts (${instagramMatch.dexId} vs ${dexContact.id})`);
+              // Don't adopt - let it create a new contact
+              existing = null;
+            }
+          }
+        }
 
         // Map Dex fields to our schema
         const contactData = {

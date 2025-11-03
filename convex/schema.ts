@@ -87,13 +87,25 @@ export default defineSchema({
     senderId: v.string(),            // Beeper user ID of sender
     senderName: v.string(),          // Display name of sender
     isFromUser: v.boolean(),         // True if user sent this message
+    // Image/media attachments from Beeper
+    attachments: v.optional(v.array(v.object({
+      type: v.string(),              // "img", "video", "audio", "unknown"
+      srcURL: v.string(),            // URL or local file path (may be temporary!)
+      mimeType: v.optional(v.string()),     // e.g., "image/png"
+      fileName: v.optional(v.string()),     // Original filename
+      fileSize: v.optional(v.number()),     // Size in bytes
+      isGif: v.optional(v.boolean()),
+      isSticker: v.optional(v.boolean()),
+      width: v.optional(v.number()),        // Image width in px
+      height: v.optional(v.number()),       // Image height in px
+    }))),
   })
     .index("by_chat", ["chatId", "timestamp"])  // Get messages for chat, sorted by time
     .index("by_message_id", ["messageId"]),     // Lookup by message ID
 
   // Dex CRM integration - sync contacts from Dex
   contacts: defineTable({
-    dexId: v.string(), // Dex's internal contact ID for sync tracking
+    dexId: v.optional(v.string()), // Dex's internal contact ID for sync tracking (optional for user-created contacts)
     firstName: v.optional(v.string()),
     lastName: v.optional(v.string()),
     description: v.optional(v.string()), // Editable field that syncs back to Dex
@@ -106,17 +118,30 @@ export default defineSchema({
     lastSyncedAt: v.number(), // Timestamp when last synced from Dex
     lastModifiedAt: v.number(), // Timestamp when last modified locally
     // Local-only fields (don't sync to Dex)
-    connection: v.optional(v.union(
-      v.literal("Professional"),
-      v.literal("Friend"),
-      v.literal("Good friend"),
-      v.literal("Romantic"),
-      v.literal("Other")
-    )), // Relationship type
+    connections: v.optional(v.array(v.string())), // Multi-select relationship types: "Professional", "Friend", "Good friend", "Romantic", "Intimate", "Other"
     notes: v.optional(v.string()), // Local notes (separate from Dex description)
+    objective: v.optional(v.string()), // What's the objective with this person?
+    // Extended local-only fields
+    sex: v.optional(v.array(v.string())), // Sex identifiers (multi-select emoji-based)
+    locationIds: v.optional(v.array(v.id("locations"))), // Multiple locations (tags)
+    leadStatus: v.optional(v.union(
+      v.literal("Talking"),
+      v.literal("Planning"),
+      v.literal("Dated"),
+      v.literal("Connected")
+    )), // Lead status for relationship tracking
+    // PIN-protected fields
+    privateNotes: v.optional(v.string()), // PIN-protected notes
+    intimateConnection: v.optional(v.boolean()), // PIN-protected yes/no
   })
     .index("by_dex_id", ["dexId"])
     .index("by_instagram", ["instagram"]), // For matching with Beeper Instagram chats
+
+  // Locations - user-defined locations for contacts
+  locations: defineTable({
+    name: v.string(), // Location name
+    createdAt: v.number(), // Creation timestamp
+  }),
 
   // User-defined prompts for AI interactions
   prompts: defineTable({

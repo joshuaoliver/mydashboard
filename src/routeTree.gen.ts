@@ -17,6 +17,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as SettingsIndexRouteImport } from './routes/settings.index'
 import { Route as ContactsIndexRouteImport } from './routes/contacts.index'
 import { Route as SettingsPromptsRouteImport } from './routes/settings.prompts'
+import { Route as SettingsLocationsRouteImport } from './routes/settings.locations'
 import { Route as ContactsContactIdRouteImport } from './routes/contacts.$contactId'
 
 const SignUpRoute = SignUpRouteImport.update({
@@ -59,6 +60,11 @@ const SettingsPromptsRoute = SettingsPromptsRouteImport.update({
   path: '/settings/prompts',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SettingsLocationsRoute = SettingsLocationsRouteImport.update({
+  id: '/settings/locations',
+  path: '/settings/locations',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ContactsContactIdRoute = ContactsContactIdRouteImport.update({
   id: '/contacts/$contactId',
   path: '/contacts/$contactId',
@@ -72,6 +78,7 @@ export interface FileRoutesByFullPath {
   '/sign-in': typeof SignInRoute
   '/sign-up': typeof SignUpRoute
   '/contacts/$contactId': typeof ContactsContactIdRoute
+  '/settings/locations': typeof SettingsLocationsRoute
   '/settings/prompts': typeof SettingsPromptsRoute
   '/contacts': typeof ContactsIndexRoute
   '/settings': typeof SettingsIndexRoute
@@ -83,6 +90,7 @@ export interface FileRoutesByTo {
   '/sign-in': typeof SignInRoute
   '/sign-up': typeof SignUpRoute
   '/contacts/$contactId': typeof ContactsContactIdRoute
+  '/settings/locations': typeof SettingsLocationsRoute
   '/settings/prompts': typeof SettingsPromptsRoute
   '/contacts': typeof ContactsIndexRoute
   '/settings': typeof SettingsIndexRoute
@@ -95,6 +103,7 @@ export interface FileRoutesById {
   '/sign-in': typeof SignInRoute
   '/sign-up': typeof SignUpRoute
   '/contacts/$contactId': typeof ContactsContactIdRoute
+  '/settings/locations': typeof SettingsLocationsRoute
   '/settings/prompts': typeof SettingsPromptsRoute
   '/contacts/': typeof ContactsIndexRoute
   '/settings/': typeof SettingsIndexRoute
@@ -108,6 +117,7 @@ export interface FileRouteTypes {
     | '/sign-in'
     | '/sign-up'
     | '/contacts/$contactId'
+    | '/settings/locations'
     | '/settings/prompts'
     | '/contacts'
     | '/settings'
@@ -119,6 +129,7 @@ export interface FileRouteTypes {
     | '/sign-in'
     | '/sign-up'
     | '/contacts/$contactId'
+    | '/settings/locations'
     | '/settings/prompts'
     | '/contacts'
     | '/settings'
@@ -130,6 +141,7 @@ export interface FileRouteTypes {
     | '/sign-in'
     | '/sign-up'
     | '/contacts/$contactId'
+    | '/settings/locations'
     | '/settings/prompts'
     | '/contacts/'
     | '/settings/'
@@ -142,6 +154,7 @@ export interface RootRouteChildren {
   SignInRoute: typeof SignInRoute
   SignUpRoute: typeof SignUpRoute
   ContactsContactIdRoute: typeof ContactsContactIdRoute
+  SettingsLocationsRoute: typeof SettingsLocationsRoute
   SettingsPromptsRoute: typeof SettingsPromptsRoute
   ContactsIndexRoute: typeof ContactsIndexRoute
   SettingsIndexRoute: typeof SettingsIndexRoute
@@ -205,6 +218,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsPromptsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/settings/locations': {
+      id: '/settings/locations'
+      path: '/settings/locations'
+      fullPath: '/settings/locations'
+      preLoaderRoute: typeof SettingsLocationsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/contacts/$contactId': {
       id: '/contacts/$contactId'
       path: '/contacts/$contactId'
@@ -222,6 +242,7 @@ const rootRouteChildren: RootRouteChildren = {
   SignInRoute: SignInRoute,
   SignUpRoute: SignUpRoute,
   ContactsContactIdRoute: ContactsContactIdRoute,
+  SettingsLocationsRoute: SettingsLocationsRoute,
   SettingsPromptsRoute: SettingsPromptsRoute,
   ContactsIndexRoute: ContactsIndexRoute,
   SettingsIndexRoute: SettingsIndexRoute,

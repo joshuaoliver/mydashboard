@@ -10,16 +10,25 @@ import {
   PromptInputTextarea, 
   PromptInputToolbar, 
   PromptInputSubmit,
+  PromptInputButton,
 } from '@/components/ai-elements/prompt-input'
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet'
 import { ChatListItem } from '@/components/messages/ChatListItem'
 import { ChatDetail } from '@/components/messages/ChatDetail'
 import { ReplySuggestions } from '@/components/messages/ReplySuggestions'
 import { ContactPanel } from '@/components/messages/ContactPanel'
 import { useAction, useQuery, useMutation } from 'convex/react'
 import { api } from '../../convex/_generated/api'
-import { useState, useEffect, useRef } from 'react'
-import { RefreshCw, AlertCircle, MessageCircle } from 'lucide-react'
+import { useState, useEffect, useRef, useCallback } from 'react'
+import { RefreshCw, AlertCircle, MessageCircle, ArrowLeft, Sparkles } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { useIsMobile } from '@/lib/hooks/use-mobile'
+import { cn } from '~/lib/utils'
 
 export const Route = createFileRoute('/messages')({
   component: Messages,
@@ -47,6 +56,18 @@ interface Chat {
   contactImageUrl?: string // From DEX integration
 }
 
+interface Attachment {
+  type: string
+  srcURL: string
+  mimeType?: string
+  fileName?: string
+  fileSize?: number
+  isGif?: boolean
+  isSticker?: boolean
+  width?: number
+  height?: number
+}
+
 interface Message {
   id: string
   text: string
@@ -54,6 +75,7 @@ interface Message {
   sender: string
   senderName: string
   isFromUser: boolean
+  attachments?: Attachment[]
 }
 
 interface ReplySuggestion {
@@ -75,17 +97,32 @@ function Messages() {
   const [messageInputValue, setMessageInputValue] = useState('')
   const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false)
   const [isSyncing, setIsSyncing] = useState(false)
+  const [isSendingMessage, setIsSendingMessage] = useState(false)
   const [error, setError] = useState<string | null>(null)
   // Removed unused conversation context/caching state
   const [tabFilter, setTabFilter] = useState<TabFilter>('unreplied')
-  const sendMessage = useAction(api.beeperActions.sendMessage)
+  const sendMessageAction = useAction(api.beeperMessages.sendMessage)
   const clearCachedSuggestions = useMutation(api.aiSuggestions.clearCachedSuggestions)
+  
+  // Mobile detection and sheet state
+  const isMobile = useIsMobile()
+  const [sheetOpen, setSheetOpen] = useState(false)
   
   // Track previous contact data to detect changes
   const prevContactDataRef = useRef<{ connection?: string; notes?: string } | null>(null)
+  
+  // Infinite scroll state
+  const [allLoadedChats, setAllLoadedChats] = useState<Chat[]>([])
+  const [nextCursor, setNextCursor] = useState<number | undefined>(undefined)
+  const [hasMoreChats, setHasMoreChats] = useState(true)
+  const [isLoadingMore, setIsLoadingMore] = useState(false)
+  const chatListRef = useRef<HTMLDivElement>(null)
 
-  // Query cached chats from database (instant, reactive)
-  const chatsData = useQuery(api.beeperQueries.listCachedChats)
+  // Query cached chats from database (instant, reactive) with pagination
+  const chatsData = useQuery(api.beeperQueries.listCachedChats, { 
+    limit: 30,
+    cursor: nextCursor 
+  })
   const syncInfo = useQuery(api.beeperQueries.getChatInfo)
   
   // Query cached messages for selected chat (instant, reactive)
@@ -99,10 +136,33 @@ function Messages() {
   const manualSync = useAction(api.beeperSync.manualSync)
   const generateReplySuggestions = useAction(api.beeperActions.generateReplySuggestions)
 
-  const allChats: Chat[] = chatsData?.chats || []
+  // Merge new chats with existing ones
+  useEffect(() => {
+    if (chatsData?.chats) {
+      setAllLoadedChats(prev => {
+        // If this is the first load (no cursor was set), replace all
+        if (nextCursor === undefined && prev.length === 0) {
+          return chatsData.chats
+        }
+        // Otherwise, append new chats
+        const existingIds = new Set(prev.map(c => c.id))
+        const newChats = chatsData.chats.filter(c => !existingIds.has(c.id))
+        return [...prev, ...newChats]
+      })
+      setHasMoreChats(chatsData.hasMore || false)
+      setIsLoadingMore(false)
+    }
+  }, [chatsData, nextCursor])
   
-  // Apply tab filtering
-  const chats = allChats.filter((chat) => {
+  // Reset pagination when tab filter changes
+  useEffect(() => {
+    setAllLoadedChats([])
+    setNextCursor(undefined)
+    setHasMoreChats(true)
+  }, [tabFilter])
+  
+  // Apply tab filtering to all loaded chats
+  const chats = allLoadedChats.filter((chat) => {
     if (tabFilter === 'unreplied') {
       return chat.needsReply === true
     } else if (tabFilter === 'unread') {
@@ -111,7 +171,29 @@ function Messages() {
     return true // 'all' tab shows everything
   })
   
-  const selectedChat = allChats.find((chat: Chat) => chat.id === selectedChatId)
+  // Load more chats when scrolling
+  const loadMoreChats = useCallback(() => {
+    if (hasMoreChats && chatsData?.nextCursor && !isLoadingMore) {
+      console.log('📜 Loading more chats from Convex DB...')
+      setIsLoadingMore(true)
+      setNextCursor(chatsData.nextCursor)
+    }
+  }, [hasMoreChats, chatsData?.nextCursor, isLoadingMore])
+  
+  // Infinite scroll handler
+  const handleScroll = useCallback(() => {
+    if (!chatListRef.current || !hasMoreChats || isLoadingMore) return
+    
+    const { scrollTop, scrollHeight, clientHeight } = chatListRef.current
+    const scrollPercentage = (scrollTop + clientHeight) / scrollHeight
+    
+    // Load more when scrolled 80% down
+    if (scrollPercentage > 0.8) {
+      loadMoreChats()
+    }
+  }, [hasMoreChats, isLoadingMore, loadMoreChats])
+  
+  const selectedChat = allLoadedChats.find((chat: Chat) => chat.id === selectedChatId)
   
   // Query contact by Instagram username if available
   const contactData = useQuery(
@@ -177,6 +259,15 @@ function Messages() {
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
 
+  // Open sheet when chat selected on mobile
+  useEffect(() => {
+    if (isMobile && selectedChatId) {
+      setSheetOpen(true)
+    } else if (!isMobile) {
+      setSheetOpen(false)
+    }
+  }, [isMobile, selectedChatId])
+
   // Watch for changes in contact connection type or notes and regenerate suggestions
   useEffect(() => {
     if (!contactData || !selectedChatId) {
@@ -237,12 +328,6 @@ function Messages() {
       const suggestions = suggestionsResult.suggestions || []
       setReplySuggestions(suggestions)
       
-      // Auto-fill first suggestion into input field
-      if (suggestions.length > 0) {
-        setMessageInputValue(suggestions[0].reply)
-        setSelectedSuggestionIndex(0)
-      }
-      
       // Log cache hit/miss for debugging
       if (suggestionsResult.isCached) {
         console.log(`✅ Using cached suggestions for ${selectedChat.name}`)
@@ -275,16 +360,46 @@ function Messages() {
   const handlePromptSubmit = async (
     message: { text?: string },
   ) => {
-    if (!selectedChatId) return
+    if (!selectedChatId || !selectedChat) return
     const text = (message.text || messageInputValue || '').trim()
     if (!text) return
 
+    setIsSendingMessage(true)
+    setError(null)
+
     try {
-      await sendMessage({ chatId: selectedChatId, text })
-      // Clear input after sending
-      setMessageInputValue('')
+      console.log(`📤 Sending message to ${selectedChat.name}: "${text.slice(0, 50)}..."`)
+      
+      const result = await sendMessageAction({ 
+        chatId: selectedChatId, 
+        text 
+      })
+
+      if (result.success) {
+        console.log(`✅ Message sent! Pending ID: ${result.pendingMessageId}`)
+        
+        // Clear input after successful send
+        setMessageInputValue('')
+        
+        // Clear AI suggestions after sending
+        setReplySuggestions([])
+        setSelectedSuggestionIndex(0)
+        
+        // Optionally trigger a sync to get the sent message back
+        // Note: The message might take a moment to sync back from Beeper
+        setTimeout(() => {
+          pageLoadSync()
+        }, 1000)
+      } else {
+        console.error('❌ Failed to send message:', result.error)
+        setError(result.error || 'Failed to send message')
+      }
     } catch (err) {
       console.error('Failed to send message:', err)
+      const errorMessage = err instanceof Error ? err.message : 'Failed to send message'
+      setError(errorMessage)
+    } finally {
+      setIsSendingMessage(false)
     }
   }
 
@@ -310,6 +425,12 @@ function Messages() {
     }
   }
 
+  // Handle closing sheet on mobile
+  const handleCloseSheet = () => {
+    setSheetOpen(false)
+    navigate({ search: { chatId: undefined } })
+  }
+
   // Construct subtitle with count and sync time
   const subtitle = [
     `${chats.length} ${chats.length === 1 ? 'conversation' : 'conversations'}`,
@@ -321,7 +442,8 @@ function Messages() {
       <FullWidthContent>
         {/* Left Sidebar - Chat List */}
         <Sidebar
-          width="w-96"
+          width="w-full md:w-96"
+          className={cn(isMobile && sheetOpen && "hidden")}
           header={
             <SidebarHeader
               title=""
@@ -410,7 +532,11 @@ function Messages() {
               <p className="text-sm">No pending messages to reply to</p>
             </div>
           ) : (
-            <div className="divide-y divide-gray-100">
+            <div 
+              ref={chatListRef}
+              className="divide-y divide-gray-100 overflow-y-auto"
+              onScroll={handleScroll}
+            >
               {chats.map((chat: Chat) => (
                 <ChatListItem
                   key={chat.id}
@@ -427,82 +553,192 @@ function Messages() {
                   contactImageUrl={chat.contactImageUrl}
                 />
               ))}
+              {isLoadingMore && (
+                <div className="py-4 text-center">
+                  <RefreshCw className="w-5 h-5 text-gray-400 animate-spin mx-auto" />
+                  <p className="text-xs text-gray-500 mt-1">Loading more from database...</p>
+                </div>
+              )}
             </div>
           )}
         </Sidebar>
 
-        {/* Main Content Area - Chat detail and AI suggestions */}
-        <div className="flex-1 flex bg-gray-50 overflow-hidden">
-          {selectedChatId && selectedChat ? (
-            <>
-              {/* Chat Messages with Input and AI Suggestions */}
-              <div className="flex-1 bg-white border-r border-gray-200 flex flex-col overflow-hidden">
-                {isLoadingMessages ? (
-                  <div className="flex items-center justify-center h-full">
-                    <div className="text-center">
-                      <RefreshCw className="w-8 h-8 text-blue-500 animate-spin mx-auto mb-2" />
-                      <p className="text-sm text-gray-600">Loading conversation...</p>
+        {/* Main Content Area - Desktop only, hidden on mobile */}
+        {!isMobile && (
+          <div className="flex-1 flex bg-gray-50 overflow-hidden">
+            {selectedChatId && selectedChat ? (
+              <>
+                {/* Chat Messages with Input and AI Suggestions */}
+                <div className="flex-1 bg-white border-r border-gray-200 flex flex-col overflow-hidden">
+                  {isLoadingMessages ? (
+                    <div className="flex items-center justify-center h-full">
+                      <div className="text-center">
+                        <RefreshCw className="w-8 h-8 text-blue-500 animate-spin mx-auto mb-2" />
+                        <p className="text-sm text-gray-600">Loading conversation...</p>
+                      </div>
                     </div>
-                  </div>
-                ) : (
-                  <>
-                    {/* Messages */}
-                    <ChatDetail messages={chatMessages} />
-                    
-                    {/* Reply Input Area */}
-                    <div className="flex-shrink-0 border-t-2 border-gray-300 p-4 bg-white shadow-sm">
-                      <PromptInput onSubmit={handlePromptSubmit} className="w-full border-2 border-gray-300 rounded-lg shadow-sm hover:border-blue-400 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-200 transition-all">
-                        <PromptInputBody>
-                          <PromptInputTextarea
-                            placeholder="Type your reply..."
-                            value={messageInputValue}
-                            onChange={(e) => setMessageInputValue(e.target.value)}
-                            className="text-gray-900 placeholder:text-gray-500"
-                          />
-                        </PromptInputBody>
-                        <PromptInputToolbar>
-                          <div />
-                          <PromptInputSubmit />
-                        </PromptInputToolbar>
-                      </PromptInput>
-                    </div>
-
-                    {/* AI Reply Suggestions - Below Input */}
-                    <div className="flex-shrink-0 border-t-2 border-gray-300 bg-gray-50 overflow-y-auto max-h-[400px]">
-                      <ReplySuggestions
-                        suggestions={replySuggestions}
-                        isLoading={isLoadingSuggestions}
-                        error={error || undefined}
-                        onGenerateClick={handleGenerateAISuggestions}
-                        selectedIndex={selectedSuggestionIndex}
-                        onSuggestionSelect={handleSuggestionSelect}
+                  ) : (
+                    <>
+                      {/* Messages */}
+                      <ChatDetail 
+                        messages={chatMessages} 
+                        isSingleChat={selectedChat?.type === 'single' || selectedChat?.type === undefined}
                       />
-                    </div>
-                  </>
-                )}
-              </div>
+                      
+                      {/* Reply Input Area */}
+                      <div className="flex-shrink-0 border-t-2 border-gray-300 p-4 bg-white shadow-sm">
+                        <PromptInput onSubmit={handlePromptSubmit} className="w-full border-2 border-gray-300 rounded-lg shadow-sm hover:border-blue-400 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-200 transition-all">
+                          <PromptInputBody>
+                            <PromptInputTextarea
+                              placeholder="Type your reply..."
+                              value={messageInputValue}
+                              onChange={(e) => setMessageInputValue(e.target.value)}
+                              className="text-gray-900 placeholder:text-gray-500"
+                            />
+                          </PromptInputBody>
+                          <PromptInputToolbar>
+                            <PromptInputButton
+                              onClick={() => {
+                                if (messageInputValue.trim()) {
+                                  handleGenerateAISuggestions(messageInputValue)
+                                } else {
+                                  handleGenerateAISuggestions()
+                                }
+                              }}
+                              disabled={isLoadingSuggestions || isSendingMessage}
+                              className="gap-1.5"
+                            >
+                              <Sparkles className="w-4 h-4" />
+                              AI
+                            </PromptInputButton>
+                            <PromptInputSubmit disabled={isSendingMessage} />
+                          </PromptInputToolbar>
+                        </PromptInput>
+                      </div>
 
-              {/* Right Sidebar - Contact Panel Only */}
-              <div className="w-[400px] bg-white overflow-hidden">
-                <ContactPanel 
-                  contact={contactData || null} 
-                  isLoading={contactData === undefined && !!selectedChat?.username}
-                  searchedUsername={selectedChat?.username}
-                />
+                      {/* AI Reply Suggestions - Below Input */}
+                      <div className="flex-shrink-0 border-t-2 border-gray-300 bg-gray-50 overflow-y-auto max-h-[400px]">
+                        <ReplySuggestions
+                          suggestions={replySuggestions}
+                          isLoading={isLoadingSuggestions}
+                          error={error || undefined}
+                          onGenerateClick={handleGenerateAISuggestions}
+                          selectedIndex={selectedSuggestionIndex}
+                          onSuggestionSelect={handleSuggestionSelect}
+                        />
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                {/* Right Sidebar - Contact Panel Only */}
+                <div className="w-[400px] bg-white overflow-hidden">
+                  <ContactPanel 
+                    contact={contactData || null} 
+                    isLoading={contactData === undefined && !!selectedChat?.username}
+                    searchedUsername={selectedChat?.username}
+                  />
+                </div>
+              </>
+            ) : (
+              <div className="flex-1 flex items-center justify-center bg-white">
+                <div className="text-center text-gray-500">
+                  <MessageCircle className="w-16 h-16 mx-auto mb-4 text-gray-300" />
+                  <p className="text-lg font-medium mb-2">👈 Select a conversation</p>
+                  <p className="text-sm">
+                    Choose a chat from the left to view messages and get AI-powered reply suggestions
+                  </p>
+                </div>
               </div>
-            </>
-          ) : (
-            <div className="flex-1 flex items-center justify-center bg-white">
-              <div className="text-center text-gray-500">
-                <MessageCircle className="w-16 h-16 mx-auto mb-4 text-gray-300" />
-                <p className="text-lg font-medium mb-2">👈 Select a conversation</p>
-                <p className="text-sm">
-                  Choose a chat from the left to view messages and get AI-powered reply suggestions
-                </p>
-              </div>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
+        )}
+
+        {/* Mobile Sheet - Chat detail slides over */}
+        {isMobile && (
+          <Sheet open={sheetOpen} onOpenChange={(open) => !open && handleCloseSheet()}>
+            <SheetContent side="right" className="w-full sm:max-w-2xl p-0 flex flex-col">
+              <SheetHeader className="px-4 py-3 border-b flex-shrink-0">
+                <div className="flex items-center gap-3">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleCloseSheet}
+                    className="h-8 w-8 p-0"
+                  >
+                    <ArrowLeft className="h-4 w-4" />
+                  </Button>
+                  <SheetTitle className="text-lg font-semibold">
+                    {selectedChat?.name || 'Conversation'}
+                  </SheetTitle>
+                </div>
+              </SheetHeader>
+
+              {selectedChatId && selectedChat && (
+                <div className="flex-1 flex flex-col sm:flex-row overflow-hidden">
+                  {/* Chat Messages with Input and AI Suggestions */}
+                  <div className="flex-1 bg-white flex flex-col overflow-hidden">
+                    {isLoadingMessages ? (
+                      <div className="flex items-center justify-center h-full">
+                        <div className="text-center">
+                          <RefreshCw className="w-8 h-8 text-blue-500 animate-spin mx-auto mb-2" />
+                          <p className="text-sm text-gray-600">Loading conversation...</p>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        {/* Messages */}
+                        <ChatDetail 
+                          messages={chatMessages} 
+                          isSingleChat={selectedChat?.type === 'single' || selectedChat?.type === undefined}
+                        />
+                        
+                        {/* Reply Input Area */}
+                        <div className="flex-shrink-0 border-t-2 border-gray-300 p-4 bg-white shadow-sm">
+                          <PromptInput onSubmit={handlePromptSubmit} className="w-full border-2 border-gray-300 rounded-lg shadow-sm hover:border-blue-400 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-200 transition-all">
+                            <PromptInputBody>
+                              <PromptInputTextarea
+                                placeholder="Type your reply..."
+                                value={messageInputValue}
+                                onChange={(e) => setMessageInputValue(e.target.value)}
+                                className="text-gray-900 placeholder:text-gray-500"
+                              />
+                            </PromptInputBody>
+                              <PromptInputToolbar>
+                                <div />
+                                <PromptInputSubmit disabled={isSendingMessage} />
+                              </PromptInputToolbar>
+                          </PromptInput>
+                        </div>
+
+                        {/* AI Reply Suggestions - Below Input */}
+                        <div className="flex-shrink-0 border-t-2 border-gray-300 bg-gray-50 overflow-y-auto max-h-[200px]">
+                          <ReplySuggestions
+                            suggestions={replySuggestions}
+                            isLoading={isLoadingSuggestions}
+                            error={error || undefined}
+                            onGenerateClick={handleGenerateAISuggestions}
+                            selectedIndex={selectedSuggestionIndex}
+                            onSuggestionSelect={handleSuggestionSelect}
+                          />
+                        </div>
+                      </>
+                    )}
+                  </div>
+
+                  {/* Contact Panel - Hidden on very small screens */}
+                  <div className="hidden sm:block sm:w-[300px] bg-white border-l overflow-hidden">
+                    <ContactPanel 
+                      contact={contactData || null} 
+                      isLoading={contactData === undefined && !!selectedChat?.username}
+                      searchedUsername={selectedChat?.username}
+                    />
+                  </div>
+                </div>
+              )}
+            </SheetContent>
+          </Sheet>
+        )}
       </FullWidthContent>
     </DashboardLayout>
   )

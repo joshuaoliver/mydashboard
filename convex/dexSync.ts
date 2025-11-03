@@ -69,19 +69,22 @@ export const updateContactDescription = mutation({
         lastModifiedAt: now,
       });
 
-      // Trigger write-back to Dex (non-blocking)
+      // Trigger write-back to Dex (non-blocking) - only if contact has dexId
       // We use scheduler to make this async and not block the mutation
       // Call internal action in separate module; using cast until codegen catches up is not needed if types are generated
-      await ctx.scheduler.runAfter(0, internal.dexWriteback.writeToDex, {
-        dexId: contact.dexId,
-        description: args.description,
-        firstName: undefined,
-        lastName: undefined,
-        instagram: undefined,
-        emails: undefined,
-        phones: undefined,
-        birthday: undefined,
-      });
+      const dexId = contact.dexId;
+      if (dexId) {
+        await ctx.scheduler.runAfter(0, internal.dexWriteback.writeToDex, {
+          dexId: dexId,
+          description: args.description,
+          firstName: undefined,
+          lastName: undefined,
+          instagram: undefined,
+          emails: undefined,
+          phones: undefined,
+          birthday: undefined,
+        });
+      }
 
       return { success: true, contactId: args.contactId };
     } catch (error) {
@@ -183,17 +186,20 @@ export const updateContact = mutation({
         lastModifiedAt: now,
       });
 
-      // Trigger write-back to Dex (non-blocking)
-      await ctx.scheduler.runAfter(0, internal.dexWriteback.writeToDex, {
-        dexId: contact.dexId,
-        description: args.updates.description,
-        firstName: args.updates.firstName,
-        lastName: args.updates.lastName,
-        instagram: args.updates.instagram,
-        emails: args.updates.emails,
-        phones: args.updates.phones,
-        birthday: args.updates.birthday,
-      });
+      // Trigger write-back to Dex (non-blocking) - only if contact has dexId
+      const dexId = contact.dexId;
+      if (dexId) {
+        await ctx.scheduler.runAfter(0, internal.dexWriteback.writeToDex, {
+          dexId: dexId,
+          description: args.updates.description,
+          firstName: args.updates.firstName,
+          lastName: args.updates.lastName,
+          instagram: args.updates.instagram,
+          emails: args.updates.emails,
+          phones: args.updates.phones,
+          birthday: args.updates.birthday,
+        });
+      }
 
       return { success: true, contactId: args.contactId };
     } catch (error) {

@@ -244,28 +244,34 @@ export const generateReplySuggestions = action({
       // Get the last message to check cache
       const lastMessage = messages[messages.length - 1];
       
-      // Try to get cached suggestions for this conversation state
-      const cached: {
-        suggestions: Array<{
-          reply: string;
-          style: string;
-          reasoning: string;
-        }>;
-        conversationContext: {
-          lastMessage: string;
-          messageCount: number;
-        };
-        isCached: boolean;
-        generatedAt: number;
-      } | null = await ctx.runQuery(internal.aiSuggestions.getCachedSuggestions, {
-        chatId: args.chatId,
-        lastMessageId: lastMessage.id,
-      });
+      // Only check cache if no custom context was provided
+      // Custom context = user wants fresh suggestions based on their specific input
+      if (!args.customContext) {
+        // Try to get cached suggestions for this conversation state
+        const cached: {
+          suggestions: Array<{
+            reply: string;
+            style: string;
+            reasoning: string;
+          }>;
+          conversationContext: {
+            lastMessage: string;
+            messageCount: number;
+          };
+          isCached: boolean;
+          generatedAt: number;
+        } | null = await ctx.runQuery(internal.aiSuggestions.getCachedSuggestions, {
+          chatId: args.chatId,
+          lastMessageId: lastMessage.id,
+        });
 
-      // If we have valid cached suggestions, return them immediately
-      if (cached) {
-        console.log(`[generateReplySuggestions] Using cached suggestions for chat ${args.chatId}`);
-        return cached;
+        // If we have valid cached suggestions, return them immediately
+        if (cached) {
+          console.log(`[generateReplySuggestions] Using cached suggestions for chat ${args.chatId}`);
+          return cached;
+        }
+      } else {
+        console.log(`[generateReplySuggestions] Custom context provided - bypassing cache and generating fresh suggestions`);
       }
 
       // No cache or last message changed - generate new suggestions
@@ -289,14 +295,16 @@ export const generateReplySuggestions = action({
         const contactName = [contact.firstName, contact.lastName].filter(Boolean).join(" ");
         contactContext = `\n\nContact Information:`;
         if (contactName) contactContext += `\n- Name: ${contactName}`;
-        if (contact.connection) contactContext += `\n- Connection type: ${contact.connection}`;
+        if (contact.connections && contact.connections.length > 0) {
+          contactContext += `\n- Connection types: ${contact.connections.join(", ")}`;
+        }
         if (contact.description) contactContext += `\n- Description: ${contact.description}`;
         if (contact.notes) contactContext += `\n- Notes: ${contact.notes}`;
       }
 
       // Add Ultimate Man Project principles for romantic connections
       let guidanceNotes = "";
-      if (contact?.connection === "Romantic") {
+      if (contact?.connections?.includes("Romantic")) {
         guidanceNotes = `\n\nIMPORTANT: This is a romantic connection. Follow Ultimate Man Project principles for texting:
 - Match the length and energy of their messages
 - Be authentic and genuine
@@ -312,8 +320,28 @@ export const generateReplySuggestions = action({
 ${args.customContext}`;
       }
 
-      // Generate reply suggestions using OpenAI
-      const prompt = `You are a helpful assistant that suggests thoughtful, contextually appropriate replies to messages.
+      // Fetch the prompt template from the database
+      const promptTemplate = await ctx.runQuery(internal.prompts.getPromptByName, {
+        name: "reply-suggestions",
+      });
+
+      // Build the prompt from template or fallback to default
+      let prompt: string;
+      if (promptTemplate) {
+        // Replace template variables with actual values
+        prompt = promptTemplate.description
+          .replace(/\{\{chatName\}\}/g, args.chatName)
+          .replace(/\{\{conversationHistory\}\}/g, conversationHistory)
+          .replace(/\{\{lastMessageText\}\}/g, lastMessageText)
+          .replace(/\{\{contactContext\}\}/g, contactContext)
+          .replace(/\{\{guidanceNotes\}\}/g, guidanceNotes)
+          .replace(/\{\{customContext\}\}/g, customContextSection);
+        
+        console.log(`[generateReplySuggestions] Using configured prompt template from database`);
+      } else {
+        // Fallback to hardcoded prompt if template not found
+        console.warn(`[generateReplySuggestions] Prompt template 'reply-suggestions' not found, using fallback`);
+        prompt = `You are a helpful assistant that suggests thoughtful, contextually appropriate replies to messages.
 
 Given the following conversation history with ${args.chatName}, suggest 3-4 different reply options that represent DIFFERENT CONVERSATION PATHWAYS - not just style variations, but different directions the conversation could take:
 
@@ -343,6 +371,7 @@ Format your response as JSON with this structure:
     }
   ]
 }`;
+      }
 
       // Initialize OpenAI client
       const openai = createOpenAI({
@@ -385,17 +414,22 @@ Format your response as JSON with this structure:
         messageCount: messages.length,
       };
 
-      // Save suggestions to cache for future use
-      await ctx.runMutation(internal.aiSuggestions.saveSuggestionsToCache, {
-        chatId: args.chatId,
-        lastMessageId: lastMessage.id,
-        lastMessageTimestamp: lastMessage.timestamp,
-        suggestions,
-        conversationContext,
-        modelUsed: "gpt-5",
-      });
+      // Only save to cache if this wasn't a custom context request
+      // Custom context suggestions are specific to the user's input, not general conversation state
+      if (!args.customContext) {
+        await ctx.runMutation(internal.aiSuggestions.saveSuggestionsToCache, {
+          chatId: args.chatId,
+          lastMessageId: lastMessage.id,
+          lastMessageTimestamp: lastMessage.timestamp,
+          suggestions,
+          conversationContext,
+          modelUsed: "gpt-5",
+        });
 
-      console.log(`[generateReplySuggestions] Saved ${suggestions.length} suggestions to cache for chat ${args.chatId}`);
+        console.log(`[generateReplySuggestions] Saved ${suggestions.length} suggestions to cache for chat ${args.chatId}`);
+      } else {
+        console.log(`[generateReplySuggestions] Custom context used - skipping cache save`);
+      }
 
       // Return fresh suggestions
       return {

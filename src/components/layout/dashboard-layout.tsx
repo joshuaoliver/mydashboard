@@ -10,8 +10,9 @@ import {
 import {
   NavigationMenu,
   NavigationMenuItem,
-  NavigationMenuLink,
   NavigationMenuList,
+  NavigationMenuTrigger,
+  NavigationMenuContent,
 } from "@/components/ui/navigation-menu"
 import { 
   Settings, 
@@ -20,7 +21,8 @@ import {
   LayoutDashboard,
   Users,
   LogOut,
-  MessageCircle
+  MessageCircle,
+  MapPin
 } from "lucide-react"
 import { Link, useNavigate } from '@tanstack/react-router'
 import { useAuthActions } from '@convex-dev/auth/react'
@@ -45,103 +47,101 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
         <div className="px-6 h-16 flex items-center justify-between">
           {/* Left side - Nav */}
           <div className="flex items-center gap-1">
-            <NavigationMenu>
+            <NavigationMenu viewport={false}>
               <NavigationMenuList className="gap-1">
                 <NavigationMenuItem>
-                  <NavigationMenuLink asChild>
-                    <Link 
-                      to="/" 
-                      className={cn(
-                        "inline-flex items-center gap-2 px-4 py-2 rounded-md",
-                        "text-sm font-medium transition-all",
-                        "text-slate-300 hover:text-white hover:bg-slate-800/80",
-                        "[&.active]:bg-slate-800 [&.active]:text-white"
-                      )}
-                      activeProps={{
-                        className: "active"
-                      }}
-                    >
-                      <LayoutDashboard className="h-4 w-4" />
-                      Home
-                    </Link>
-                  </NavigationMenuLink>
+                  <Link 
+                    to="/" 
+                    className={cn(
+                      "inline-flex items-center gap-2 px-4 py-2 rounded-md",
+                      "text-sm font-medium transition-all",
+                      "text-slate-300 hover:text-white hover:bg-slate-800/80",
+                      "[&.active]:bg-slate-800 [&.active]:text-white"
+                    )}
+                    activeProps={{
+                      className: "active"
+                    }}
+                  >
+                    <LayoutDashboard className="h-4 w-4" />
+                    Home
+                  </Link>
                 </NavigationMenuItem>
                 <NavigationMenuItem>
-                  <NavigationMenuLink asChild>
-                    <Link 
-                      to="/messages"
-                      search={{ chatId: undefined }}
-                      className={cn(
-                        "inline-flex items-center gap-2 px-4 py-2 rounded-md",
-                        "text-sm font-medium transition-all",
-                        "text-slate-300 hover:text-white hover:bg-slate-800/80",
-                        "[&.active]:bg-slate-800 [&.active]:text-white"
-                      )}
-                      activeProps={{
-                        className: "active"
-                      }}
-                    >
-                      <MessageSquare className="h-4 w-4" />
-                      Messages
-                    </Link>
-                  </NavigationMenuLink>
+                  <Link 
+                    to="/messages"
+                    search={{ chatId: undefined }}
+                    className={cn(
+                      "inline-flex items-center gap-2 px-4 py-2 rounded-md",
+                      "text-sm font-medium transition-all",
+                      "text-slate-300 hover:text-white hover:bg-slate-800/80",
+                      "[&.active]:bg-slate-800 [&.active]:text-white"
+                    )}
+                    activeProps={{
+                      className: "active"
+                    }}
+                  >
+                    <MessageSquare className="h-4 w-4" />
+                    Messages
+                  </Link>
                 </NavigationMenuItem>
                 <NavigationMenuItem>
-                  <NavigationMenuLink asChild>
-                    <Link 
-                      to="/contacts" 
-                      className={cn(
-                        "inline-flex items-center gap-2 px-4 py-2 rounded-md",
-                        "text-sm font-medium transition-all",
-                        "text-slate-300 hover:text-white hover:bg-slate-800/80",
-                        "[&.active]:bg-slate-800 [&.active]:text-white"
-                      )}
-                      activeProps={{
-                        className: "active"
-                      }}
-                    >
-                      <Users className="h-4 w-4" />
-                      Contacts
-                    </Link>
-                  </NavigationMenuLink>
+                  <Link 
+                    to="/contacts" 
+                    className={cn(
+                      "inline-flex items-center gap-2 px-4 py-2 rounded-md",
+                      "text-sm font-medium transition-all",
+                      "text-slate-300 hover:text-white hover:bg-slate-800/80",
+                      "[&.active]:bg-slate-800 [&.active]:text-white"
+                    )}
+                    activeProps={{
+                      className: "active"
+                    }}
+                  >
+                    <Users className="h-4 w-4" />
+                    Contacts
+                  </Link>
                 </NavigationMenuItem>
                 <NavigationMenuItem>
-                  <NavigationMenuLink asChild>
-                    <Link 
-                      to="/settings/prompts" 
-                      className={cn(
-                        "inline-flex items-center gap-2 px-4 py-2 rounded-md",
-                        "text-sm font-medium transition-all",
-                        "text-slate-300 hover:text-white hover:bg-slate-800/80",
-                        "[&.active]:bg-slate-800 [&.active]:text-white"
-                      )}
-                      activeProps={{
-                        className: "active"
-                      }}
-                    >
-                      <MessageCircle className="h-4 w-4" />
-                      Prompts
-                    </Link>
-                  </NavigationMenuLink>
-                </NavigationMenuItem>
-                <NavigationMenuItem>
-                  <NavigationMenuLink asChild>
-                    <Link 
-                      to="/settings" 
-                      className={cn(
-                        "inline-flex items-center gap-2 px-4 py-2 rounded-md",
-                        "text-sm font-medium transition-all",
-                        "text-slate-300 hover:text-white hover:bg-slate-800/80",
-                        "[&.active]:bg-slate-800 [&.active]:text-white"
-                      )}
-                      activeProps={{
-                        className: "active"
-                      }}
-                    >
-                      <Settings className="h-4 w-4" />
-                      Settings
-                    </Link>
-                  </NavigationMenuLink>
+                  <NavigationMenuTrigger className={cn(
+                    "inline-flex items-center gap-2 px-4 py-2 rounded-md",
+                    "text-sm font-medium transition-all",
+                    "text-slate-300 hover:text-white hover:bg-slate-800/80 data-[state=open]:bg-slate-800 data-[state=open]:text-white",
+                    "bg-transparent"
+                  )}>
+                    <Settings className="h-4 w-4" />
+                    Settings
+                  </NavigationMenuTrigger>
+                  <NavigationMenuContent className="bg-slate-800 border-slate-700">
+                    <ul className="grid w-[200px] gap-1 p-2">
+                      <li>
+                        <Link 
+                          to="/settings/prompts"
+                          className="flex items-center gap-2 px-3 py-2 rounded-md text-sm text-slate-300 hover:text-white hover:bg-slate-700 transition-colors"
+                        >
+                          <MessageCircle className="h-4 w-4" />
+                          Prompts
+                        </Link>
+                      </li>
+                      <li>
+                        <Link 
+                          to="/settings/locations"
+                          className="flex items-center gap-2 px-3 py-2 rounded-md text-sm text-slate-300 hover:text-white hover:bg-slate-700 transition-colors"
+                        >
+                          <MapPin className="h-4 w-4" />
+                          Locations
+                        </Link>
+                      </li>
+                      <li>
+                        <Link 
+                          to="/settings"
+                          className="flex items-center gap-2 px-3 py-2 rounded-md text-sm text-slate-300 hover:text-white hover:bg-slate-700 transition-colors"
+                        >
+                          <Settings className="h-4 w-4" />
+                          Settings
+                        </Link>
+                      </li>
+                    </ul>
+                  </NavigationMenuContent>
                 </NavigationMenuItem>
               </NavigationMenuList>
             </NavigationMenu>

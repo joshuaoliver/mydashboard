@@ -1,6 +1,5 @@
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Copy, Check, Sparkles, RefreshCw } from 'lucide-react'
+import { Copy, Check, Sparkles } from 'lucide-react'
 import { useState } from 'react'
 import { Loader } from '@/components/ai-elements/loader'
 import { Response } from '@/components/ai-elements/response'
@@ -35,8 +34,6 @@ export function ReplySuggestions({
   onSuggestionSelect,
 }: ReplySuggestionsProps) {
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null)
-  const [customContext, setCustomContext] = useState<string>('')
-  const [showCustomInput, setShowCustomInput] = useState<boolean>(false)
 
   const handleCopy = async (text: string, index: number) => {
     try {
@@ -91,84 +88,6 @@ export function ReplySuggestions({
 
   return (
     <div className="p-4">
-      {/* Quick Action Chips */}
-      <div className="mb-4">
-        <div className="flex flex-wrap gap-2 mb-2">
-          {suggestions.map((suggestion, index) => (
-            <button
-              key={index}
-              onClick={() => onSuggestionSelect?.(index)}
-              className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all flex items-center gap-1.5 ${
-                index === selectedIndex
-                  ? 'bg-blue-500 text-white shadow-sm'
-                  : 'bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100'
-              }`}
-            >
-              <Sparkles className="w-3 h-3" />
-              {suggestion.style}
-            </button>
-          ))}
-        </div>
-        
-        {/* Custom Context Input */}
-        <div className="flex items-center gap-2">
-          {!showCustomInput ? (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowCustomInput(true)}
-              className="text-xs gap-1.5"
-            >
-              <Sparkles className="w-3 h-3" />
-              Add Custom Context
-            </Button>
-          ) : (
-            <>
-              <Input
-                type="text"
-                placeholder="Add context or instructions for AI..."
-                value={customContext}
-                onChange={(e) => setCustomContext(e.target.value)}
-                className="flex-1 text-sm h-9"
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && customContext.trim()) {
-                    onGenerateClick?.(customContext)
-                    setCustomContext('')
-                    setShowCustomInput(false)
-                  }
-                }}
-              />
-              <Button
-                size="sm"
-                onClick={() => {
-                  if (customContext.trim()) {
-                    onGenerateClick?.(customContext)
-                    setCustomContext('')
-                    setShowCustomInput(false)
-                  }
-                }}
-                className="gap-1.5 h-9"
-                disabled={!customContext.trim()}
-              >
-                <RefreshCw className="w-3 h-3" />
-                Generate
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  setShowCustomInput(false)
-                  setCustomContext('')
-                }}
-                className="h-9 px-2"
-              >
-                Cancel
-              </Button>
-            </>
-          )}
-        </div>
-      </div>
-
       {/* Suggestion Cards */}
       <div className="space-y-3">
         {suggestions.map((suggestion, index) => {
@@ -183,64 +102,47 @@ export function ReplySuggestions({
                   : 'bg-white border-2 border-gray-300 hover:border-blue-400 hover:shadow-sm'
               }`}
             >
-              {/* Style badge */}
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  {isSelected && (
-                    <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
-                  )}
-                  <span className={`text-xs font-medium px-2 py-0.5 rounded ${
-                    isSelected 
-                      ? 'text-blue-700 bg-blue-100' 
-                      : 'text-blue-600 bg-blue-50'
-                  }`}>
-                    {suggestion.style}
-                  </span>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    handleCopy(suggestion.reply, index)
-                  }}
-                  className="h-7 text-xs opacity-0 group-hover:opacity-100 transition-opacity"
-                >
-                  {copiedIndex === index ? (
-                    <>
-                      <Check className="w-3 h-3 mr-1 text-green-600" />
-                      <span className="text-green-600">Copied</span>
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="w-3 h-3 mr-1" />
-                      Copy
-                    </>
-                  )}
-                </Button>
-              </div>
-
               {/* Reply text with markdown support */}
-              <div className="text-sm text-gray-900 mb-2 leading-relaxed">
+              <div className={`text-sm text-gray-900 leading-relaxed ${isSelected ? 'mb-3' : ''}`}>
                 <Response>{suggestion.reply}</Response>
               </div>
 
-              {/* Reasoning */}
-              {suggestion.reasoning && (
-                <div className="pt-2 border-t border-gray-200">
-                  <p className="text-xs text-gray-600">
-                    <span className="font-medium">Why:</span>{' '}
-                    {suggestion.reasoning}
-                  </p>
-                </div>
-              )}
-              
-              {/* Selected indicator */}
+              {/* Style badge, reasoning, and copy button - only show for selected */}
               {isSelected && (
-                <div className="mt-2 pt-2 border-t border-blue-200">
-                  <p className="text-xs text-blue-700 font-medium">
-                    ✓ Active in input field
-                  </p>
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 flex-1 min-w-0">
+                    <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse flex-shrink-0" />
+                    <span className="text-xs font-medium px-2 py-0.5 rounded flex-shrink-0 text-blue-700 bg-blue-100">
+                      {suggestion.style}
+                    </span>
+                    {suggestion.reasoning && (
+                      <p className="text-xs text-gray-600 truncate">
+                        <span className="font-medium">Why:</span>{' '}
+                        {suggestion.reasoning}
+                      </p>
+                    )}
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleCopy(suggestion.reply, index)
+                    }}
+                    className="h-7 text-xs opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
+                  >
+                    {copiedIndex === index ? (
+                      <>
+                        <Check className="w-3 h-3 mr-1 text-green-600" />
+                        <span className="text-green-600">Copied</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-3 h-3 mr-1" />
+                        Copy
+                      </>
+                    )}
+                  </Button>
                 </div>
               )}
             </div>

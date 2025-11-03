@@ -6,10 +6,17 @@ import { v } from "convex/values";
  * Fast, reactive, real-time updates
  * Replaces direct API calls from frontend
  * Includes contact images from DEX integration
+ * Supports pagination for infinite scroll
  */
 export const listCachedChats = query({
-  handler: async (ctx) => {
-    const chats = await ctx.db
+  args: {
+    limit: v.optional(v.number()),
+    cursor: v.optional(v.number()), // lastActivity timestamp as cursor
+  },
+  handler: async (ctx, args) => {
+    const limit = args.limit || 50;
+    
+    let queryBuilder = ctx.db
       .query("beeperChats")
       .withIndex("by_activity")
       .order("desc")
@@ -18,13 +25,22 @@ export const listCachedChats = query({
           q.eq(q.field("type"), "single"), // Direct messages only
           q.eq(q.field("isArchived"), false) // Not archived
         )
-      )
-      .take(50);
+      );
+    
+    // If cursor provided, only get chats older than cursor
+    if (args.cursor !== undefined) {
+      queryBuilder = queryBuilder.filter((q) =>
+        q.lt(q.field("lastActivity"), args.cursor!)
+      );
+    }
+    
+    const chats = await queryBuilder.take(limit);
 
-    // Fetch contact images for chats with Instagram usernames
+    // Fetch contact images and names for chats with Instagram usernames
     const chatsWithContacts = await Promise.all(
       chats.map(async (chat) => {
         let contactImageUrl: string | undefined = undefined;
+        let contactName: string | undefined = undefined;
         
         // If chat has Instagram username, look up contact
         if (chat.username) {
@@ -33,13 +49,20 @@ export const listCachedChats = query({
             .withIndex("by_instagram", (q) => q.eq("instagram", chat.username))
             .first();
           
-          contactImageUrl = contact?.imageUrl;
+          if (contact) {
+            contactImageUrl = contact.imageUrl;
+            // Build contact name from firstName and lastName
+            const nameParts = [contact.firstName, contact.lastName].filter(Boolean);
+            if (nameParts.length > 0) {
+              contactName = nameParts.join(" ");
+            }
+          }
         }
         
         return {
           id: chat.chatId,
           roomId: chat.localChatID,
-          name: chat.title,
+          name: contactName || chat.title, // Use contact name from Dex if available, otherwise fall back to Beeper title
           network: chat.network,
           accountID: chat.accountID,
           username: chat.username, // Instagram handle, etc.
@@ -55,10 +78,16 @@ export const listCachedChats = query({
       })
     );
 
+    // Determine if there are more chats to load
+    const hasMore = chats.length === limit;
+    const nextCursor = chats.length > 0 ? chats[chats.length - 1].lastActivity : null;
+
     return {
       chats: chatsWithContacts,
       lastSync: chats[0]?.lastSyncedAt || null,
       count: chats.length,
+      hasMore,
+      nextCursor,
     };
   },
 });
@@ -129,6 +158,7 @@ export const getCachedMessages = query({
         sender: msg.senderId,
         senderName: msg.senderName,
         isFromUser: msg.isFromUser,
+        attachments: msg.attachments,
       })),
     };
   },

@@ -22,14 +22,35 @@ export const Route = createRootRouteWithContext<{
       },
       {
         name: 'viewport',
-        content: 'width=device-width, initial-scale=1',
+        content: 'width=device-width, initial-scale=1, viewport-fit=cover',
       },
       {
         title: 'Dashboard',
       },
       {
+        name: 'description',
+        content: 'Personal dashboard and messaging tool',
+      },
+      {
         name: 'theme-color',
         content: '#6366f1',
+      },
+      // iOS-specific PWA meta tags
+      {
+        name: 'apple-mobile-web-app-capable',
+        content: 'yes',
+      },
+      {
+        name: 'apple-mobile-web-app-status-bar-style',
+        content: 'black-translucent',
+      },
+      {
+        name: 'apple-mobile-web-app-title',
+        content: 'Dashboard',
+      },
+      {
+        name: 'mobile-web-app-capable',
+        content: 'yes',
       },
     ],
     links: [
@@ -58,6 +79,15 @@ export const Route = createRootRouteWithContext<{
       },
       { rel: 'manifest', href: '/site.webmanifest' },
       { rel: 'icon', href: '/favicon.ico' },
+      // iOS Splash Screens
+      { rel: 'apple-touch-startup-image', media: '(device-width: 430px) and (device-height: 932px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)', href: '/apple-splash-2796-1290.svg' },
+      { rel: 'apple-touch-startup-image', media: '(device-width: 393px) and (device-height: 852px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)', href: '/apple-splash-2556-1179.svg' },
+      { rel: 'apple-touch-startup-image', media: '(device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)', href: '/apple-splash-2532-1170.svg' },
+      { rel: 'apple-touch-startup-image', media: '(device-width: 428px) and (device-height: 926px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)', href: '/apple-splash-2778-1284.svg' },
+      { rel: 'apple-touch-startup-image', media: '(device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)', href: '/apple-splash-2436-1125.svg' },
+      { rel: 'apple-touch-startup-image', media: '(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)', href: '/apple-splash-1792-828.svg' },
+      { rel: 'apple-touch-startup-image', media: '(device-width: 414px) and (device-height: 736px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)', href: '/apple-splash-2208-1242.svg' },
+      { rel: 'apple-touch-startup-image', media: '(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)', href: '/apple-splash-1334-750.svg' },
     ],
   }),
   notFoundComponent: () => <div>Route not found</div>,
@@ -83,6 +113,33 @@ function RootComponent() {
   React.useEffect(() => {
     setIsMounted(true)
   }, [])
+
+  // Register service worker for PWA support
+  React.useEffect(() => {
+    if ('serviceWorker' in navigator && isMounted) {
+      navigator.serviceWorker
+        .register('/sw.js')
+        .then((registration) => {
+          console.log('✅ Service Worker registered successfully:', registration.scope)
+          
+          // Check for updates periodically
+          registration.addEventListener('updatefound', () => {
+            const newWorker = registration.installing
+            if (newWorker) {
+              newWorker.addEventListener('statechange', () => {
+                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                  console.log('🔄 New service worker available - update available')
+                  // Optionally notify user about update
+                }
+              })
+            }
+          })
+        })
+        .catch((error) => {
+          console.error('❌ Service Worker registration failed:', error)
+        })
+    }
+  }, [isMounted])
 
   // Handle redirects based on auth state
   React.useEffect(() => {

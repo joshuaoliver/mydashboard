@@ -8,6 +8,12 @@ const BEEPER_API_URL = process.env.BEEPER_API_URL || "https://beeper.bywave.com.
 const BEEPER_TOKEN = process.env.BEEPER_TOKEN;
 
 /**
+ * In-memory cache for sync tracking
+ * Stores the last sync time to filter API requests by lastActivityAfter
+ */
+let lastSyncTimestamp: number | null = null;
+
+/**
  * Initialize Beeper SDK client
  * Configured for your custom V0 endpoint server
  */
@@ -99,6 +105,17 @@ export const syncChatMessages = internalMutation({
         senderId: v.string(),
         senderName: v.string(),
         isFromUser: v.boolean(),
+        attachments: v.optional(v.array(v.object({
+          type: v.string(),
+          srcURL: v.string(),
+          mimeType: v.optional(v.string()),
+          fileName: v.optional(v.string()),
+          fileSize: v.optional(v.number()),
+          isGif: v.optional(v.boolean()),
+          isSticker: v.optional(v.boolean()),
+          width: v.optional(v.number()),
+          height: v.optional(v.number()),
+        }))),
       })
     ),
     chatDocId: v.id("beeperChats"),
@@ -126,6 +143,7 @@ export const syncChatMessages = internalMutation({
           senderId: msg.senderId,
           senderName: msg.senderName,
           isFromUser: msg.isFromUser,
+          attachments: msg.attachments,
         });
         updatedCount++;
       } else {
@@ -138,6 +156,7 @@ export const syncChatMessages = internalMutation({
           senderId: msg.senderId,
           senderName: msg.senderName,
           isFromUser: msg.isFromUser,
+          attachments: msg.attachments,
         });
         insertedCount++;
       }
@@ -184,27 +203,53 @@ export const syncChatMessages = internalMutation({
  * - Better timeout handling
  */
 export const syncBeeperChatsInternal = internalAction({
-  handler: async (ctx, args: { syncSource: string; forceMessageSync?: boolean }) => {
+  handler: async (ctx, args: { syncSource: string; forceMessageSync?: boolean; bypassCache?: boolean }) => {
     try {
+      const now = Date.now();
+      
       // Initialize Beeper SDK client
       const client = createBeeperClient();
 
-      // Fetch chats using SDK (automatically handles V0 endpoints)
-      // The SDK will retry on failures and handle errors gracefully
-      const response = await client.get('/v0/search-chats', {
-        query: { 
-          limit: 100,
-          // Optional filters:
-          // type: 'single',  // Only direct messages
-          // unreadOnly: true,  // Only unread chats
-        }
-      }) as any; // Type assertion needed for custom V0 endpoint
+      // Determine if we should filter by lastActivityAfter
+      const useFilter = !args.bypassCache && lastSyncTimestamp !== null;
+      
+      if (useFilter) {
+        const filterAge = now - lastSyncTimestamp!;
+        console.log(
+          `[Beeper Sync] Filtering chats with activity after ${new Date(lastSyncTimestamp!).toISOString()} ` +
+          `(${Math.round(filterAge / 1000)}s ago)`
+        );
+      } else {
+        console.log(`[Beeper Sync] ${args.bypassCache ? 'Cache bypassed' : 'No previous sync'} - fetching all chats`);
+      }
+
+      // Fetch chats using V1 API which supports date filtering
+      // V1 API: /v1/chats/search supports lastActivityAfter and lastActivityBefore
+      const queryParams: any = {
+        limit: 100,
+        // Optional filters:
+        // type: 'single',  // Only direct messages
+        // unreadOnly: true,  // Only unread chats
+      };
+
+      // Add lastActivityAfter filter if we have a previous sync timestamp
+      if (useFilter && lastSyncTimestamp) {
+        queryParams.lastActivityAfter = new Date(lastSyncTimestamp).toISOString();
+      }
+
+      const response = await client.get('/v1/chats/search', {
+        query: queryParams
+      }) as any;
 
       const chats = response.items || [];
+      
+      console.log(
+        `[Beeper Sync] Received ${chats.length} chats from API ` +
+        `(${useFilter ? 'filtered by lastActivityAfter' : 'all chats'})`
+      );
 
       let syncedChatsCount = 0;
       let syncedMessagesCount = 0;
-      const now = Date.now();
 
       // Process each chat
       for (const chat of chats) {
@@ -268,7 +313,7 @@ export const syncBeeperChatsInternal = internalAction({
             
             // Fetch messages using direct fetch (SDK doesn't handle array parameters correctly)
             // The API expects chatIDs[] (with brackets) for array notation
-            const messagesUrl = `${BEEPER_API_URL}/v0/search-messages?chatIDs[]=${encodeURIComponent(chat.id)}&limit=30`;
+            const messagesUrl = `${BEEPER_API_URL}/v0/search-messages?chatIDs[]=${encodeURIComponent(chat.id)}&limit=20`;
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 15000);
 
@@ -289,14 +334,30 @@ export const syncBeeperChatsInternal = internalAction({
 
             // Prepare messages for mutation
             const messagesToSync = messages
-              .map((msg: any) => ({
-                messageId: msg.id,
-                text: msg.text || "",
-                timestamp: new Date(msg.timestamp).getTime(),
-                senderId: msg.senderID,
-                senderName: msg.senderName || msg.senderID,
-                isFromUser: msg.isSender || false,
-              }))
+              .map((msg: any) => {
+                // Extract attachments if present
+                const attachments = msg.attachments?.map((att: any) => ({
+                  type: att.type || "unknown",
+                  srcURL: att.srcURL,
+                  mimeType: att.mimeType,
+                  fileName: att.fileName,
+                  fileSize: att.fileSize,
+                  isGif: att.isGif,
+                  isSticker: att.isSticker,
+                  width: att.size?.width,
+                  height: att.size?.height,
+                }));
+
+                return {
+                  messageId: msg.id,
+                  text: msg.text || "",
+                  timestamp: new Date(msg.timestamp).getTime(),
+                  senderId: msg.senderID,
+                  senderName: msg.senderName || msg.senderID,
+                  isFromUser: msg.isSender || false,
+                  attachments: attachments && attachments.length > 0 ? attachments : undefined,
+                };
+              })
               // CRITICAL: Sort by timestamp (oldest to newest) before syncing
               // This ensures lastMessage is correctly identified as the most recent
               .sort((a: { timestamp: number }, b: { timestamp: number }) => a.timestamp - b.timestamp);
@@ -331,6 +392,10 @@ export const syncBeeperChatsInternal = internalAction({
         `[Beeper Sync] Synced ${syncedChatsCount} chats, ${syncedMessagesCount} messages (source: ${args.syncSource})`
       );
 
+      // Update lastSyncTimestamp for next sync (use current time, not max activity)
+      lastSyncTimestamp = now;
+      console.log(`[Beeper Sync] Updated lastSyncTimestamp to ${new Date(now).toISOString()}`);
+
       return {
         success: true,
         syncedChats: syncedChatsCount,
@@ -359,6 +424,7 @@ export const syncBeeperChatsInternal = internalAction({
  * Public action for manual sync
  * Can be triggered by frontend on page load or refresh button
  * Forces message sync for all chats to ensure latest data
+ * Bypasses cache to get a full refresh
  */
 export const manualSync = action({
   args: {},
@@ -373,6 +439,7 @@ export const manualSync = action({
     const result = await ctx.runAction(internal.beeperSync.syncBeeperChatsInternal, {
       syncSource: "manual",
       forceMessageSync: true, // Always fetch messages on manual refresh
+      bypassCache: true, // Bypass cache for manual refresh
     });
     return result;
   },
@@ -381,6 +448,7 @@ export const manualSync = action({
 /**
  * Page load sync - triggered when user opens the page
  * Only syncs messages for chats with new activity (not forced)
+ * Uses in-memory cache to avoid re-fetching unchanged chats
  */
 export const pageLoadSync = action({
   args: {},
@@ -395,6 +463,7 @@ export const pageLoadSync = action({
     const result = await ctx.runAction(internal.beeperSync.syncBeeperChatsInternal, {
       syncSource: "page_load",
       forceMessageSync: false, // Don't force on page load - only sync new activity
+      bypassCache: false, // Use cache to filter by recent activity
     });
     return result;
   },
