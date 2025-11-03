@@ -59,7 +59,6 @@ export function ProxiedImage({ src, alt, className }: ProxiedImageProps) {
         const baseUrl = convexUrl.replace('/api', '') // Remove /api suffix
         const proxyUrl = `${baseUrl}/image-proxy?url=${encodeURIComponent(src)}`
         
-        console.log(`[ProxiedImage] Fetching via Convex proxy...`)
         setImageUrl(proxyUrl)
         setLoading(false)
 

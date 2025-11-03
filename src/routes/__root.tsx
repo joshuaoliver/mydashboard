@@ -11,6 +11,7 @@ import { convexQuery } from '@convex-dev/react-query'
 import * as React from 'react'
 import appCss from '~/styles/app.css?url'
 import { api } from '../../convex/_generated/api'
+import { PinEntry } from '@/components/auth/PinEntry'
 
 export const Route = createRootRouteWithContext<{
   queryClient: QueryClient
@@ -98,11 +99,20 @@ function RootComponent() {
   const navigate = useNavigate()
   const location = useLocation()
   const [isMounted, setIsMounted] = React.useState(false)
+  const [isAppUnlocked, setIsAppUnlocked] = React.useState(false)
+  
+  // Check if app is unlocked (PIN entered)
+  React.useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const unlocked = sessionStorage.getItem('app-unlocked') === 'true'
+      setIsAppUnlocked(unlocked)
+    }
+  }, [])
   
   // Only check auth on client-side (not during SSR)
   const { data: user, isLoading } = useQuery({
     ...convexQuery(api.auth.currentUser, {}),
-    enabled: isMounted, // Only run on client
+    enabled: isMounted && isAppUnlocked, // Only run on client after PIN unlock
   })
 
   // Public routes that don't require authentication
@@ -113,6 +123,20 @@ function RootComponent() {
   React.useEffect(() => {
     setIsMounted(true)
   }, [])
+
+  // Handle PIN unlock
+  const handlePinUnlock = () => {
+    setIsAppUnlocked(true)
+  }
+
+  // Show PIN entry if not unlocked (before everything else)
+  if (isMounted && !isAppUnlocked) {
+    return (
+      <RootDocument>
+        <PinEntry onUnlock={handlePinUnlock} />
+      </RootDocument>
+    )
+  }
 
   // Register service worker for PWA support
   React.useEffect(() => {

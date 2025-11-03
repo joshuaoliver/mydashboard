@@ -42,9 +42,6 @@ export function ChatDetail({ messages, isSingleChat = true }: ChatDetailProps) {
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
   }
 
-  // Debug: log to verify isSingleChat is being set correctly
-  console.log('ChatDetail render - isSingleChat:', isSingleChat, 'messageCount:', messages.length)
-
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-gray-50">
       <Conversation className="flex-1">
