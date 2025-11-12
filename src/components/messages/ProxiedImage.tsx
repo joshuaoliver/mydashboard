@@ -8,18 +8,26 @@ interface ProxiedImageProps {
   mimeType?: string
 }
 
+// Beeper Media Server Configuration
+const BEEPER_MEDIA_SERVER = import.meta.env.VITE_BEEPER_MEDIA_SERVER || 'https://beeperimage.bywave.com.au'
+const BEEPER_MEDIA_TOKEN = import.meta.env.VITE_BEEPER_MEDIA_TOKEN || '1c265ccc683ee3a761d38ecadaee812d18a6404a582150044ec3973661e016c9'
+
 /**
- * Image component that resolves MXC URLs to local file:// paths
+ * Image component that handles different image URL types:
  * 
- * Flow:
- * 1. For mxc:// or localmxc:// URLs, call Beeper's /v1/assets/download API
- * 2. Get the local file:// path from the response
- * 3. Use the file:// URL directly (requires local file permissions in browser)
+ * 1. Convex storage URLs (profile pictures - cached by backend)
+ *    - https://*.convex.cloud/api/storage/...
+ *    - Used as-is (fast, reliable)
  * 
- * Browser local file permissions must be enabled:
- * 1. Navigate to the site
- * 2. Click the padlock/info icon in address bar
- * 3. Site settings → File access → Allow
+ * 2. file:// URLs (message attachments - from Beeper)
+ *    - file:///Users/.../BeeperTexts/media/local.beeper.com/HASH
+ *    - Proxied through media server with auth token
+ * 
+ * 3. Regular HTTP/HTTPS URLs
+ *    - Used as-is
+ * 
+ * Note: Profile pictures are cached to Convex at the backend level (imageCache.ts)
+ * This component just displays whatever URL it receives.
  */
 export function ProxiedImage({ src, alt, className }: ProxiedImageProps) {
   const [imageUrl, setImageUrl] = useState<string | null>(null)
@@ -29,59 +37,64 @@ export function ProxiedImage({ src, alt, className }: ProxiedImageProps) {
   useEffect(() => {
     let isMounted = true
 
-    const loadImage = async () => {
-      // Check if we need to resolve the URL via Beeper API
-      const needsDownload = src.startsWith('mxc://') || src.startsWith('localmxc://')
-      
-      if (!needsDownload) {
-        // Regular HTTP or file:// URL - use directly
-        if (isMounted) {
-          setImageUrl(src)
-          setLoading(false)
-        }
-        return
-      }
-
-      // Call Beeper API to get local file path
-      setLoading(true)
-      setError(null)
-
+    const loadImage = () => {
       try {
-        // Use localhost:23373 for local Beeper Desktop API
-        const beeperApiUrl = 'http://localhost:23373'
+        // Handle different URL types
         
-        const response = await fetch(`${beeperApiUrl}/v1/assets/download`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            // Note: localhost API typically doesn't require authentication
-          },
-          body: JSON.stringify({ url: src }),
-        })
-
-        if (!response.ok) {
-          throw new Error(`Beeper API error: ${response.status}`)
-        }
-
-        const data = await response.json() as { srcURL?: string; error?: string }
-        
-        if (data.error) {
-          throw new Error(data.error)
+        // 1. Convex storage URLs - use as-is (profile pictures cached by backend)
+        if (src.includes('.convex.cloud/api/storage/')) {
+          if (isMounted) {
+            setImageUrl(src)
+            setLoading(false)
+          }
+          return
         }
         
-        if (!data.srcURL) {
-          throw new Error('No srcURL returned from Beeper API')
+        // 2. Regular HTTP/HTTPS URLs - use as-is
+        if (src.startsWith('http://') || src.startsWith('https://')) {
+          if (isMounted) {
+            setImageUrl(src)
+            setLoading(false)
+          }
+          return
         }
 
-        if (isMounted) {
-          setImageUrl(data.srcURL)
-          setLoading(false)
+        // 3. file:// URLs - proxy through media server (message attachments)
+        if (src.startsWith('file://')) {
+          // Convert file:// URL to media server URL
+          // Example: file:///Users/.../media/local.beeper.com/joshuaoliver_HASH
+          // Extract the path after "/media/"
+          
+          // Decode URL-encoded spaces and special chars
+          const decodedSrc = decodeURIComponent(src)
+          
+          // Find the media path
+          const mediaMatch = decodedSrc.match(/\/media\/(.+)$/)
+          
+          if (!mediaMatch) {
+            throw new Error('Invalid file:// URL format - missing /media/ path')
+          }
+          
+          const mediaPath = mediaMatch[1]
+          // mediaPath will be like: "local.beeper.com/joshuaoliver_HASH" or "beeper.com/HASH"
+          
+          // Construct the proxied URL with query string auth
+          const proxiedUrl = `${BEEPER_MEDIA_SERVER}/${mediaPath}?token=${BEEPER_MEDIA_TOKEN}`
+          
+          if (isMounted) {
+            setImageUrl(proxiedUrl)
+            setLoading(false)
+          }
+          return
         }
+
+        // Unsupported URL scheme
+        throw new Error(`Unsupported URL scheme: ${src.substring(0, 20)}...`)
 
       } catch (err) {
         if (!isMounted) return
         const errorMsg = err instanceof Error ? err.message : 'Failed to load image'
-        console.error('[ProxiedImage] Error:', errorMsg)
+        console.error('[ProxiedImage] Error:', errorMsg, 'Source:', src)
         setError(errorMsg)
         setImageUrl(null)
         setLoading(false)

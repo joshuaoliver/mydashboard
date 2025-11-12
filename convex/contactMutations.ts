@@ -296,16 +296,18 @@ export const toggleLocation = mutation({
 });
 
 /**
- * Update intimate connection flag (local-only, PIN-protected)
+ * Update intimate connection flag and date (local-only, PIN-protected)
  */
 export const updateIntimateConnection = mutation({
   args: {
     contactId: v.id("contacts"),
     intimateConnection: v.boolean(),
+    intimateConnectionDate: v.optional(v.string()), // ISO date string
   },
   handler: async (ctx, args) => {
     await ctx.db.patch(args.contactId, {
       intimateConnection: args.intimateConnection,
+      intimateConnectionDate: args.intimateConnectionDate,
       lastModifiedAt: Date.now(),
     });
 
@@ -411,6 +413,7 @@ export const createContact = mutation({
 
 /**
  * Update lead status (local-only)
+ * Auto-sets sex to "Female" if leadStatus is set and sex is empty
  */
 export const updateLeadStatus = mutation({
   args: {
@@ -425,10 +428,24 @@ export const updateLeadStatus = mutation({
     ),
   },
   handler: async (ctx, args) => {
-    await ctx.db.patch(args.contactId, {
+    // Get the current contact
+    const contact = await ctx.db.get(args.contactId);
+    if (!contact) {
+      throw new Error("Contact not found");
+    }
+
+    // Prepare the update
+    const update: any = {
       leadStatus: args.leadStatus ?? undefined,
       lastModifiedAt: Date.now(),
-    });
+    };
+
+    // If setting a lead status (not clearing it) and sex is empty, set to Female
+    if (args.leadStatus && (!contact.sex || contact.sex.length === 0)) {
+      update.sex = ["Female"];
+    }
+
+    await ctx.db.patch(args.contactId, update);
 
     return { success: true };
   },

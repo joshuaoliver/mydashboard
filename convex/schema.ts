@@ -47,17 +47,24 @@ export default defineSchema({
     network: v.string(),             // "WhatsApp", "Instagram", etc.
     accountID: v.string(),           // "whatsapp", "instagram", etc.
     type: v.union(v.literal("single"), v.literal("group")),  // "single" or "group"
+    description: v.optional(v.string()),     // Chat description (from API)
     
     // Contact identifiers (for the other person in single chats)
     username: v.optional(v.string()),        // Instagram/Twitter username
     phoneNumber: v.optional(v.string()),     // Phone number for WhatsApp/SMS
     email: v.optional(v.string()),           // Email if available
     participantId: v.optional(v.string()),   // Beeper participant ID
+    participantFullName: v.optional(v.string()), // Participant's full display name
+    participantImgURL: v.optional(v.string()),   // Participant's profile image (file:// URL from Beeper)
+    // Note: Cached image URLs are looked up from cachedImages table at query time
+    cannotMessage: v.optional(v.boolean()),      // Whether messaging is disabled/blocked
+    participantCount: v.optional(v.number()),    // Total participant count
     
     // Activity tracking
     lastActivity: v.number(),        // Timestamp (converted from ISO)
     unreadCount: v.number(),
     lastMessage: v.optional(v.string()),       // Text of the most recent message
+    lastReadMessageSortKey: v.optional(v.string()), // Last read position for pagination
     
     // Status flags
     isArchived: v.boolean(),
@@ -72,6 +79,13 @@ export default defineSchema({
     // Reply tracking
     lastMessageFrom: v.optional(v.string()),   // "user" or "them" - who sent last message
     needsReply: v.optional(v.boolean()),       // Does user need to reply?
+    
+    // Message cursor tracking (boundaries of our message window)
+    newestMessageSortKey: v.optional(v.string()),  // Newest message sortKey we have
+    oldestMessageSortKey: v.optional(v.string()),  // Oldest message sortKey we have
+    messageCount: v.optional(v.number()),          // Number of messages in our window
+    hasCompleteHistory: v.optional(v.boolean()),   // True if we've fetched all historical messages
+    lastFullSyncAt: v.optional(v.number()),        // When we last did a full conversation load
   })
     .index("by_activity", ["lastActivity"])    // Sort by recent
     .index("by_chat_id", ["chatId"])           // Lookup by ID
@@ -82,11 +96,14 @@ export default defineSchema({
   beeperMessages: defineTable({
     chatId: v.string(),              // Which chat this message belongs to
     messageId: v.string(),           // Unique message ID from Beeper
+    accountID: v.string(),           // Beeper account ID
     text: v.string(),                // Message text
     timestamp: v.number(),           // When message was sent
+    sortKey: v.string(),             // Sortable key for pagination (from API)
     senderId: v.string(),            // Beeper user ID of sender
     senderName: v.string(),          // Display name of sender
-    isFromUser: v.boolean(),         // True if user sent this message
+    isFromUser: v.boolean(),         // True if user sent this message (isSender in API)
+    isUnread: v.optional(v.boolean()), // True if message is unread
     // Image/media attachments from Beeper
     attachments: v.optional(v.array(v.object({
       type: v.string(),              // "img", "video", "audio", "unknown"
@@ -96,12 +113,23 @@ export default defineSchema({
       fileSize: v.optional(v.number()),     // Size in bytes
       isGif: v.optional(v.boolean()),
       isSticker: v.optional(v.boolean()),
-      width: v.optional(v.number()),        // Image width in px
-      height: v.optional(v.number()),       // Image height in px
+      isVoiceNote: v.optional(v.boolean()),  // Is this a voice note?
+      posterImg: v.optional(v.string()),     // Video poster frame
+      width: v.optional(v.number()),         // Image width in px
+      height: v.optional(v.number()),        // Image height in px
+    }))),
+    // Reactions to this message
+    reactions: v.optional(v.array(v.object({
+      id: v.string(),                 // Reaction ID
+      participantID: v.string(),      // Who reacted
+      reactionKey: v.string(),        // Emoji or shortcode
+      emoji: v.optional(v.boolean()), // Is it an emoji?
+      imgURL: v.optional(v.string()), // Reaction image URL
     }))),
   })
     .index("by_chat", ["chatId", "timestamp"])  // Get messages for chat, sorted by time
-    .index("by_message_id", ["messageId"]),     // Lookup by message ID
+    .index("by_message_id", ["messageId"])      // Lookup by message ID
+    .index("by_chat_sortKey", ["chatId", "sortKey"]),  // Query by sortKey for cursor pagination
 
   // Dex CRM integration - sync contacts from Dex
   contacts: defineTable({
@@ -135,6 +163,7 @@ export default defineSchema({
     // PIN-protected fields
     privateNotes: v.optional(v.string()), // PIN-protected notes
     intimateConnection: v.optional(v.boolean()), // PIN-protected yes/no
+    intimateConnectionDate: v.optional(v.string()), // ISO date string for when intimate connection started
     // Deduplication and cross-platform tracking
     whatsapp: v.optional(v.string()), // Primary WhatsApp phone number for matching
     socialHandles: v.optional(v.array(v.object({
@@ -175,6 +204,17 @@ export default defineSchema({
   })
     .index("by_name", ["name"]),
 
+  // Global chat list sync state - tracks cursor boundaries
+  chatListSync: defineTable({
+    key: v.string(),                      // Always "global" (single record)
+    newestCursor: v.optional(v.string()), // Newest chat cursor (boundary)
+    oldestCursor: v.optional(v.string()), // Oldest chat cursor (boundary)
+    lastSyncedAt: v.number(),             // Last sync timestamp
+    syncSource: v.string(),               // "cron", "manual", or "page_load"
+    totalChats: v.number(),               // Total chats in our window
+  })
+    .index("by_key", ["key"]),
+
   // Cached AI reply suggestions - avoid regenerating for same conversation state
   aiReplySuggestions: defineTable({
     chatId: v.string(),                    // Which chat these suggestions are for
@@ -192,4 +232,15 @@ export default defineSchema({
   })
     .index("by_chat_id", ["chatId"])       // Lookup cached suggestions by chat
     .index("by_chat_and_message", ["chatId", "lastMessageId"]), // Check if cache is valid
+
+  // Cached images - deduplicated storage for Beeper profile/attachment images
+  cachedImages: defineTable({
+    sourceUrl: v.string(),           // Original file:// URL from Beeper
+    convexStorageId: v.string(),     // Convex storage ID
+    convexUrl: v.string(),           // Public Convex URL
+    contentType: v.string(),         // MIME type (e.g., "image/jpeg")
+    fileSize: v.number(),            // Size in bytes
+    cachedAt: v.number(),            // When cached to Convex
+  })
+    .index("by_source_url", ["sourceUrl"]), // Quick lookup by original URL
 });

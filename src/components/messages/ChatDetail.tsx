@@ -7,9 +7,8 @@ import {
 } from '@/components/ai-elements/conversation'
 import { Message as AIMessage, MessageContent } from '@/components/ai-elements/message'
 import { ProxiedImage } from './ProxiedImage'
-import { ScrollArea } from '@/components/ui/scroll-area'
 import { RefreshCw } from 'lucide-react'
-import { useRef, useEffect } from 'react'
+import { useRef, useEffect, memo } from 'react'
 
 interface Attachment {
   type: string
@@ -40,11 +39,12 @@ interface ChatDetailProps {
   onLoadMore?: (numItems: number) => void
 }
 
-export function ChatDetail({ messages, isSingleChat = true, messagesStatus, onLoadMore }: ChatDetailProps) {
+export const ChatDetail = memo(function ChatDetail({ messages, isSingleChat = true, messagesStatus, onLoadMore }: ChatDetailProps) {
   const conversationRef = useRef<HTMLDivElement>(null)
   const prevScrollHeightRef = useRef<number>(0)
 
   // Handle scroll to top - load more messages
+  // Note: Conversation uses StickToBottom which manages its own scroll container
   useEffect(() => {
     const container = conversationRef.current
     if (!container || !onLoadMore || messagesStatus !== "CanLoadMore") return
@@ -52,8 +52,8 @@ export function ChatDetail({ messages, isSingleChat = true, messagesStatus, onLo
     const handleScroll = () => {
       const { scrollTop } = container
       
-      // Load more when scrolled near the top (within 100px)
-      if (scrollTop < 100) {
+      // Load more when scrolled near the top (within 200px from top)
+      if (scrollTop < 200) {
         console.log('📜 Loading older messages...')
         // Store current scroll height before loading
         prevScrollHeightRef.current = container.scrollHeight
@@ -66,6 +66,7 @@ export function ChatDetail({ messages, isSingleChat = true, messagesStatus, onLo
   }, [messagesStatus, onLoadMore])
 
   // Maintain scroll position when new messages are prepended
+  // StickToBottom handles this automatically, but we enhance it here
   useEffect(() => {
     const container = conversationRef.current
     if (!container || messagesStatus !== "LoadingMore") return
@@ -87,9 +88,24 @@ export function ChatDetail({ messages, isSingleChat = true, messagesStatus, onLo
   }
 
   return (
-    <ScrollArea className="flex-1 bg-gray-50" ref={conversationRef}>
-      <Conversation className="flex-1">
-        <ConversationContent>
+    <Conversation 
+      className={cn(
+        "flex-1 bg-gray-50",
+        // Custom scrollbar styling with auto-hide (Webkit browsers - Chrome, Safari, Edge)
+        "[&::-webkit-scrollbar]:w-2",
+        "[&::-webkit-scrollbar-track]:bg-transparent",
+        "[&::-webkit-scrollbar-thumb]:bg-gray-300",
+        "[&::-webkit-scrollbar-thumb]:rounded-full",
+        "[&::-webkit-scrollbar-thumb:hover]:bg-gray-400",
+        // Auto-hide: scrollbar only visible when scrolling
+        "[&::-webkit-scrollbar-thumb]:transition-opacity",
+        "[&:not(:hover)::-webkit-scrollbar-thumb]:opacity-0",
+        // Firefox scrollbar styling
+        "scrollbar-thin scrollbar-track-transparent scrollbar-thumb-gray-300"
+      )}
+      ref={conversationRef}
+    >
+      <ConversationContent>
           {messages.length === 0 ? (
             <ConversationEmptyState 
               title="Start a conversation"
@@ -170,7 +186,6 @@ export function ChatDetail({ messages, isSingleChat = true, messagesStatus, onLo
         </ConversationContent>
         <ConversationScrollButton />
       </Conversation>
-    </ScrollArea>
   )
-}
+})
 

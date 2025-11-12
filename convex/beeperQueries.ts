@@ -113,6 +113,27 @@ export const listCachedChats = query({
           }
         }
         
+        // Profile image priority (at query time - lookup cached images):
+        // 1. Cached image from cachedImages table (file:// URLs cached to Convex)
+        // 2. Dex contact image (synced from CRM)
+        // 3. undefined (will show initials fallback)
+        let profileImageUrl: string | undefined = undefined;
+        
+        if (chat.participantImgURL) {
+          // Look up cached version of Beeper profile image
+          const cachedImage = await ctx.db
+            .query("cachedImages")
+            .withIndex("by_source_url", (q) => q.eq("sourceUrl", chat.participantImgURL!))
+            .first();
+          
+          profileImageUrl = cachedImage?.convexUrl;
+        }
+        
+        // Fall back to Dex contact image if no Beeper cache
+        if (!profileImageUrl) {
+          profileImageUrl = contactImageUrl;
+        }
+        
         return {
           id: chat.chatId,
           roomId: chat.localChatID,
@@ -128,7 +149,7 @@ export const listCachedChats = query({
           lastSyncedAt: chat.lastSyncedAt,
           needsReply: chat.needsReply,
           lastMessageFrom: chat.lastMessageFrom,
-          contactImageUrl, // From DEX integration
+          contactImageUrl: profileImageUrl, // Cached Convex URL or Dex contact image
         };
       })
     );

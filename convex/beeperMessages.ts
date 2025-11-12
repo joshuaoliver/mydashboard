@@ -1,27 +1,7 @@
 import { action } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { v } from "convex/values";
-import BeeperDesktop from '@beeper/desktop-api';
-
-// Beeper API configuration
-const BEEPER_API_URL = process.env.BEEPER_API_URL || "https://beeper.bywave.com.au";
-const BEEPER_TOKEN = process.env.BEEPER_TOKEN;
-
-/**
- * Initialize Beeper SDK client
- */
-function createBeeperClient() {
-  if (!BEEPER_TOKEN) {
-    throw new Error("BEEPER_TOKEN environment variable is not set");
-  }
-
-  return new BeeperDesktop({
-    accessToken: BEEPER_TOKEN,
-    baseURL: BEEPER_API_URL,
-    maxRetries: 2,
-    timeout: 15000,
-  });
-}
+import { createBeeperClient } from "./beeperClient";
 
 /**
  * Focus/open a chat in Beeper Desktop
@@ -196,14 +176,17 @@ export const loadFullConversation = action({
 
       console.log(`✅ Fetched ${allMessages.length} messages from Beeper SDK`);
 
-      // Transform messages to match our schema
+      // Transform messages to match our schema - all API fields
       const transformedMessages = allMessages.map((msg: any) => ({
         messageId: msg.id,
+        accountID: msg.accountID,
         text: msg.text || "",
         timestamp: new Date(msg.timestamp).getTime(),
-        senderId: msg.sender?.id || "unknown",
-        senderName: msg.sender?.displayName || msg.sender?.name || "Unknown",
-        isFromUser: msg.sender?.isSelf || false,
+        sortKey: msg.sortKey,
+        senderId: msg.senderID || msg.sender?.id || "unknown",
+        senderName: msg.senderName || msg.sender?.displayName || msg.sender?.name || "Unknown",
+        isFromUser: msg.isSender || msg.sender?.isSelf || false,
+        isUnread: msg.isUnread,
         attachments: msg.attachments?.map((att: any) => ({
           type: att.type || "unknown",
           srcURL: att.url || att.srcURL || "",
@@ -212,13 +195,22 @@ export const loadFullConversation = action({
           fileSize: att.fileSize,
           isGif: att.isGif,
           isSticker: att.isSticker,
-          width: att.width,
-          height: att.height,
+          isVoiceNote: att.isVoiceNote,
+          posterImg: att.posterImg,
+          width: att.size?.width || att.width,
+          height: att.size?.height || att.height,
+        })),
+        reactions: msg.reactions?.map((r: any) => ({
+          id: r.id,
+          participantID: r.participantID,
+          reactionKey: r.reactionKey,
+          emoji: r.emoji,
+          imgURL: r.imgURL,
         })),
       }));
 
-      // Sort messages by timestamp (oldest first) for proper storage
-      transformedMessages.sort((a, b) => a.timestamp - b.timestamp);
+      // Sort messages by sortKey (oldest first) for proper storage
+      transformedMessages.sort((a, b) => a.sortKey.localeCompare(b.sortKey));
 
       // Store messages using the existing syncChatMessages mutation
       const storedCount: number = await ctx.runMutation(
@@ -232,6 +224,25 @@ export const loadFullConversation = action({
       );
 
       console.log(`✅ Stored ${storedCount} new messages`);
+      
+      // Update cursor boundaries - we've loaded full history
+      if (transformedMessages.length > 0) {
+        const newestSortKey = transformedMessages[transformedMessages.length - 1]?.sortKey;
+        const oldestSortKey = transformedMessages[0]?.sortKey;
+        
+        await ctx.runMutation(
+          internal.cursorHelpers.updateChatMessageCursors,
+          {
+            chatDocId: chat._id,
+            newestMessageSortKey: newestSortKey,
+            oldestMessageSortKey: oldestSortKey,
+            messageCount: transformedMessages.length,
+            hasCompleteHistory: true, // Full history loaded from last year
+          }
+        );
+        
+        console.log(`✅ Updated cursor boundaries: newest=${newestSortKey?.slice(0, 10)}..., oldest=${oldestSortKey?.slice(0, 10)}...`);
+      }
 
       return {
         success: true,

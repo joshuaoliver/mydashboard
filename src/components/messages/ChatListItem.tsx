@@ -1,6 +1,7 @@
 import { cn } from '@/lib/utils'
 import { Archive, ArchiveRestore } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { memo } from 'react'
 
 interface ChatListItemProps {
   id: string
@@ -18,7 +19,7 @@ interface ChatListItemProps {
   contactImageUrl?: string // From DEX integration
 }
 
-export function ChatListItem({
+export const ChatListItem = memo(function ChatListItem({
   id,
   name,
   network,
@@ -104,14 +105,14 @@ export function ChatListItem({
         </div>
 
         {/* Chat info */}
-        <div className="flex-1 min-w-0">
+        <div className="flex-1 min-w-0 overflow-hidden">
           {/* Header row: Name, network badge, time */}
           <div className="flex items-center justify-between gap-2 mb-1">
-            <div className="flex items-center gap-2 min-w-0 flex-1">
+            <div className="flex items-center gap-2 min-w-0 flex-1 overflow-hidden">
               {/* Name with username tooltip on hover */}
               <h3 
                 className={cn(
-                  "truncate text-sm",
+                  "truncate text-sm min-w-0 flex-shrink",
                   hasUnread ? "font-bold text-gray-900" : "font-normal text-gray-700"
                 )}
                 title={username ? `@${username}` : phoneNumber || undefined}
@@ -119,13 +120,13 @@ export function ChatListItem({
                 {name}
               </h3>
               {network && (
-                <span className="px-1.5 py-0.5 text-xs font-medium bg-gray-100 text-gray-600 rounded flex-shrink-0">
+                <span className="px-1.5 py-0.5 text-xs font-medium bg-gray-100 text-gray-600 rounded flex-shrink-0 whitespace-nowrap">
                   {network}
                 </span>
               )}
             </div>
             <span className={cn(
-              "text-xs flex-shrink-0",
+              "text-xs flex-shrink-0 whitespace-nowrap",
               hasUnread ? "font-semibold text-blue-600" : "text-gray-500"
             )}>
               {formatTime(lastMessageTime)}
@@ -133,15 +134,15 @@ export function ChatListItem({
           </div>
 
           {/* Last message preview */}
-          <div className="flex items-start gap-2">
+          <div className="flex items-start gap-2 overflow-hidden">
             <p className={cn(
-              "text-sm truncate flex-1",
+              "text-sm truncate flex-1 min-w-0",
               hasUnread ? "font-medium text-gray-900" : "text-gray-600"
             )}>
               {truncatedMessage}
             </p>
             {hasUnread && (
-              <span className="px-1.5 py-0.5 text-xs font-bold bg-blue-600/90 text-white rounded-full flex-shrink-0 min-w-[20px] text-center">
+              <span className="px-1.5 py-0.5 text-xs font-bold bg-blue-600/90 text-white rounded-full flex-shrink-0 min-w-[20px] text-center whitespace-nowrap">
                 {unreadCount}
               </span>
             )}
@@ -170,5 +171,5 @@ export function ChatListItem({
       )}
     </div>
   )
-}
+})
 

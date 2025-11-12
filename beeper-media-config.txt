@@ -1,0 +1,34 @@
+# Beeper Media Server Configuration
+# KEEP THIS FILE SECURE - Contains authentication token
+
+Server URL: http://localhost:47392
+Auth Token: 1c265ccc683ee3a761d38ecadaee812d18a6404a582150044ec3973661e016c9
+
+# ============================================================
+# Authentication Methods (choose one):
+# ============================================================
+
+# METHOD 1: Authorization Header (recommended for API calls)
+# fetch('http://localhost:47392/local.beeper.com/filename', {
+#   headers: {
+#     'Authorization': 'Bearer 1c265ccc683ee3a761d38ecadaee812d18a6404a582150044ec3973661e016c9'
+#   }
+# })
+
+# METHOD 2: Query String (easier for direct links/browser)
+# fetch('http://localhost:47392/local.beeper.com/filename?token=1c265ccc683ee3a761d38ecadaee812d18a6404a582150044ec3973661e016c9')
+# 
+# Or use directly in browser/img tags:
+# <img src="http://localhost:47392/local.beeper.com/filename?token=1c265ccc683ee3a761d38ecadaee812d18a6404a582150044ec3973661e016c9" />
+
+# ============================================================
+# cURL Examples:
+# ============================================================
+
+# With header:
+# curl -H "Authorization: Bearer 1c265ccc683ee3a761d38ecadaee812d18a6404a582150044ec3973661e016c9" \
+#   http://localhost:47392/local.beeper.com/filename
+
+# With query string:
+# curl "http://localhost:47392/local.beeper.com/filename?token=1c265ccc683ee3a761d38ecadaee812d18a6404a582150044ec3973661e016c9"
+

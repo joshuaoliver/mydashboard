@@ -6,7 +6,8 @@ const crons = cronJobs();
 /**
  * Sync Beeper chats every 10 minutes
  * Keeps database fresh with latest chat data
- * Uses in-memory cache to only fetch chats with recent activity
+ * Lightweight sync: Fetches chat list + last 15 messages per active chat
+ * Full history loaded on-demand when user opens a chat
  */
 crons.interval(
   "sync-beeper-chats",
@@ -14,7 +15,6 @@ crons.interval(
   internal.beeperSync.syncBeeperChatsInternal,
   { 
     syncSource: "cron",
-    forceMessageSync: false, // Only sync messages for chats with new activity
     bypassCache: false, // Use cache to filter by recent activity
   }
 );

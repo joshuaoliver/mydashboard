@@ -51,9 +51,46 @@ mydashboard/
 
 ### Development Commands
 
-- `npm run dev` - Start development server with Convex
+- `npm run dev` - Start development server with Convex (dev deployment)
+- `npm run dev:prod` - Start development server connected to production deployment
 - `npm run build` - Build for production
 - `npm run format` - Format code with Prettier
+- `npm run setup:deployments` - Configure multiple Convex deployments (one-time setup)
+
+### Switching Between Dev and Production Deployments
+
+This project supports running locally against either your **dev** or **production** Convex deployment:
+
+```bash
+# Use dev deployment (default - safe for development)
+npm run dev
+
+# Use production deployment (⚠️ affects live data!)
+npm run dev:prod
+```
+
+**First time setup:**
+```bash
+# Configure your deployments (one-time)
+npm run setup:deployments
+source ~/.zshrc
+```
+
+**How it works:**
+- `npm run dev` connects to: `https://posh-starfish-269.convex.cloud` (dev)
+- `npm run dev:prod` connects to: `https://quick-bear-158.convex.cloud` (prod)
+
+**Additional commands:**
+```bash
+npm run deployments        # List all deployments
+npm run verify:deployments # Check configuration
+npm run switch:dev         # Manually switch to dev
+npm run switch:prod        # Manually switch to prod
+```
+
+⚠️ **Important**: When using `npm run dev:prod`, you're connected to production data. Any mutations or schema changes will affect your live deployment.
+
+See the [Convex Deployments Guide](./docs/CONVEX_DEPLOYMENTS.md) for detailed documentation.
 
 ## 🎯 Features
 

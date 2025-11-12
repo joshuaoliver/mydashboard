@@ -12,9 +12,10 @@ import type * as aiSuggestions from "../aiSuggestions.js";
 import type * as auth from "../auth.js";
 import type * as beeperActions from "../beeperActions.js";
 import type * as beeperActions_improved from "../beeperActions_improved.js";
-import type * as beeperGlobalSync from "../beeperGlobalSync.js";
+import type * as beeperClient from "../beeperClient.js";
 import type * as beeperMessages from "../beeperMessages.js";
 import type * as beeperMutations from "../beeperMutations.js";
+import type * as beeperPagination from "../beeperPagination.js";
 import type * as beeperQueries from "../beeperQueries.js";
 import type * as beeperSync from "../beeperSync.js";
 import type * as chatActions from "../chatActions.js";
@@ -23,6 +24,7 @@ import type * as contactDuplicates from "../contactDuplicates.js";
 import type * as contactMerge from "../contactMerge.js";
 import type * as contactMutations from "../contactMutations.js";
 import type * as crons from "../crons.js";
+import type * as cursorHelpers from "../cursorHelpers.js";
 import type * as dexActions from "../dexActions.js";
 import type * as dexAdmin from "../dexAdmin.js";
 import type * as dexQueries from "../dexQueries.js";
@@ -31,6 +33,7 @@ import type * as dexUpsert from "../dexUpsert.js";
 import type * as dexWriteback from "../dexWriteback.js";
 import type * as diagnostics from "../diagnostics.js";
 import type * as http from "../http.js";
+import type * as imageCache from "../imageCache.js";
 import type * as locationMutations from "../locationMutations.js";
 import type * as locationQueries from "../locationQueries.js";
 import type * as myFunctions from "../myFunctions.js";
@@ -44,22 +47,15 @@ import type {
   FunctionReference,
 } from "convex/server";
 
-/**
- * A utility for referencing Convex functions in your app's API.
- *
- * Usage:
- * ```js
- * const myFunctionReference = api.myModule.myFunction;
- * ```
- */
 declare const fullApi: ApiFromModules<{
   aiSuggestions: typeof aiSuggestions;
   auth: typeof auth;
   beeperActions: typeof beeperActions;
   beeperActions_improved: typeof beeperActions_improved;
-  beeperGlobalSync: typeof beeperGlobalSync;
+  beeperClient: typeof beeperClient;
   beeperMessages: typeof beeperMessages;
   beeperMutations: typeof beeperMutations;
+  beeperPagination: typeof beeperPagination;
   beeperQueries: typeof beeperQueries;
   beeperSync: typeof beeperSync;
   chatActions: typeof chatActions;
@@ -68,6 +64,7 @@ declare const fullApi: ApiFromModules<{
   contactMerge: typeof contactMerge;
   contactMutations: typeof contactMutations;
   crons: typeof crons;
+  cursorHelpers: typeof cursorHelpers;
   dexActions: typeof dexActions;
   dexAdmin: typeof dexAdmin;
   dexQueries: typeof dexQueries;
@@ -76,6 +73,7 @@ declare const fullApi: ApiFromModules<{
   dexWriteback: typeof dexWriteback;
   diagnostics: typeof diagnostics;
   http: typeof http;
+  imageCache: typeof imageCache;
   locationMutations: typeof locationMutations;
   locationQueries: typeof locationQueries;
   myFunctions: typeof myFunctions;
@@ -83,14 +81,30 @@ declare const fullApi: ApiFromModules<{
   tagMutations: typeof tagMutations;
   tagQueries: typeof tagQueries;
 }>;
-declare const fullApiWithMounts: typeof fullApi;
 
+/**
+ * A utility for referencing Convex functions in your app's public API.
+ *
+ * Usage:
+ * ```js
+ * const myFunctionReference = api.myModule.myFunction;
+ * ```
+ */
 export declare const api: FilterApi<
-  typeof fullApiWithMounts,
+  typeof fullApi,
   FunctionReference<any, "public">
 >;
+
+/**
+ * A utility for referencing Convex functions in your app's internal API.
+ *
+ * Usage:
+ * ```js
+ * const myFunctionReference = internal.myModule.myFunction;
+ * ```
+ */
 export declare const internal: FilterApi<
-  typeof fullApiWithMounts,
+  typeof fullApi,
   FunctionReference<any, "internal">
 >;
 

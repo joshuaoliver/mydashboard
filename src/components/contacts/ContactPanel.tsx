@@ -3,6 +3,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
 import {
@@ -40,6 +41,7 @@ interface Contact {
   tagIds?: Id<"tags">[]
   locationIds?: Id<"locations">[]
   intimateConnection?: boolean
+  intimateConnectionDate?: string
   leadStatus?: "Talking" | "Planning" | "Dated" | "Connected" | "Former"
 }
 
@@ -90,6 +92,7 @@ export function ContactPanel({ contact, isLoading, searchedUsername, searchedPho
   // Extended fields state
   const [privateNotes, setPrivateNotes] = useState(contact?.privateNotes || "")
   const [intimateConnection, setIntimateConnection] = useState(contact?.intimateConnection || false)
+  const [intimateConnectionDate, setIntimateConnectionDate] = useState(contact?.intimateConnectionDate || "")
   const [leadStatus, setLeadStatus] = useState<string | undefined>(contact?.leadStatus)
   
   // Duplicate detection state
@@ -159,6 +162,7 @@ export function ContactPanel({ contact, isLoading, searchedUsername, searchedPho
     setObjective(contact?.objective || "")
     setPrivateNotes(contact?.privateNotes || "")
     setIntimateConnection(contact?.intimateConnection || false)
+    setIntimateConnectionDate(contact?.intimateConnectionDate || "")
     setLeadStatus(contact?.leadStatus)
   }, [contact])
 
@@ -283,9 +287,28 @@ export function ContactPanel({ contact, isLoading, searchedUsername, searchedPho
       await updateIntimateConn({
         contactId: contact._id,
         intimateConnection: checked,
+        intimateConnectionDate: checked ? intimateConnectionDate : undefined,
       })
     } catch (error) {
       console.error('Failed to update intimate connection:', error)
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const handleIntimateConnectionDateChange = async (date: string) => {
+    if (!contact) return
+    
+    setIntimateConnectionDate(date)
+    setIsSaving(true)
+    try {
+      await updateIntimateConn({
+        contactId: contact._id,
+        intimateConnection: intimateConnection,
+        intimateConnectionDate: date,
+      })
+    } catch (error) {
+      console.error('Failed to update intimate connection date:', error)
     } finally {
       setIsSaving(false)
     }
@@ -521,7 +544,159 @@ export function ContactPanel({ contact, isLoading, searchedUsername, searchedPho
           </div>
         )}
 
-        {/* Local Notes Field - Always visible at top, no title */}
+        {/* Tags - Autocomplete dropdown - NO LABEL */}
+        <div>
+          <Popover open={isTagPopoverOpen} onOpenChange={setIsTagPopoverOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                className="w-full justify-start h-auto min-h-[40px] p-2"
+                disabled={isSaving}
+              >
+                <div className="flex flex-wrap gap-1">
+                  {selectedTags.length > 0 ? (
+                    selectedTags.map((tagId) => {
+                      const tag = tags?.find(t => t._id === tagId)
+                      return tag ? (
+                        <Badge key={tagId} variant="secondary" className="gap-1">
+                          {tag.name}
+                          <X
+                            className="w-3 h-3 cursor-pointer hover:text-destructive"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleRemoveTag(tagId)
+                            }}
+                          />
+                        </Badge>
+                      ) : null
+                    })
+                  ) : (
+                    <span className="text-muted-foreground text-sm">Select tags...</span>
+                  )}
+                </div>
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-full p-0 bg-white" align="start">
+              <Command>
+                <CommandInput 
+                  placeholder="Search or create tag..." 
+                  value={tagSearch}
+                  onValueChange={setTagSearch}
+                />
+                <CommandList>
+                  <CommandEmpty>
+                    <Button
+                      variant="ghost"
+                      className="w-full justify-start text-sm"
+                      onClick={() => {
+                        handleCreateAndSelectTag(tagSearch)
+                        setIsTagPopoverOpen(false)
+                      }}
+                      disabled={!tagSearch.trim()}
+                    >
+                      Create "{tagSearch}"
+                    </Button>
+                  </CommandEmpty>
+                  <CommandGroup>
+                    {tags?.map((tag) => {
+                      const isSelected = selectedTags.includes(tag._id)
+                      return (
+                        <CommandItem
+                          key={tag._id}
+                          onSelect={() => {
+                            handleToggleTag(tag._id)
+                          }}
+                          className="cursor-pointer"
+                        >
+                          <span className="flex-1">{tag.name}</span>
+                          {isSelected && <Check className="w-4 h-4 text-blue-600" />}
+                        </CommandItem>
+                      )
+                    })}
+                  </CommandGroup>
+                </CommandList>
+              </Command>
+            </PopoverContent>
+          </Popover>
+        </div>
+
+        {/* Location Tags - Autocomplete dropdown - NO LABEL */}
+        <div>
+          <Popover open={isLocationPopoverOpen} onOpenChange={setIsLocationPopoverOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                className="w-full justify-start h-auto min-h-[40px] p-2"
+                disabled={isSaving}
+              >
+                <div className="flex flex-wrap gap-1">
+                  {selectedLocations.length > 0 ? (
+                    selectedLocations.map((locId) => {
+                      const location = locations?.find(l => l._id === locId)
+                      return location ? (
+                        <Badge key={locId} variant="secondary" className="gap-1">
+                          {location.name}
+                          <X
+                            className="w-3 h-3 cursor-pointer hover:text-destructive"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleRemoveLocation(locId)
+                            }}
+                          />
+                        </Badge>
+                      ) : null
+                    })
+                  ) : (
+                    <span className="text-muted-foreground text-sm">Select locations...</span>
+                  )}
+                </div>
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-full p-0 bg-white" align="start">
+              <Command>
+                <CommandInput 
+                  placeholder="Search or create location..." 
+                  value={locationSearch}
+                  onValueChange={setLocationSearch}
+                />
+                <CommandList>
+                  <CommandEmpty>
+                    <Button
+                      variant="ghost"
+                      className="w-full justify-start text-sm"
+                      onClick={() => {
+                        handleCreateAndSelectLocation(locationSearch)
+                        setIsLocationPopoverOpen(false)
+                      }}
+                      disabled={!locationSearch.trim()}
+                    >
+                      Create "{locationSearch}"
+                    </Button>
+                  </CommandEmpty>
+                  <CommandGroup>
+                    {locations?.map((location) => {
+                      const isSelected = selectedLocations.includes(location._id)
+                      return (
+                        <CommandItem
+                          key={location._id}
+                          onSelect={() => {
+                            handleToggleLocation(location._id)
+                          }}
+                          className="cursor-pointer"
+                        >
+                          <span className="flex-1">{location.name}</span>
+                          {isSelected && <Check className="w-4 h-4 text-blue-600" />}
+                        </CommandItem>
+                      )
+                    })}
+                  </CommandGroup>
+                </CommandList>
+              </Command>
+            </PopoverContent>
+          </Popover>
+        </div>
+
+        {/* Local Notes Field - Always visible, no title */}
         <div>
           <Textarea
             id="contact-notes"
@@ -618,7 +793,7 @@ export function ContactPanel({ contact, isLoading, searchedUsername, searchedPho
             })}
           </div>
 
-          {/* Lead Status - Button style */}
+          {/* Lead Status - Button style (in hover section) */}
           <div>
             <Label className="text-xs text-gray-600 mb-2 block">Lead Status</Label>
             <div className="flex flex-wrap gap-2">
@@ -640,160 +815,6 @@ export function ContactPanel({ contact, isLoading, searchedUsername, searchedPho
                 )
               })}
             </div>
-          </div>
-
-          {/* Tags - Autocomplete dropdown */}
-          <div>
-            <Label className="text-xs text-gray-600 mb-2 block">Tags</Label>
-            <Popover open={isTagPopoverOpen} onOpenChange={setIsTagPopoverOpen}>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  className="w-full justify-start h-auto min-h-[40px] p-2"
-                  disabled={isSaving}
-                >
-                  <div className="flex flex-wrap gap-1">
-                    {selectedTags.length > 0 ? (
-                      selectedTags.map((tagId) => {
-                        const tag = tags?.find(t => t._id === tagId)
-                        return tag ? (
-                          <Badge key={tagId} variant="secondary" className="gap-1">
-                            {tag.name}
-                            <X
-                              className="w-3 h-3 cursor-pointer hover:text-destructive"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                handleRemoveTag(tagId)
-                              }}
-                            />
-                          </Badge>
-                        ) : null
-                      })
-                    ) : (
-                      <span className="text-muted-foreground text-sm">Select tags...</span>
-                    )}
-                  </div>
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-full p-0 bg-white" align="start">
-                <Command>
-                  <CommandInput 
-                    placeholder="Search or create tag..." 
-                    value={tagSearch}
-                    onValueChange={setTagSearch}
-                  />
-                  <CommandList>
-                    <CommandEmpty>
-                      <Button
-                        variant="ghost"
-                        className="w-full justify-start text-sm"
-                        onClick={() => {
-                          handleCreateAndSelectTag(tagSearch)
-                          setIsTagPopoverOpen(false)
-                        }}
-                        disabled={!tagSearch.trim()}
-                      >
-                        Create "{tagSearch}"
-                      </Button>
-                    </CommandEmpty>
-                    <CommandGroup>
-                      {tags?.map((tag) => {
-                        const isSelected = selectedTags.includes(tag._id)
-                        return (
-                          <CommandItem
-                            key={tag._id}
-                            onSelect={() => {
-                              handleToggleTag(tag._id)
-                            }}
-                            className="cursor-pointer"
-                          >
-                            <span className="flex-1">{tag.name}</span>
-                            {isSelected && <Check className="w-4 h-4 text-blue-600" />}
-                          </CommandItem>
-                        )
-                      })}
-                    </CommandGroup>
-                  </CommandList>
-                </Command>
-              </PopoverContent>
-            </Popover>
-          </div>
-
-          {/* Location Tags - Autocomplete dropdown */}
-          <div>
-            <Label className="text-xs text-gray-600 mb-2 block">Locations</Label>
-            <Popover open={isLocationPopoverOpen} onOpenChange={setIsLocationPopoverOpen}>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  className="w-full justify-start h-auto min-h-[40px] p-2"
-                  disabled={isSaving}
-                >
-                  <div className="flex flex-wrap gap-1">
-                    {selectedLocations.length > 0 ? (
-                      selectedLocations.map((locId) => {
-                        const location = locations?.find(l => l._id === locId)
-                        return location ? (
-                          <Badge key={locId} variant="secondary" className="gap-1">
-                            {location.name}
-                            <X
-                              className="w-3 h-3 cursor-pointer hover:text-destructive"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                handleRemoveLocation(locId)
-                              }}
-                            />
-                          </Badge>
-                        ) : null
-                      })
-                    ) : (
-                      <span className="text-muted-foreground text-sm">Select locations...</span>
-                    )}
-                  </div>
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-full p-0 bg-white" align="start">
-                <Command>
-                  <CommandInput 
-                    placeholder="Search or create location..." 
-                    value={locationSearch}
-                    onValueChange={setLocationSearch}
-                  />
-                  <CommandList>
-                    <CommandEmpty>
-                      <Button
-                        variant="ghost"
-                        className="w-full justify-start text-sm"
-                        onClick={() => {
-                          handleCreateAndSelectLocation(locationSearch)
-                          setIsLocationPopoverOpen(false)
-                        }}
-                        disabled={!locationSearch.trim()}
-                      >
-                        Create "{locationSearch}"
-                      </Button>
-                    </CommandEmpty>
-                    <CommandGroup>
-                      {locations?.map((location) => {
-                        const isSelected = selectedLocations.includes(location._id)
-                        return (
-                          <CommandItem
-                            key={location._id}
-                            onSelect={() => {
-                              handleToggleLocation(location._id)
-                            }}
-                            className="cursor-pointer"
-                          >
-                            <span className="flex-1">{location.name}</span>
-                            {isSelected && <Check className="w-4 h-4 text-blue-600" />}
-                          </CommandItem>
-                        )
-                      })}
-                    </CommandGroup>
-                  </CommandList>
-                </Command>
-              </PopoverContent>
-            </Popover>
           </div>
 
           {/* Description from Dex */}
@@ -879,16 +900,35 @@ export function ContactPanel({ contact, isLoading, searchedUsername, searchedPho
                 </div>
 
                 {/* Intimate Connection Toggle */}
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="intimate-connection" className="text-xs text-gray-600">
-                    Intimate Connection
-                  </Label>
-                  <Switch
-                    id="intimate-connection"
-                    checked={intimateConnection}
-                    onCheckedChange={handleToggleIntimateConnection}
-                    disabled={isSaving}
-                  />
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="intimate-connection" className="text-xs text-gray-600">
+                      Intimate Connection
+                    </Label>
+                    <Switch
+                      id="intimate-connection"
+                      checked={intimateConnection}
+                      onCheckedChange={handleToggleIntimateConnection}
+                      disabled={isSaving}
+                    />
+                  </div>
+                  
+                  {/* Date Picker - Shows when switch is ON */}
+                  {intimateConnection && (
+                    <div>
+                      <Label htmlFor="intimate-connection-date" className="text-xs text-gray-600 mb-1 block">
+                        Date
+                      </Label>
+                      <Input
+                        id="intimate-connection-date"
+                        type="date"
+                        value={intimateConnectionDate}
+                        onChange={(e) => handleIntimateConnectionDateChange(e.target.value)}
+                        disabled={isSaving}
+                        className="text-sm"
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
             )}

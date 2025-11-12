@@ -22,8 +22,10 @@ export const saveUserMessage = internalMutation({
     await ctx.db.insert("beeperMessages", {
       chatId: args.chatId,
       messageId: syntheticId,
+      accountID: "local",  // Synthetic account ID for user-sent messages
       text: args.text,
       timestamp: now,
+      sortKey: now.toString(), // Use timestamp as sortKey for proper ordering
       senderId: "user",
       senderName: "You",
       isFromUser: true,
