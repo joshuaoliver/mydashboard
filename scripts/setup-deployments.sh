@@ -57,6 +57,10 @@ export CONVEX_URL_DEV="${DEV_URL:-YOUR_DEV_URL_HERE}"
 
 # Production deployment
 export CONVEX_URL_PROD="${PROD_URL:-YOUR_PROD_URL_HERE}"
+
+# Production deploy key (get from Convex dashboard -> Settings -> Deploy Key)
+# This allows running 'convex dev' against production
+export CONVEX_DEPLOY_KEY_PROD="YOUR_PROD_DEPLOY_KEY_HERE"
 EOF
 
 echo "✅ Created configuration file: $ENV_FILE"

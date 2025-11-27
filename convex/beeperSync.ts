@@ -607,6 +607,8 @@ export const syncBeeperChatsInternal = internalAction({
       // SDK v4.2.2+ provides specific error types
       let errorMsg = "Unknown error";
       let errorType = "UnknownError";
+      let isCloudflareError = false;
+      let statusCode = 0;
       
       if (error && typeof error === 'object' && 'constructor' in error) {
         const errorName = error.constructor.name;
@@ -615,10 +617,28 @@ export const syncBeeperChatsInternal = internalAction({
         // Check for specific API error types from SDK
         if ('status' in error && 'message' in error) {
           const apiError = error as any;
+          statusCode = apiError.status;
           errorMsg = `${errorName} (${apiError.status}): ${apiError.message}`;
           
-          // Log specific error details for debugging
-          if (apiError.status === 429) {
+          // Detect Cloudflare errors (502, 530, 522, 524, etc.)
+          // These are expected when the backend is on a mobile device that's sometimes down
+          const cloudflareErrorCodes = [502, 503, 504, 520, 521, 522, 523, 524, 525, 526, 527, 530, 1033];
+          const messageIndicatesCloudflare = 
+            apiError.message?.includes('Cloudflare') || 
+            apiError.message?.includes('cloudflare') ||
+            apiError.message?.includes('Bad gateway') ||
+            apiError.message?.includes('Tunnel error');
+          
+          isCloudflareError = cloudflareErrorCodes.includes(statusCode) || messageIndicatesCloudflare;
+          
+          if (isCloudflareError) {
+            // Cloudflare/tunnel errors are EXPECTED - the backend runs on a mobile device
+            // that's sometimes unavailable. Just log as info and wait for next sync.
+            console.log(
+              `[Beeper Sync] Backend temporarily unavailable (Cloudflare ${statusCode}). ` +
+              `This is expected - the sync server may be offline. Will retry in 10 minutes.`
+            );
+          } else if (apiError.status === 429) {
             console.error(`[Beeper Sync] Rate limited! Please wait before retrying.`);
           } else if (apiError.status >= 500) {
             console.error(`[Beeper Sync] Server error - Beeper API may be experiencing issues.`);
@@ -627,10 +647,25 @@ export const syncBeeperChatsInternal = internalAction({
           }
         } else if (error instanceof Error) {
           errorMsg = error.message;
+          // Also check error message for Cloudflare indicators
+          isCloudflareError = 
+            errorMsg.includes('Cloudflare') || 
+            errorMsg.includes('Bad gateway') ||
+            errorMsg.includes('ECONNREFUSED');
+          
+          if (isCloudflareError) {
+            console.log(
+              `[Beeper Sync] Backend temporarily unavailable. ` +
+              `This is expected - the sync server may be offline. Will retry in 10 minutes.`
+            );
+          }
         }
       }
       
-      console.error(`[Beeper Sync] ${errorType}: ${errorMsg}`);
+      // Only log as error if it's NOT a Cloudflare/connectivity issue
+      if (!isCloudflareError) {
+        console.error(`[Beeper Sync] ${errorType}: ${errorMsg}`);
+      }
       
       return {
         success: false,
@@ -638,7 +673,11 @@ export const syncBeeperChatsInternal = internalAction({
         syncedMessages: 0,
         timestamp: Date.now(),
         source: args.syncSource,
-        error: errorMsg,
+        error: isCloudflareError 
+          ? `Backend temporarily unavailable (will retry)` 
+          : errorMsg,
+        // Flag to indicate this was an expected temporary error
+        isTemporaryError: isCloudflareError,
       };
     }
   },
@@ -659,6 +698,7 @@ export const manualSync = action({
     timestamp: number;
     source: string;
     error?: string;
+    isTemporaryError?: boolean;
   }> => {
     const result = await ctx.runAction(internal.beeperSync.syncBeeperChatsInternal, {
       syncSource: "manual",
@@ -682,6 +722,7 @@ export const pageLoadSync = action({
     timestamp: number;
     source: string;
     error?: string;
+    isTemporaryError?: boolean;
   }> => {
     const result = await ctx.runAction(internal.beeperSync.syncBeeperChatsInternal, {
       syncSource: "page_load",

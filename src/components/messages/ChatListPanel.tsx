@@ -1,4 +1,5 @@
 import { useCallback, useRef, useEffect, useState } from 'react'
+import { useNavigate } from '@tanstack/react-router'
 import { usePaginatedQuery, useQuery, useAction } from 'convex/react'
 import { api } from '../../../convex/_generated/api'
 import { useChatStore } from '@/stores/useChatStore'
@@ -10,9 +11,9 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { useMemo } from 'react'
 
 export function ChatListPanel() {
+  const navigate = useNavigate()
   // Get state from Zustand store
   const selectedChatId = useChatStore((state) => state.selectedChatId)
-  const setSelectedChatId = useChatStore((state) => state.setSelectedChatId)
   const tabFilter = useChatStore((state) => state.tabFilter)
   const setTabFilter = useChatStore((state) => state.setTabFilter)
 
@@ -70,21 +71,21 @@ export function ChatListPanel() {
 
   // Handle chat selection
   const handleChatSelect = useCallback((chatId: string) => {
-    setSelectedChatId(chatId)
-  }, [setSelectedChatId])
+    navigate({ to: '/messages', search: { chatId } })
+  }, [navigate])
 
   // Handle archive
   const handleArchiveChat = useCallback(async (chatId: string) => {
     try {
       await archiveChat({ chatId })
       if (selectedChatId === chatId) {
-        setSelectedChatId(null)
+        navigate({ to: '/messages', search: { chatId: undefined } })
       }
     } catch (err) {
       console.error('Failed to archive chat:', err)
       setError(err instanceof Error ? err.message : 'Failed to archive chat')
     }
-  }, [archiveChat, selectedChatId, setSelectedChatId])
+  }, [archiveChat, selectedChatId, navigate])
 
   // Handle manual refresh
   const handleRefresh = useCallback(async () => {

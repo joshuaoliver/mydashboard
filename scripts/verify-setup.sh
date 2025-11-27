@@ -68,3 +68,9 @@ echo "  npm run deployments   - List all deployments"
 echo ""
 echo "✨ Setup complete!"
 
+
+
+
+
+
+

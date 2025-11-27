@@ -95,6 +95,22 @@ export const Route = createRootRouteWithContext<{
   component: RootComponent,
 })
 
+// RootDocument is the HTML shell - always rendered
+function RootDocument({ children }: { children: React.ReactNode }) {
+  return (
+    <html>
+      <head>
+        <HeadContent />
+      </head>
+      <body>
+        {children}
+        <Scripts />
+      </body>
+    </html>
+  )
+}
+
+// RootComponent uses client-side hooks - rendered after hydration with ssr: false
 function RootComponent() {
   const navigate = useNavigate()
   const location = useLocation()
@@ -174,7 +190,6 @@ function RootComponent() {
   }
 
   // Show PIN entry if not unlocked (before everything else)
-  // This is AFTER all hooks, so it's safe
   if (isMounted && !isAppUnlocked) {
     return (
       <RootDocument>
@@ -201,19 +216,5 @@ function RootComponent() {
     <RootDocument>
       <Outlet />
     </RootDocument>
-  )
-}
-
-function RootDocument({ children }: { children: React.ReactNode }) {
-  return (
-    <html>
-      <head>
-        <HeadContent />
-      </head>
-      <body>
-        {children}
-        <Scripts />
-      </body>
-    </html>
   )
 }

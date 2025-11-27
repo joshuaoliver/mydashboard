@@ -47,17 +47,11 @@ function Messages() {
 
   // Sync URL param with Zustand store
   useEffect(() => {
-    if (chatId && chatId !== selectedChatId) {
-      setSelectedChatId(chatId)
+    const targetId = chatId || null
+    if (selectedChatId !== targetId) {
+      setSelectedChatId(targetId)
     }
   }, [chatId, selectedChatId, setSelectedChatId])
-
-  // Sync Zustand store with URL
-  useEffect(() => {
-    if (selectedChatId !== chatId) {
-      navigate({ search: { chatId: selectedChatId || undefined } })
-    }
-  }, [selectedChatId, chatId, navigate])
 
   // Open sheet when chat selected on mobile
   useEffect(() => {
@@ -71,7 +65,7 @@ function Messages() {
   // Handle closing sheet on mobile
   const handleCloseSheet = () => {
     setSheetOpen(false)
-    setSelectedChatId(null)
+    navigate({ search: { chatId: undefined } })
   }
 
   return (

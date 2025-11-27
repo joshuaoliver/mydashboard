@@ -96,10 +96,10 @@ export default defineSchema({
   beeperMessages: defineTable({
     chatId: v.string(),              // Which chat this message belongs to
     messageId: v.string(),           // Unique message ID from Beeper
-    accountID: v.string(),           // Beeper account ID
+    accountID: v.optional(v.string()), // Beeper account ID (optional for backward compatibility)
     text: v.string(),                // Message text
     timestamp: v.number(),           // When message was sent
-    sortKey: v.string(),             // Sortable key for pagination (from API)
+    sortKey: v.optional(v.string()), // Sortable key for pagination (from API, optional for old messages)
     senderId: v.string(),            // Beeper user ID of sender
     senderName: v.string(),          // Display name of sender
     isFromUser: v.boolean(),         // True if user sent this message (isSender in API)

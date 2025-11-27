@@ -56,6 +56,7 @@ function createRouterInstance() {
     createTanStackRouter({
       routeTree,
       defaultPreload: 'intent',
+      defaultSsr: false, // Disable SSR globally - client-side only rendering
       context: { queryClient },
       scrollRestoration: true,
       defaultPreloadStaleTime: 0, // Let React Query handle all caching
