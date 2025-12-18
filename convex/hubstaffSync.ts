@@ -8,6 +8,7 @@ import type {
   HubstaffTask,
   HubstaffActivitiesResponse 
 } from "./hubstaffClient";
+import { getTodaySydney, getYesterdaySydney, getDaysAgoSydney } from "./timezone";
 
 /**
  * Hubstaff Sync - Periodic sync of time entries
@@ -74,15 +75,11 @@ export const syncTimeEntries = internalAction({
     }
 
     try {
-      // Sync today and yesterday (to catch late entries)
-      const today = new Date();
-      const yesterday = new Date(today);
-      yesterday.setDate(yesterday.getDate() - 1);
+      // Sync today and yesterday (to catch late entries) in Sydney timezone
+      const startDate = getYesterdaySydney();
+      const endDate = getTodaySydney();
 
-      const startDate = yesterday.toISOString().split("T")[0];
-      const endDate = today.toISOString().split("T")[0];
-
-      console.log(`Syncing Hubstaff entries from ${startDate} to ${endDate} for user ${settings.selectedUserId}`);
+      console.log(`Syncing Hubstaff entries from ${startDate} to ${endDate} (Sydney time) for user ${settings.selectedUserId}`);
 
       // Get active projects to filter by
       const projects: Project[] = await ctx.runQuery(
@@ -216,6 +213,13 @@ export const upsertTimeEntries = internalMutation({
         userName: v.string(),
         projectName: v.string(),
         taskName: v.optional(v.string()),
+        // Additional fields from Hubstaff API (not stored, but need to be validated)
+        created_at: v.optional(v.string()),
+        updated_at: v.optional(v.string()),
+        idle: v.optional(v.number()),
+        manual: v.optional(v.number()),
+        resumed: v.optional(v.number()),
+        work_break: v.optional(v.number()),
       })
     ),
     selectedUserId: v.number(),
@@ -431,12 +435,12 @@ export const getDailySummaries = query({
 });
 
 /**
- * Get today's stats
+ * Get today's stats (using Sydney timezone)
  */
 export const getTodayStats = query({
   args: {},
   handler: async (ctx) => {
-    const today = new Date().toISOString().split("T")[0];
+    const today = getTodaySydney();
 
     const summary = await ctx.db
       .query("hubstaffDailySummary")
@@ -449,15 +453,12 @@ export const getTodayStats = query({
 });
 
 /**
- * Get this week's stats
+ * Get this week's stats (using Sydney timezone)
  */
 export const getWeekStats = query({
   args: {},
   handler: async (ctx) => {
-    const today = new Date();
-    const weekAgo = new Date(today);
-    weekAgo.setDate(weekAgo.getDate() - 7);
-    const weekAgoStr = weekAgo.toISOString().split("T")[0];
+    const weekAgoStr = getDaysAgoSydney(7);
 
     const summaries = await ctx.db
       .query("hubstaffDailySummary")

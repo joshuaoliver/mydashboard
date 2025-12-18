@@ -24,6 +24,7 @@ import {
 } from 'lucide-react'
 import { useState } from 'react'
 import type { Id } from '../../../../convex/_generated/dataModel'
+import { formatSydneyDateTime } from '@/lib/timezone'
 
 export const Route = createFileRoute('/_authenticated/stats/gmail')({
   component: GmailStatsPage,
@@ -269,7 +270,7 @@ function GmailStatsPage() {
                 {recentSnapshots.map((snapshot) => (
                   <TableRow key={snapshot._id}>
                     <TableCell>
-                      {new Date(snapshot.timestamp).toLocaleString()}
+                      {formatSydneyDateTime(snapshot.timestamp)}
                     </TableCell>
                     <TableCell className="text-right font-medium">
                       {snapshot.totalInbox}
@@ -302,7 +303,7 @@ function GmailStatsPage() {
           <p>
             Tracking since{' '}
             {stats.oldestSnapshot
-              ? new Date(stats.oldestSnapshot).toLocaleDateString()
+              ? formatSydneyDateTime(stats.oldestSnapshot)
               : 'N/A'}{' '}
             • {stats.totalSnapshots} snapshots recorded
           </p>

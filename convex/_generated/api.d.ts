@@ -52,6 +52,7 @@ import type * as prompts from "../prompts.js";
 import type * as settingsStore from "../settingsStore.js";
 import type * as tagMutations from "../tagMutations.js";
 import type * as tagQueries from "../tagQueries.js";
+import type * as timezone from "../timezone.js";
 
 import type {
   ApiFromModules,
@@ -104,6 +105,7 @@ declare const fullApi: ApiFromModules<{
   settingsStore: typeof settingsStore;
   tagMutations: typeof tagMutations;
   tagQueries: typeof tagQueries;
+  timezone: typeof timezone;
 }>;
 
 /**

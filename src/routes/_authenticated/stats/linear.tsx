@@ -18,6 +18,7 @@ import {
   RefreshCw,
 } from 'lucide-react'
 import { useState } from 'react'
+import { formatSydneyDateTime } from '@/lib/timezone'
 
 export const Route = createFileRoute('/_authenticated/stats/linear')({
   component: LinearStatsPage,
@@ -317,7 +318,7 @@ function LinearStatsPage() {
       {/* Last Synced */}
       {stats?.lastSyncedAt && (
         <div className="mt-6 text-sm text-gray-500">
-          <p>Last synced: {new Date(stats.lastSyncedAt).toLocaleString()}</p>
+          <p>Last synced: {formatSydneyDateTime(stats.lastSyncedAt)}</p>
         </div>
       )}
     </div>

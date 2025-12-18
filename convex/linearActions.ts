@@ -274,10 +274,14 @@ export const fetchMyIssues = internalAction({
   handler: async (ctx, args) => {
     const workspaces = await ctx.runQuery(internal.linearActions.listActiveWorkspacesInternal, {});
     
+    console.log(`[Linear] Found ${workspaces.length} active workspaces`);
+    
     // Filter by workspace if specified
     const targetWorkspaces = args.workspaceId
       ? workspaces.filter((w: any) => w.workspaceId === args.workspaceId)
       : workspaces;
+
+    console.log(`[Linear] Target workspaces: ${targetWorkspaces.map((w: any) => w.workspaceName).join(', ')}`);
 
     const allIssues: {
       workspaceId: string;
@@ -287,17 +291,26 @@ export const fetchMyIssues = internalAction({
 
     for (const workspace of targetWorkspaces) {
       try {
+        console.log(`[Linear] Fetching issues for workspace: ${workspace.workspaceName}`);
         const result = await getMyUncompletedIssues(workspace.apiKey);
+        console.log(`[Linear] Found ${result.issues.length} issues in ${workspace.workspaceName}`);
         allIssues.push({
           workspaceId: workspace.workspaceId,
           workspaceName: workspace.workspaceName,
           issues: result.issues,
         });
       } catch (error) {
-        console.error(`Failed to fetch issues for workspace ${workspace.workspaceName}:`, error);
+        console.error(`[Linear] Failed to fetch issues for workspace ${workspace.workspaceName}:`, error);
+        // Still add the workspace with empty issues so it shows in the results
+        allIssues.push({
+          workspaceId: workspace.workspaceId,
+          workspaceName: workspace.workspaceName,
+          issues: [],
+        });
       }
     }
 
+    console.log(`[Linear] Total workspaces with data: ${allIssues.length}`);
     return allIssues;
   },
 });

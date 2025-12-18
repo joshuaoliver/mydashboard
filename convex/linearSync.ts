@@ -31,13 +31,14 @@ export const syncAllWorkspaces = internalAction({
     totalIssuesProcessed?: number;
     workspaces?: { workspace: string; issues: number; error?: string }[];
   }> => {
-    console.log("Starting Linear issues sync...");
+    console.log("[LinearSync] Starting Linear issues sync...");
 
     // Get all active workspaces
     const workspaces = await ctx.runQuery(internal.linearActions.listActiveWorkspacesInternal, {});
+    console.log(`[LinearSync] Found ${workspaces.length} active workspaces from DB`);
 
     if (workspaces.length === 0) {
-      console.log("No active Linear workspaces configured, skipping sync");
+      console.log("[LinearSync] No active Linear workspaces configured, skipping sync");
       return { skipped: true, reason: "no_workspaces" };
     }
 
@@ -45,12 +46,15 @@ export const syncAllWorkspaces = internalAction({
     const results: { workspace: string; issues: number; error?: string }[] = [];
 
     // Fetch issues from each workspace
+    console.log("[LinearSync] Calling fetchMyIssues...");
     const allIssuesData: WorkspaceIssuesData[] = await ctx.runAction(
       internal.linearActions.fetchMyIssues, 
       {}
     );
+    console.log(`[LinearSync] fetchMyIssues returned ${allIssuesData.length} workspaces with data`);
 
     for (const workspaceData of allIssuesData) {
+      console.log(`[LinearSync] Processing workspace ${workspaceData.workspaceName} with ${workspaceData.issues.length} issues`);
       try {
         // Upsert issues for this workspace
         const result = await ctx.runMutation(internal.linearSync.upsertIssues, {
