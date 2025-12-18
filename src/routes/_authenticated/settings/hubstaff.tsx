@@ -42,13 +42,9 @@ function HubstaffSettingsPage() {
   const fetchOrganizations = useConvexAction(api.hubstaffActions.fetchOrganizations)
   const fetchUsers = useConvexAction(api.hubstaffActions.fetchOrganizationUsers)
 
-  const [refreshToken, setRefreshToken] = useState(settings?.refreshToken ?? '')
-  const [organizationId, setOrganizationId] = useState<number | null>(
-    settings?.organizationId ?? null
-  )
-  const [selectedUserId, setSelectedUserId] = useState<number | null>(
-    settings?.selectedUserId ?? null
-  )
+  const [refreshToken, setRefreshToken] = useState('')
+  const [organizationId, setOrganizationId] = useState<number | null>(null)
+  const [selectedUserId, setSelectedUserId] = useState<number | null>(null)
   const [isSaving, setIsSaving] = useState(false)
   const [isTesting, setIsTesting] = useState(false)
   const [isLoadingOrgs, setIsLoadingOrgs] = useState(false)
@@ -63,6 +59,21 @@ function HubstaffSettingsPage() {
   } | null>(null)
 
   const isConfigured = settings?.isConfigured ?? false
+
+  // Sync state from settings when they load
+  useEffect(() => {
+    if (settings) {
+      if (settings.refreshToken && !refreshToken) {
+        setRefreshToken(settings.refreshToken)
+      }
+      if (settings.organizationId && !organizationId) {
+        setOrganizationId(settings.organizationId)
+      }
+      if (settings.selectedUserId && !selectedUserId) {
+        setSelectedUserId(settings.selectedUserId)
+      }
+    }
+  }, [settings])
 
   // Load organizations when refresh token changes
   const handleLoadOrganizations = async () => {

@@ -92,12 +92,18 @@ export async function getOrganizations(
 
 /**
  * Get users in an organization
+ * Note: Hubstaff API returns "members" array, not "users"
  */
 export async function getOrganizationUsers(
   accessToken: string,
   organizationId: number
 ): Promise<{ users: HubstaffUser[] }> {
-  return makeRequest(accessToken, `/organizations/${organizationId}/members`);
+  const response = await makeRequest<{ members?: HubstaffUser[] }>(
+    accessToken,
+    `/organizations/${organizationId}/members`
+  );
+  // Transform the response to match expected interface
+  return { users: response.members || [] };
 }
 
 /**
