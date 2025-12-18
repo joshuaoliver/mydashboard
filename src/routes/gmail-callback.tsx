@@ -3,12 +3,6 @@ import { useEffect, useState, useRef } from 'react'
 import { useAction } from 'convex/react'
 import { api } from '../../convex/_generated/api'
 
-type GmailCallbackSearch = {
-  code?: string
-  error?: string
-  scope?: string
-}
-
 /**
  * Gmail OAuth Callback Route
  * 
@@ -19,19 +13,16 @@ type GmailCallbackSearch = {
  * 1. Google redirects here with ?code=xxx
  * 2. We exchange the code for tokens via Convex action
  * 3. On success, redirect to /settings/gmail
+ * 
+ * Note: We parse URL params directly with URLSearchParams because TanStack Router's
+ * search parsing can have issues with special characters in OAuth codes.
  */
 export const Route = createFileRoute('/gmail-callback')({
   component: GmailCallbackPage,
-  validateSearch: (search: Record<string, unknown>): GmailCallbackSearch => ({
-    code: typeof search.code === 'string' ? search.code : undefined,
-    error: typeof search.error === 'string' ? search.error : undefined,
-    scope: typeof search.scope === 'string' ? search.scope : undefined,
-  }),
 })
 
 function GmailCallbackPage() {
   const navigate = useNavigate()
-  const { code, error } = Route.useSearch()
   const exchangeCode = useAction(api.gmailActions.exchangeCodeForTokens)
   const [status, setStatus] = useState<'processing' | 'success' | 'error'>('processing')
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
@@ -43,7 +34,17 @@ function GmailCallbackPage() {
     hasProcessed.current = true
 
     const handleCallback = async () => {
-      console.log('[Gmail Callback] Processing', { hasCode: !!code, error })
+      // Parse URL params directly - more reliable for OAuth codes with special chars
+      const params = new URLSearchParams(window.location.search)
+      const code = params.get('code')
+      const error = params.get('error')
+      
+      console.log('[Gmail Callback] Processing', { 
+        hasCode: !!code, 
+        codeLength: code?.length,
+        error,
+        fullSearch: window.location.search 
+      })
 
       if (error) {
         setStatus('error')
@@ -80,7 +81,7 @@ function GmailCallbackPage() {
     }
 
     handleCallback()
-  }, [code, error, exchangeCode, navigate])
+  }, [exchangeCode, navigate])
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-slate-900">

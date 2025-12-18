@@ -29,8 +29,14 @@ function RootComponent() {
   
   // OAuth callback routes - need auth bypass because user might be mid-auth-flow
   // These handle their own redirect after processing
+  // Check both router location AND window.location for reliability during initial load
   const callbackRoutes = ['/gmail-callback']
-  const isCallbackRoute = callbackRoutes.some(route => location.pathname === route)
+  const isCallbackRoute = callbackRoutes.some(route => 
+    location.pathname === route || 
+    location.pathname.startsWith(route) ||
+    window.location.pathname === route ||
+    window.location.pathname.startsWith(route)
+  )
   
   // Skip all auth/PIN logic for callbacks - render immediately
   const shouldBypassAuth = isCallbackRoute
