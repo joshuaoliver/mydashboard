@@ -137,11 +137,18 @@ function SyncSettingsSection() {
     setIsSyncingHubstaff(true)
     setSyncResult(null)
     try {
-      const result = await triggerHubstaffSync({ daysBack: hubstaffDaysBack })
-      setSyncResult({
-        type: 'success',
-        message: `Hubstaff sync complete! Processed ${result.entriesProcessed ?? 0} entries.`
-      })
+      const result = await triggerHubstaffSync({ daysBack: hubstaffDaysBack, onlyLinkedProjects: false })
+      if (result.success) {
+        setSyncResult({
+          type: 'success',
+          message: result.message || `Synced ${result.entriesProcessed ?? 0} entries from ${result.projectsFound ?? 0} projects.`
+        })
+      } else {
+        setSyncResult({
+          type: 'error',
+          message: result.error || 'Sync failed'
+        })
+      }
     } catch (e) {
       setSyncResult({
         type: 'error',

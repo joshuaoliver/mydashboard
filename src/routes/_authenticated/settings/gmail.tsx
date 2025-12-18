@@ -1,5 +1,5 @@
-import { createFileRoute } from '@tanstack/react-router'
-import { useQuery } from '@tanstack/react-query'
+import { createFileRoute, useSearch } from '@tanstack/react-router'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { convexQuery } from '@convex-dev/react-query'
 import { useConvexMutation, useConvexAction } from '@convex-dev/react-query'
 import { api } from '../../../../convex/_generated/api'
@@ -17,13 +17,28 @@ import {
   RefreshCw,
   AlertCircle,
 } from 'lucide-react'
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
+
+// Define search params for OAuth callback handling
+type GmailSearchParams = {
+  oauth_success?: string
+  oauth_error?: string
+}
 
 export const Route = createFileRoute('/_authenticated/settings/gmail')({
   component: GmailSettingsPage,
+  validateSearch: (search: Record<string, unknown>): GmailSearchParams => {
+    return {
+      oauth_success: search.oauth_success as string | undefined,
+      oauth_error: search.oauth_error as string | undefined,
+    }
+  },
 })
 
 function GmailSettingsPage() {
+  const searchParams = useSearch({ from: '/_authenticated/settings/gmail' })
+  const queryClient = useQueryClient()
+  
   const { data: settings } = useQuery(
     convexQuery(api.settingsStore.getGmailSettings, {})
   )
@@ -34,7 +49,6 @@ function GmailSettingsPage() {
 
   const setSetting = useConvexMutation(api.settingsStore.setSetting)
   const testConnection = useConvexAction(api.gmailActions.testConnection)
-  const exchangeCode = useConvexAction(api.gmailActions.exchangeCodeForTokens)
 
   const [clientId, setClientId] = useState(settings?.clientId ?? '')
   const [clientSecret, setClientSecret] = useState(settings?.clientSecret ?? '')
@@ -44,16 +58,39 @@ function GmailSettingsPage() {
     success: boolean
     message: string
   } | null>(null)
+  const [oauthMessage, setOauthMessage] = useState<{
+    type: 'success' | 'error'
+    message: string
+  } | null>(null)
+
+  // Handle OAuth callback results from query params
+  useEffect(() => {
+    if (searchParams.oauth_success === 'true') {
+      setOauthMessage({
+        type: 'success',
+        message: 'Gmail connected successfully!',
+      })
+      // Invalidate queries to refresh the settings
+      queryClient.invalidateQueries()
+      // Clean up URL
+      window.history.replaceState({}, '', '/settings/gmail')
+    } else if (searchParams.oauth_error) {
+      setOauthMessage({
+        type: 'error',
+        message: `OAuth failed: ${searchParams.oauth_error}`,
+      })
+      // Clean up URL
+      window.history.replaceState({}, '', '/settings/gmail')
+    }
+  }, [searchParams, queryClient])
 
   const isConfigured = settings?.isConfigured ?? false
   const hasCredentials = !!(settings?.clientId && settings?.clientSecret)
 
-  // Get the redirect URI for OAuth
-  // Using /gmail-callback (a public route) to avoid auth redirect race conditions
-  const redirectUri =
-    typeof window !== 'undefined'
-      ? `${window.location.origin}/gmail-callback`
-      : ''
+  // Get the Convex HTTP endpoint URL for OAuth redirect
+  // This goes directly to Convex server, bypassing client-side routing issues
+  const convexSiteUrl = import.meta.env.VITE_CONVEX_URL?.replace('.cloud', '.site') || ''
+  const redirectUri = convexSiteUrl ? `${convexSiteUrl}/gmail-callback` : ''
 
   const handleSaveCredentials = async () => {
     if (!clientId.trim() || !clientSecret.trim()) {
@@ -86,14 +123,18 @@ function GmailSettingsPage() {
       return
     }
 
+    if (!redirectUri) {
+      alert('Could not determine Convex site URL. Check VITE_CONVEX_URL.')
+      return
+    }
+
     const scopes = [
       'https://www.googleapis.com/auth/gmail.readonly',
       'https://www.googleapis.com/auth/gmail.labels',
     ].join(' ')
 
-    // Store redirect URI in sessionStorage for the callback to use
-    sessionStorage.setItem('gmail_oauth_redirect_uri', redirectUri)
-
+    // OAuth redirects directly to Convex HTTP endpoint
+    // which handles the code exchange server-side
     const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth')
     authUrl.searchParams.set('client_id', settings.clientId)
     authUrl.searchParams.set('redirect_uri', redirectUri)
@@ -101,6 +142,8 @@ function GmailSettingsPage() {
     authUrl.searchParams.set('scope', scopes)
     authUrl.searchParams.set('access_type', 'offline')
     authUrl.searchParams.set('prompt', 'consent')
+
+    console.log('[Gmail OAuth] Redirecting to Google with redirect_uri:', redirectUri)
 
     // Redirect in same window (no popup)
     window.location.href = authUrl.toString()
@@ -149,6 +192,26 @@ function GmailSettingsPage() {
             </p>
           </div>
         </div>
+
+        {/* OAuth Result Message */}
+        {oauthMessage && (
+          <div
+            className={`p-4 rounded-lg border ${
+              oauthMessage.type === 'success'
+                ? 'bg-green-500/10 text-green-500 border-green-500/20'
+                : 'bg-destructive/10 text-destructive border-destructive/20'
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              {oauthMessage.type === 'success' ? (
+                <CheckCircle2 className="w-5 h-5" />
+              ) : (
+                <XCircle className="w-5 h-5" />
+              )}
+              {oauthMessage.message}
+            </div>
+          </div>
+        )}
 
         {/* Connection Status */}
         <Card>

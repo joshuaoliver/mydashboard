@@ -271,5 +271,116 @@ http.route({
   }),
 });
 
+/**
+ * Gmail OAuth Callback Endpoint
+ * 
+ * Handles the OAuth redirect from Google directly on the server.
+ * This avoids client-side routing issues where the authorization code
+ * can get lost during SSR hydration.
+ * 
+ * Flow:
+ * 1. Google redirects to: https://your-app.convex.site/gmail-callback?code=xxx
+ * 2. This endpoint exchanges the code for tokens (server-side)
+ * 3. Redirects to frontend /settings/gmail with success/error status
+ * 
+ * Configure Google OAuth with redirect URI:
+ *   https://your-convex-site.convex.site/gmail-callback
+ */
+http.route({
+  path: "/gmail-callback",
+  method: "GET",
+  handler: httpAction(async (ctx, request) => {
+    const url = new URL(request.url);
+    const code = url.searchParams.get("code");
+    const error = url.searchParams.get("error");
+    
+    // Get the frontend URL from environment or derive from request
+    // Railway/production: use SITE_URL env var
+    // Fallback: derive from Convex site URL
+    const FRONTEND_URL = process.env.SITE_URL || "https://mydashboard-oliver.up.railway.app";
+    const settingsUrl = `${FRONTEND_URL}/settings/gmail`;
+    
+    console.log(`[Gmail OAuth] Callback received: hasCode=${!!code}, error=${error}`);
+
+    // Handle OAuth errors from Google
+    if (error) {
+      console.error(`[Gmail OAuth] Error from Google: ${error}`);
+      const redirectUrl = `${settingsUrl}?oauth_error=${encodeURIComponent(error)}`;
+      return Response.redirect(redirectUrl, 302);
+    }
+
+    // No code received
+    if (!code) {
+      console.error(`[Gmail OAuth] No authorization code received`);
+      const redirectUrl = `${settingsUrl}?oauth_error=${encodeURIComponent("No authorization code received")}`;
+      return Response.redirect(redirectUrl, 302);
+    }
+
+    try {
+      // Get Gmail settings (client ID and secret)
+      const settings = await ctx.runQuery(internal.settingsStore.getGmailSettingsInternal, {});
+      
+      if (!settings?.clientId || !settings?.clientSecret) {
+        throw new Error("Gmail OAuth not configured. Please set Client ID and Client Secret first.");
+      }
+
+      // The redirect URI must match exactly what was used to initiate OAuth
+      // This is the Convex HTTP endpoint URL
+      const redirectUri = `${url.origin}/gmail-callback`;
+      
+      console.log(`[Gmail OAuth] Exchanging code for tokens with redirect_uri: ${redirectUri}`);
+
+      // Exchange code for tokens
+      const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: new URLSearchParams({
+          code,
+          client_id: settings.clientId,
+          client_secret: settings.clientSecret,
+          redirect_uri: redirectUri,
+          grant_type: "authorization_code",
+        }),
+      });
+
+      if (!tokenResponse.ok) {
+        const errorText = await tokenResponse.text();
+        console.error(`[Gmail OAuth] Token exchange failed: ${tokenResponse.status}`, errorText);
+        throw new Error(`Token exchange failed: ${tokenResponse.status}`);
+      }
+
+      const tokens = await tokenResponse.json();
+      console.log(`[Gmail OAuth] Token exchange successful, storing tokens...`);
+      
+      // Store tokens in settings
+      await ctx.runMutation(internal.settingsStore.setSettingInternal, {
+        key: "gmail",
+        type: "oauth",
+        value: {
+          ...settings,
+          refreshToken: tokens.refresh_token || settings.refreshToken,
+          accessToken: tokens.access_token,
+          tokenExpiry: Date.now() + (tokens.expires_in * 1000),
+          isConfigured: true,
+        },
+      });
+
+      console.log(`[Gmail OAuth] ✅ OAuth complete, redirecting to frontend`);
+      
+      // Redirect to settings with success
+      const redirectUrl = `${settingsUrl}?oauth_success=true`;
+      return Response.redirect(redirectUrl, 302);
+      
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : "Unknown error";
+      console.error(`[Gmail OAuth] Error:`, errorMsg);
+      const redirectUrl = `${settingsUrl}?oauth_error=${encodeURIComponent(errorMsg)}`;
+      return Response.redirect(redirectUrl, 302);
+    }
+  }),
+});
+
 export default http;
 

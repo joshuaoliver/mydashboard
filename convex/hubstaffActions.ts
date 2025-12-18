@@ -166,23 +166,30 @@ export const testConnection = action({
 
 /**
  * Trigger a manual sync with configurable date range
+ * 
+ * By default, fetches ALL projects (not just linked ones) so you can
+ * see all your time data and then link projects afterwards.
  */
 export const triggerManualSync = action({
   args: {
     daysBack: v.optional(v.number()),
+    onlyLinkedProjects: v.optional(v.boolean()), // If true, only fetch linked projects
   },
   handler: async (ctx, args): Promise<{
     success: boolean;
     entriesProcessed?: number;
     datesProcessed?: number;
+    projectsFound?: number;
+    message?: string;
     error?: string;
   }> => {
     const daysBack = args.daysBack ?? 7;
+    const onlyLinkedProjects = args.onlyLinkedProjects ?? false;
     
     const settings = await ctx.runQuery(internal.settingsStore.getHubstaffSettingsInternal, {});
     
     if (!settings?.isConfigured || !settings?.selectedUserId) {
-      return { success: false, error: "Hubstaff not configured" };
+      return { success: false, error: "Hubstaff not configured. Go to Settings > Hubstaff to set up." };
     }
 
     try {
@@ -193,24 +200,41 @@ export const triggerManualSync = action({
       const startDate = startDay.toISOString().split("T")[0];
       const endDate = today.toISOString().split("T")[0];
 
-      console.log(`Manual Hubstaff sync: ${startDate} to ${endDate} (${daysBack} days)`);
+      console.log(`Manual Hubstaff sync: ${startDate} to ${endDate} (${daysBack} days), onlyLinkedProjects=${onlyLinkedProjects}`);
 
-      // Get active projects to filter by
-      const projects = await ctx.runQuery(internal.projectsStore.listActiveProjectsInternal, {});
-      const hubstaffProjectIds: number[] = projects
-        .filter((p: any) => p.hubstaffProjectId)
-        .map((p: any) => p.hubstaffProjectId as number);
+      // Optionally filter by linked projects
+      let hubstaffProjectIds: number[] | undefined = undefined;
+      if (onlyLinkedProjects) {
+        const projects = await ctx.runQuery(internal.projectsStore.listActiveProjectsInternal, {});
+        const linkedIds = projects
+          .filter((p: any) => p.hubstaffProjectId)
+          .map((p: any) => p.hubstaffProjectId as number);
+        if (linkedIds.length > 0) {
+          hubstaffProjectIds = linkedIds;
+        }
+      }
 
-      // Fetch activities from Hubstaff API
+      // Fetch activities from Hubstaff API (no project filter = all projects)
       const activities = await ctx.runAction(internal.hubstaffActions.fetchActivities, {
         startDate,
         endDate,
         userIds: [settings.selectedUserId],
-        projectIds: hubstaffProjectIds.length > 0 ? hubstaffProjectIds : undefined,
+        projectIds: hubstaffProjectIds,
       });
 
+      // Count unique projects in the response
+      const uniqueProjectIds = new Set(
+        (activities.daily_activities || []).map((a: any) => a.project_id)
+      );
+
       if (!activities.daily_activities?.length) {
-        return { success: true, entriesProcessed: 0, datesProcessed: 0 };
+        return { 
+          success: true, 
+          entriesProcessed: 0, 
+          datesProcessed: 0,
+          projectsFound: 0,
+          message: `No time entries found for ${settings.selectedUserName || 'selected user'} between ${startDate} and ${endDate}`
+        };
       }
 
       // Create lookup maps
@@ -238,12 +262,21 @@ export const triggerManualSync = action({
         });
       }
 
+      // Build project names for message
+      const projectNames = Array.from(uniqueProjectIds)
+        .map((id) => (projectMap.get(id) as any)?.name || `Project ${id}`)
+        .slice(0, 5);
+      const moreProjects = uniqueProjectIds.size > 5 ? ` and ${uniqueProjectIds.size - 5} more` : '';
+
       return {
         success: true,
         entriesProcessed: result.entriesProcessed,
         datesProcessed: affectedDates.length,
+        projectsFound: uniqueProjectIds.size,
+        message: `Synced ${result.entriesProcessed} entries across ${uniqueProjectIds.size} projects: ${projectNames.join(', ')}${moreProjects}`
       };
     } catch (error) {
+      console.error("Manual Hubstaff sync failed:", error);
       return {
         success: false,
         error: error instanceof Error ? error.message : "Unknown error",
