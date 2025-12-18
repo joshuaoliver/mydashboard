@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { useSuspenseQuery } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { convexQuery } from '@convex-dev/react-query'
 import { useMutation } from 'convex/react'
 import { api } from '../../../../convex/_generated/api'
@@ -56,7 +56,7 @@ const TEMPLATE_VARIABLES = [
 ]
 
 function PromptsPage() {
-  const { data: prompts } = useSuspenseQuery(convexQuery(api.prompts.listPrompts, {}))
+  const { data: prompts } = useQuery(convexQuery(api.prompts.listPrompts, {}))
   
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
   const [editingPromptId, setEditingPromptId] = useState<Id<'prompts'> | null>(null)
@@ -269,7 +269,7 @@ function PromptsPage() {
         </Card>
 
         {/* Prompts List */}
-        {prompts.length === 0 ? (
+        {(prompts?.length ?? 0) === 0 ? (
           <Card className="bg-slate-800/50 border-slate-700">
             <CardContent className="py-12 text-center">
               <MessageSquare className="h-12 w-12 text-slate-600 mx-auto mb-4" />
@@ -282,7 +282,7 @@ function PromptsPage() {
           </Card>
         ) : (
           <div className="space-y-4">
-            {prompts.map((prompt) => {
+            {(prompts ?? []).map((prompt) => {
               const isEditing = editingPromptId === prompt._id
               const isExpanded = expandedPromptId === prompt._id
               const isSaved = savedPromptId === prompt._id

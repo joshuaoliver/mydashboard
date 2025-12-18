@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { useSuspenseQuery } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { convexQuery, useConvexMutation } from '@convex-dev/react-query'
 import { useMutation } from 'convex/react'
 import { api } from '../../../../convex/_generated/api'
@@ -20,10 +20,10 @@ export const Route = createFileRoute('/_authenticated/settings/ai')({
 })
 
 function AISettingsPage() {
-  const { data: settings } = useSuspenseQuery(
+  const { data: settings } = useQuery(
     convexQuery(api.aiSettings.listSettings, {})
   )
-  const { data: availableModels } = useSuspenseQuery(
+  const { data: availableModels } = useQuery(
     convexQuery(api.aiSettings.getAvailableModels, {})
   )
   
@@ -34,13 +34,13 @@ function AISettingsPage() {
   const [savedKeys, setSavedKeys] = useState<Set<string>>(new Set())
 
   // Group models by provider
-  const modelsByProvider = availableModels.reduce((acc, model) => {
+  const modelsByProvider = (availableModels ?? []).reduce((acc, model) => {
     if (!acc[model.provider]) {
       acc[model.provider] = []
     }
     acc[model.provider].push(model)
     return acc
-  }, {} as Record<string, typeof availableModels>)
+  }, {} as Record<string, NonNullable<typeof availableModels>>)
 
   const handleInitialize = async () => {
     setIsInitializing(true)
@@ -67,7 +67,7 @@ function AISettingsPage() {
   }
 
   // Check if we need to show the initialize button
-  const hasSettings = settings.length > 0
+  const hasSettings = (settings?.length ?? 0) > 0
 
   return (
     <div className="p-6">
@@ -105,7 +105,7 @@ function AISettingsPage() {
         )}
 
         {/* Settings cards */}
-        {settings.map((setting) => (
+        {(settings ?? []).map((setting) => (
           <Card key={setting._id} className="bg-slate-800/50 border-slate-700">
             <CardHeader>
               <div className="flex items-center justify-between">

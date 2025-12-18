@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { useSuspenseQuery } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { convexQuery } from '@convex-dev/react-query'
 import { api } from '../../../../convex/_generated/api'
 import { ArrowLeft, Mail, Phone, Instagram, Calendar, ExternalLink, User as UserIcon, Clock } from 'lucide-react'
@@ -13,7 +13,7 @@ export const Route = createFileRoute('/_authenticated/contacts/$contactId')({
 
 function ContactDetailPage() {
   const { contactId } = Route.useParams()
-  const { data: contact } = useSuspenseQuery(convexQuery(api.dexQueries.getContactById, { contactId: contactId as Id<'contacts'> }))
+  const { data: contact } = useQuery(convexQuery(api.dexQueries.getContactById, { contactId: contactId as Id<'contacts'> }))
 
   const formatTimestamp = (ts: number) => new Date(ts).toLocaleString('en-US', { month: 'long', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })
   const formatDate = (s: string | undefined) => s ? new Date(s).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : 'Not set'
@@ -27,6 +27,15 @@ function ContactDetailPage() {
     if (d < 30) return `${Math.floor(d / 7)} weeks ago`
     if (d < 365) return `${Math.floor(d / 30)} months ago`
     return `${Math.floor(d / 365)} years ago`
+  }
+
+  if (!contact) {
+    return (
+      <div className="space-y-6 max-w-4xl p-6">
+        <Button variant="ghost" asChild className="gap-2"><Link to="/contacts"><ArrowLeft className="w-4 h-4" />Back to Contacts</Link></Button>
+        <div className="text-center py-12 text-gray-500">Loading contact...</div>
+      </div>
+    )
   }
 
   return (

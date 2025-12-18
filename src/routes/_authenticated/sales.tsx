@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
-import { useSuspenseQuery } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { convexQuery } from '@convex-dev/react-query'
-import { useQuery, useMutation } from 'convex/react'
+import { useQuery as useConvexQuery, useMutation } from 'convex/react'
 import type { Id } from '../../../convex/_generated/dataModel'
 import { api } from '../../../convex/_generated/api'
 import { PageHeader } from '@/components/layout/page-header'
@@ -62,15 +62,16 @@ function SalesPage() {
   const [sheetOpen, setSheetOpen] = useState(false)
   const [draggedOverColumn, setDraggedOverColumn] = useState<string | null>(null)
 
-  const { data } = useSuspenseQuery(convexQuery(api.dexQueries.listContacts, { limit: 1000 }))
+  const { data } = useQuery(convexQuery(api.dexQueries.listContacts, { limit: 1000 }))
   const updateLeadStatus = useMutation(api.contactMutations.updateLeadStatus)
 
   const romanticContacts = useMemo(() => {
+    if (!data?.contacts) return []
     const lowercaseTarget = new Set(['romantic', 'romatic'])
     return data.contacts
       .filter((contact) => contact.connections?.some((c) => lowercaseTarget.has(c.toLowerCase())))
       .sort((a, b) => (b.lastModifiedAt ?? 0) - (a.lastModifiedAt ?? 0))
-  }, [data.contacts])
+  }, [data?.contacts])
 
   const kanbanData = useMemo(() => {
     return romanticContacts.map((contact) => {
@@ -80,7 +81,7 @@ function SalesPage() {
     })
   }, [romanticContacts])
 
-  const selectedContact = useQuery(api.dexQueries.getContactById, selectedContactId ? { contactId: selectedContactId } : 'skip')
+  const selectedContact = useConvexQuery(api.dexQueries.getContactById, selectedContactId ? { contactId: selectedContactId } : 'skip')
 
   const handleOpenContact = (contactId: Id<'contacts'>) => { setSelectedContactId(contactId); setSheetOpen(true) }
   const handleCloseSheet = () => { setSheetOpen(false); setSelectedContactId(null) }

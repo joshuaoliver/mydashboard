@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { useSuspenseQuery, useQuery } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { convexQuery } from '@convex-dev/react-query'
 import { api } from '../../../../convex/_generated/api'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -27,7 +27,7 @@ export const Route = createFileRoute('/_authenticated/stats/gmail')({
 })
 
 function GmailStatsPage() {
-  const { data: settings } = useSuspenseQuery(
+  const { data: settings } = useQuery(
     convexQuery(api.settingsStore.getGmailSettings, {})
   )
   const { data: latestSnapshot } = useQuery({

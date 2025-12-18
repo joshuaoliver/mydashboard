@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { useSuspenseQuery, useQuery } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { convexQuery } from '@convex-dev/react-query'
 import { useConvexMutation, useConvexAction } from '@convex-dev/react-query'
 import { api } from '../../../../convex/_generated/api'
@@ -37,7 +37,7 @@ export const Route = createFileRoute('/_authenticated/settings/linear')({
 })
 
 function LinearSettingsPage() {
-  const { data: workspaces } = useSuspenseQuery(
+  const { data: workspaces } = useQuery(
     convexQuery(api.linearActions.listWorkspaces, {})
   )
   const { data: stats } = useQuery(convexQuery(api.linearSync.getStats, {}))
@@ -165,7 +165,7 @@ function LinearSettingsPage() {
         </Card>
       ) : (
         <div className="space-y-4">
-          {workspaces.map((workspace) => (
+          {(workspaces ?? []).map((workspace) => (
             <WorkspaceCard key={workspace._id} workspace={workspace} />
           ))}
         </div>

@@ -20,13 +20,16 @@ const convex = new ConvexReactClient(CONVEX_URL)
 const convexQueryClient = new ConvexQueryClient(convex)
 
 // Create QueryClient with Convex integration
+// Convex provides real-time updates via WebSocket, so we can cache aggressively
+// staleTime: how long data is considered fresh (won't refetch during this window)
+// gcTime: how long to keep unused data in cache before garbage collecting
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       queryKeyHashFn: convexQueryClient.hashFn(),
       queryFn: convexQueryClient.queryFn(),
-      gcTime: 5 * 60 * 1000,
-      staleTime: 0,
+      gcTime: 10 * 60 * 1000, // Keep unused data for 10 minutes
+      staleTime: 60 * 1000, // Consider data fresh for 60 seconds
     },
   },
 })

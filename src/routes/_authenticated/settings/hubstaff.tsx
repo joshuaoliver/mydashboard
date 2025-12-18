@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { useSuspenseQuery, useQuery } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { convexQuery } from '@convex-dev/react-query'
 import { useConvexMutation, useConvexAction } from '@convex-dev/react-query'
 import { api } from '../../../../convex/_generated/api'
@@ -31,7 +31,7 @@ export const Route = createFileRoute('/_authenticated/settings/hubstaff')({
 })
 
 function HubstaffSettingsPage() {
-  const { data: settings } = useSuspenseQuery(
+  const { data: settings } = useQuery(
     convexQuery(api.settingsStore.getHubstaffSettings, {})
   )
   const { data: stats } = useQuery({

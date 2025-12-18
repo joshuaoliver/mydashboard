@@ -940,3 +940,84 @@ export const pageLoadSync = action({
   },
 });
 
+/**
+ * Full resync - resyncs all chats and messages
+ * Used for admin purposes when data needs to be refreshed
+ * By default syncs over existing data (upserts), optionally can clear first
+ */
+export const fullResync = action({
+  args: {
+    messageLimit: v.optional(v.number()), // Messages per chat to fetch (default 50)
+    clearFirst: v.optional(v.boolean()), // Whether to clear existing messages first (default false)
+  },
+  handler: async (ctx, args): Promise<{
+    success: boolean;
+    clearedMessages?: number;
+    syncedChats: number;
+    syncedMessages: number;
+    timestamp: number;
+    error?: string;
+  }> => {
+    const messageLimit = args.messageLimit ?? 50;
+    const clearFirst = args.clearFirst ?? false;
+    
+    try {
+      let clearedMessages = 0;
+      
+      // Optionally clear existing messages first
+      if (clearFirst) {
+        const clearResult = await ctx.runMutation(
+          internal.beeperSync.clearMessagesForResync,
+          {}
+        );
+        clearedMessages = clearResult.deleted;
+      }
+      
+      // Trigger a full sync with bypass cache
+      const syncResult = await ctx.runAction(
+        internal.beeperSync.syncBeeperChatsInternal,
+        {
+          syncSource: "full_resync",
+          bypassCache: true,
+        }
+      );
+      
+      return {
+        success: syncResult.success,
+        clearedMessages,
+        syncedChats: syncResult.syncedChats,
+        syncedMessages: syncResult.syncedMessages,
+        timestamp: Date.now(),
+        error: syncResult.error,
+      };
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : "Unknown error";
+      return {
+        success: false,
+        syncedChats: 0,
+        syncedMessages: 0,
+        timestamp: Date.now(),
+        error: errorMsg,
+      };
+    }
+  },
+});
+
+/**
+ * Internal mutation to clear messages for resync
+ */
+export const clearMessagesForResync = internalMutation({
+  args: {},
+  handler: async (ctx): Promise<{ deleted: number }> => {
+    const messages = await ctx.db.query("beeperMessages").collect();
+    
+    for (const msg of messages) {
+      await ctx.db.delete(msg._id);
+    }
+    
+    console.log(`[fullResync] Cleared ${messages.length} messages for resync`);
+    
+    return { deleted: messages.length };
+  },
+});
+

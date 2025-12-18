@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { useSuspenseQuery } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { convexQuery } from '@convex-dev/react-query'
 import { api } from '../../../../convex/_generated/api'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -22,10 +22,10 @@ export const Route = createFileRoute('/_authenticated/stats/linear')({
 })
 
 function LinearStatsPage() {
-  const { data: issuesByWorkspace } = useSuspenseQuery(
+  const { data: issuesByWorkspace } = useQuery(
     convexQuery(api.linearSync.getIssuesByWorkspace, {})
   )
-  const { data: stats } = useSuspenseQuery(convexQuery(api.linearSync.getStats, {}))
+  const { data: stats } = useQuery(convexQuery(api.linearSync.getStats, {}))
 
   const hasWorkspaces = (stats?.totalWorkspaces ?? 0) > 0
 
@@ -198,7 +198,7 @@ function LinearStatsPage() {
       )}
 
       {/* Issues by Workspace */}
-      {issuesByWorkspace.map((workspace) => (
+      {(issuesByWorkspace ?? []).map((workspace) => (
         <Card key={workspace.workspaceId} className="mb-6">
           <CardHeader>
             <CardTitle className="flex items-center justify-between">

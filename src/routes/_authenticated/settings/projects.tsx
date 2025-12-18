@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { useSuspenseQuery } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { convexQuery } from '@convex-dev/react-query'
 import { useConvexMutation } from '@convex-dev/react-query'
 import { api } from '../../../../convex/_generated/api'
@@ -26,11 +26,11 @@ export const Route = createFileRoute('/_authenticated/settings/projects')({
 })
 
 function ProjectsPage() {
-  const { data: projects } = useSuspenseQuery(
+  const { data: projects } = useQuery(
     convexQuery(api.projectsStore.listProjects, {})
   )
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
-  const [editingProject, setEditingProject] = useState<typeof projects[0] | null>(null)
+  const [editingProject, setEditingProject] = useState<NonNullable<typeof projects>[0] | null>(null)
 
   return (
     <div className="container mx-auto p-6">
@@ -71,7 +71,7 @@ function ProjectsPage() {
         </Card>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {projects.map((project) => (
+          {(projects ?? []).map((project) => (
             <ProjectCard
               key={project._id}
               project={project}

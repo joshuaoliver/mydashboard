@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { useSuspenseQuery } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { convexQuery } from '@convex-dev/react-query'
 import { useConvexMutation } from '@convex-dev/react-query'
 import { api } from '../../../../convex/_generated/api'
@@ -16,7 +16,7 @@ export const Route = createFileRoute('/_authenticated/settings/locations')({
 })
 
 function LocationsPage() {
-  const { data: locations } = useSuspenseQuery(convexQuery(api.locationQueries.listLocations, {}))
+  const { data: locations } = useQuery(convexQuery(api.locationQueries.listLocations, {}))
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
   const [locationName, setLocationName] = useState('')
   const createLocation = useConvexMutation(api.locationMutations.createLocation)
@@ -42,11 +42,11 @@ function LocationsPage() {
           </DialogContent>
         </Dialog>
       </div>
-      {locations.length === 0 ? (
+      {(locations?.length ?? 0) === 0 ? (
         <Card><CardContent className="flex flex-col items-center justify-center py-12"><MapPin className="w-12 h-12 text-gray-400 mb-4" /><p className="text-gray-600 mb-2">No locations yet</p><Button onClick={() => setIsCreateDialogOpen(true)}><Plus className="w-4 h-4 mr-2" />Create Location</Button></CardContent></Card>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {locations.map((l) => (
+          {(locations ?? []).map((l) => (
             <Card key={l._id}>
               <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
                 <div className="flex items-center gap-2"><MapPin className="w-5 h-5 text-blue-600" /><CardTitle className="text-lg font-semibold">{l.name}</CardTitle></div>

@@ -4,7 +4,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { useSuspenseQuery } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { convexQuery } from '@convex-dev/react-query'
 import { api } from '../../../../convex/_generated/api'
 import { useState } from 'react'
@@ -17,9 +17,11 @@ export const Route = createFileRoute('/_authenticated/contacts/')({
 function ContactsListPage() {
   const navigate = useNavigate()
   const [searchTerm, setSearchTerm] = useState('')
-  const { data: { contacts, total } } = useSuspenseQuery(
+  const { data } = useQuery(
     convexQuery(api.dexQueries.listContacts, { searchTerm: searchTerm || undefined, limit: 1000 })
   )
+  const contacts = data?.contacts ?? []
+  const total = data?.total ?? 0
 
   const formatDate = (dateString: string | undefined) => {
     if (!dateString) return null

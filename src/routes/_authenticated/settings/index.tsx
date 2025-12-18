@@ -1,12 +1,14 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { useMutation } from 'convex/react'
-import { useSuspenseQuery } from '@tanstack/react-query'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { useMutation, useAction } from 'convex/react'
+import { useQuery } from '@tanstack/react-query'
 import { convexQuery } from '@convex-dev/react-query'
 import { api } from '../../../../convex/_generated/api'
 import { useState } from 'react'
-import { Trash2, Database, AlertCircle, CheckCircle, Settings as SettingsIcon, Users, RefreshCw, Bot, MessageSquare, MapPin } from 'lucide-react'
+import { Trash2, Database, AlertCircle, CheckCircle, Settings as SettingsIcon, Users, RefreshCw, Bot, MessageSquare, MapPin, RotateCcw } from 'lucide-react'
 
 export const Route = createFileRoute('/_authenticated/settings/')({
   component: SettingsPage,
@@ -17,11 +19,15 @@ function SettingsPage() {
   const [clearResult, setClearResult] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
   const [isSyncing, setIsSyncing] = useState(false)
   const [syncResult, setSyncResult] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
+  const [isResyncing, setIsResyncing] = useState(false)
+  const [resyncResult, setResyncResult] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
+  const [messageLimit, setMessageLimit] = useState(50)
 
   const clearMessages = useMutation(api.cleanupMessages.clearAllMessages)
   const clearChats = useMutation(api.cleanupMessages.clearAllChats)
   const triggerDexSync = useMutation(api.dexAdmin.triggerManualSync)
-  const { data: dexStats } = useSuspenseQuery(convexQuery(api.dexQueries.getSyncStats, {}))
+  const fullResync = useAction(api.beeperSync.fullResync)
+  const { data: dexStats } = useQuery(convexQuery(api.dexQueries.getSyncStats, {}))
 
   const handleClearMessages = async () => {
     if (!confirm('Delete all cached messages?')) return
@@ -46,6 +52,24 @@ function SettingsPage() {
     finally { setIsSyncing(false) }
   }
 
+  const handleFullResync = async () => {
+    setIsResyncing(true); setResyncResult(null)
+    try {
+      const result = await fullResync({ messageLimit, clearFirst: false })
+      if (result.success) {
+        setResyncResult({ 
+          type: 'success', 
+          message: `Re-synced ${result.syncedChats} chats with ${result.syncedMessages} messages.` 
+        })
+      } else {
+        setResyncResult({ type: 'error', message: result.error || 'Resync failed' })
+      }
+    } catch (e) { 
+      setResyncResult({ type: 'error', message: `Failed: ${e instanceof Error ? e.message : 'Unknown'}` }) 
+    }
+    finally { setIsResyncing(false) }
+  }
+
   const formatTimestamp = (ts: number | null) => {
     if (!ts) return 'Never'
     const m = Math.floor((Date.now() - ts) / 60000)
@@ -57,9 +81,9 @@ function SettingsPage() {
   }
 
   return (
-    <div className="p-6">
+    <div className="min-h-full bg-slate-900 p-6">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-slate-100">Settings</h1>
+        <h1 className="text-2xl font-bold text-white">Settings</h1>
         <p className="text-slate-400 mt-1">Manage your dashboard configuration and integrations</p>
       </div>
       <div className="space-y-6 max-w-4xl">
@@ -90,11 +114,11 @@ function SettingsPage() {
             <div className="bg-slate-900/50 border border-slate-700 rounded-lg p-4 grid grid-cols-2 gap-4">
               <div>
                 <p className="text-sm font-medium text-slate-400">Total Contacts</p>
-                <p className="text-2xl font-bold text-slate-100">{dexStats.totalContacts}</p>
+                <p className="text-2xl font-bold text-slate-100">{dexStats?.totalContacts ?? '-'}</p>
               </div>
               <div>
                 <p className="text-sm font-medium text-slate-400">Last Synced</p>
-                <p className="text-lg font-semibold text-slate-100">{formatTimestamp(dexStats.lastSyncTime)}</p>
+                <p className="text-lg font-semibold text-slate-100">{formatTimestamp(dexStats?.lastSyncTime ?? null)}</p>
               </div>
             </div>
             <div className="flex items-start gap-4">
@@ -167,6 +191,52 @@ function SettingsPage() {
               <div>
                 <p className="text-sm font-medium text-slate-300">Full Cache Reset</p>
                 <p className="text-xs text-slate-500">Delete everything and resync</p>
+              </div>
+            </div>
+            
+            <div className="border-t border-slate-700 pt-4 mt-2">
+              <h4 className="text-sm font-medium text-slate-200 mb-3">Message Re-sync</h4>
+              {resyncResult && (
+                <div className={`rounded-lg p-4 flex items-start gap-3 border mb-4 ${
+                  resyncResult.type === 'success' 
+                    ? 'bg-green-900/20 border-green-700' 
+                    : 'bg-red-900/20 border-red-700'
+                }`}>
+                  {resyncResult.type === 'success' 
+                    ? <CheckCircle className="w-5 h-5 text-green-400 flex-shrink-0" /> 
+                    : <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0" />
+                  }
+                  <p className={`text-sm ${resyncResult.type === 'success' ? 'text-green-300' : 'text-red-300'}`}>
+                    {resyncResult.message}
+                  </p>
+                </div>
+              )}
+              <div className="flex items-end gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="messageLimit" className="text-slate-400 text-xs">Messages per chat</Label>
+                  <Input
+                    id="messageLimit"
+                    type="number"
+                    min={10}
+                    max={500}
+                    value={messageLimit}
+                    onChange={(e) => setMessageLimit(Number(e.target.value))}
+                    className="w-24 bg-slate-900 border-slate-600 text-slate-200"
+                  />
+                </div>
+                <Button 
+                  onClick={handleFullResync} 
+                  disabled={isResyncing} 
+                  variant="outline" 
+                  className="gap-2 bg-slate-800 border-slate-600 text-slate-300 hover:bg-slate-700 hover:text-slate-100"
+                >
+                  <RotateCcw className={`w-4 h-4 ${isResyncing ? 'animate-spin' : ''}`} />
+                  {isResyncing ? 'Re-syncing...' : 'Full Re-sync'}
+                </Button>
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-slate-300">Re-sync Messages</p>
+                  <p className="text-xs text-slate-500">Fetches fresh data from Beeper (updates existing messages)</p>
+                </div>
               </div>
             </div>
           </CardContent>

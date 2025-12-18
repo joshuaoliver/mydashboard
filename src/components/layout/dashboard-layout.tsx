@@ -296,16 +296,16 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                     <Settings className="h-4 w-4" />
                     Settings
                   </NavigationMenuTrigger>
-                  <NavigationMenuContent className="!bg-slate-800 !border-slate-700 !text-slate-300 z-[100] !mt-0">
+                  <NavigationMenuContent className="bg-slate-800 border-slate-700 z-[100]">
                     <ul className="grid w-[200px] gap-1 p-2">
                       <li>
                         <NavigationMenuLink asChild>
                           <Link 
                             to="/settings/prompts"
-                            className="flex items-center gap-2 px-3 py-2 rounded-md text-sm !text-slate-300 hover:!text-white hover:!bg-slate-700 transition-colors w-full"
+                            className="flex flex-row items-center gap-2 px-3 py-2 rounded-md text-sm text-slate-300 hover:text-white hover:bg-slate-700 transition-colors w-full"
                           >
-                            <MessageCircle className="h-4 w-4" />
-                            Prompts
+                            <MessageCircle className="h-4 w-4 flex-shrink-0" />
+                            <span>Prompts</span>
                           </Link>
                         </NavigationMenuLink>
                       </li>
@@ -313,10 +313,10 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                         <NavigationMenuLink asChild>
                           <Link 
                             to="/settings/locations"
-                            className="flex items-center gap-2 px-3 py-2 rounded-md text-sm !text-slate-300 hover:!text-white hover:!bg-slate-700 transition-colors w-full"
+                            className="flex flex-row items-center gap-2 px-3 py-2 rounded-md text-sm text-slate-300 hover:text-white hover:bg-slate-700 transition-colors w-full"
                           >
-                            <MapPin className="h-4 w-4" />
-                            Locations
+                            <MapPin className="h-4 w-4 flex-shrink-0" />
+                            <span>Locations</span>
                           </Link>
                         </NavigationMenuLink>
                       </li>
@@ -324,10 +324,10 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                         <NavigationMenuLink asChild>
                           <Link 
                             to="/settings/ai"
-                            className="flex items-center gap-2 px-3 py-2 rounded-md text-sm !text-slate-300 hover:!text-white hover:!bg-slate-700 transition-colors w-full"
+                            className="flex flex-row items-center gap-2 px-3 py-2 rounded-md text-sm text-slate-300 hover:text-white hover:bg-slate-700 transition-colors w-full"
                           >
-                            <Bot className="h-4 w-4" />
-                            AI Models
+                            <Bot className="h-4 w-4 flex-shrink-0" />
+                            <span>AI Models</span>
                           </Link>
                         </NavigationMenuLink>
                       </li>
@@ -335,10 +335,10 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                         <NavigationMenuLink asChild>
                           <Link 
                             to="/settings"
-                            className="flex items-center gap-2 px-3 py-2 rounded-md text-sm !text-slate-300 hover:!text-white hover:!bg-slate-700 transition-colors w-full"
+                            className="flex flex-row items-center gap-2 px-3 py-2 rounded-md text-sm text-slate-300 hover:text-white hover:bg-slate-700 transition-colors w-full"
                           >
-                            <Settings className="h-4 w-4" />
-                            Settings
+                            <Settings className="h-4 w-4 flex-shrink-0" />
+                            <span>Settings</span>
                           </Link>
                         </NavigationMenuLink>
                       </li>
