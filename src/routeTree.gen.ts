@@ -33,7 +33,6 @@ import { Route as AuthenticatedSettingsHubstaffRouteImport } from './routes/_aut
 import { Route as AuthenticatedSettingsGmailRouteImport } from './routes/_authenticated/settings/gmail'
 import { Route as AuthenticatedSettingsAiRouteImport } from './routes/_authenticated/settings/ai'
 import { Route as AuthenticatedContactsContactIdRouteImport } from './routes/_authenticated/contacts/$contactId'
-import { Route as AuthenticatedSettingsGmailCallbackRouteImport } from './routes/_authenticated/settings/gmail/callback'
 
 const SignUpRoute = SignUpRouteImport.update({
   id: '/sign-up',
@@ -165,12 +164,6 @@ const AuthenticatedContactsContactIdRoute =
     path: '/$contactId',
     getParentRoute: () => AuthenticatedContactsRoute,
   } as any)
-const AuthenticatedSettingsGmailCallbackRoute =
-  AuthenticatedSettingsGmailCallbackRouteImport.update({
-    id: '/callback',
-    path: '/callback',
-    getParentRoute: () => AuthenticatedSettingsGmailRoute,
-  } as any)
 
 export interface FileRoutesByFullPath {
   '/gmail-callback': typeof GmailCallbackRoute
@@ -184,7 +177,7 @@ export interface FileRoutesByFullPath {
   '/': typeof AuthenticatedIndexRoute
   '/contacts/$contactId': typeof AuthenticatedContactsContactIdRoute
   '/settings/ai': typeof AuthenticatedSettingsAiRoute
-  '/settings/gmail': typeof AuthenticatedSettingsGmailRouteWithChildren
+  '/settings/gmail': typeof AuthenticatedSettingsGmailRoute
   '/settings/hubstaff': typeof AuthenticatedSettingsHubstaffRoute
   '/settings/linear': typeof AuthenticatedSettingsLinearRoute
   '/settings/locations': typeof AuthenticatedSettingsLocationsRoute
@@ -196,7 +189,6 @@ export interface FileRoutesByFullPath {
   '/contacts/': typeof AuthenticatedContactsIndexRoute
   '/settings/': typeof AuthenticatedSettingsIndexRoute
   '/stats/': typeof AuthenticatedStatsIndexRoute
-  '/settings/gmail/callback': typeof AuthenticatedSettingsGmailCallbackRoute
 }
 export interface FileRoutesByTo {
   '/gmail-callback': typeof GmailCallbackRoute
@@ -207,7 +199,7 @@ export interface FileRoutesByTo {
   '/': typeof AuthenticatedIndexRoute
   '/contacts/$contactId': typeof AuthenticatedContactsContactIdRoute
   '/settings/ai': typeof AuthenticatedSettingsAiRoute
-  '/settings/gmail': typeof AuthenticatedSettingsGmailRouteWithChildren
+  '/settings/gmail': typeof AuthenticatedSettingsGmailRoute
   '/settings/hubstaff': typeof AuthenticatedSettingsHubstaffRoute
   '/settings/linear': typeof AuthenticatedSettingsLinearRoute
   '/settings/locations': typeof AuthenticatedSettingsLocationsRoute
@@ -219,7 +211,6 @@ export interface FileRoutesByTo {
   '/contacts': typeof AuthenticatedContactsIndexRoute
   '/settings': typeof AuthenticatedSettingsIndexRoute
   '/stats': typeof AuthenticatedStatsIndexRoute
-  '/settings/gmail/callback': typeof AuthenticatedSettingsGmailCallbackRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -235,7 +226,7 @@ export interface FileRoutesById {
   '/_authenticated/': typeof AuthenticatedIndexRoute
   '/_authenticated/contacts/$contactId': typeof AuthenticatedContactsContactIdRoute
   '/_authenticated/settings/ai': typeof AuthenticatedSettingsAiRoute
-  '/_authenticated/settings/gmail': typeof AuthenticatedSettingsGmailRouteWithChildren
+  '/_authenticated/settings/gmail': typeof AuthenticatedSettingsGmailRoute
   '/_authenticated/settings/hubstaff': typeof AuthenticatedSettingsHubstaffRoute
   '/_authenticated/settings/linear': typeof AuthenticatedSettingsLinearRoute
   '/_authenticated/settings/locations': typeof AuthenticatedSettingsLocationsRoute
@@ -247,7 +238,6 @@ export interface FileRoutesById {
   '/_authenticated/contacts/': typeof AuthenticatedContactsIndexRoute
   '/_authenticated/settings/': typeof AuthenticatedSettingsIndexRoute
   '/_authenticated/stats/': typeof AuthenticatedStatsIndexRoute
-  '/_authenticated/settings/gmail/callback': typeof AuthenticatedSettingsGmailCallbackRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -275,7 +265,6 @@ export interface FileRouteTypes {
     | '/contacts/'
     | '/settings/'
     | '/stats/'
-    | '/settings/gmail/callback'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/gmail-callback'
@@ -298,7 +287,6 @@ export interface FileRouteTypes {
     | '/contacts'
     | '/settings'
     | '/stats'
-    | '/settings/gmail/callback'
   id:
     | '__root__'
     | '/_authenticated'
@@ -325,7 +313,6 @@ export interface FileRouteTypes {
     | '/_authenticated/contacts/'
     | '/_authenticated/settings/'
     | '/_authenticated/stats/'
-    | '/_authenticated/settings/gmail/callback'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -505,13 +492,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedContactsContactIdRouteImport
       parentRoute: typeof AuthenticatedContactsRoute
     }
-    '/_authenticated/settings/gmail/callback': {
-      id: '/_authenticated/settings/gmail/callback'
-      path: '/callback'
-      fullPath: '/settings/gmail/callback'
-      preLoaderRoute: typeof AuthenticatedSettingsGmailCallbackRouteImport
-      parentRoute: typeof AuthenticatedSettingsGmailRoute
-    }
   }
 }
 
@@ -530,24 +510,9 @@ const AuthenticatedContactsRouteWithChildren =
     AuthenticatedContactsRouteChildren,
   )
 
-interface AuthenticatedSettingsGmailRouteChildren {
-  AuthenticatedSettingsGmailCallbackRoute: typeof AuthenticatedSettingsGmailCallbackRoute
-}
-
-const AuthenticatedSettingsGmailRouteChildren: AuthenticatedSettingsGmailRouteChildren =
-  {
-    AuthenticatedSettingsGmailCallbackRoute:
-      AuthenticatedSettingsGmailCallbackRoute,
-  }
-
-const AuthenticatedSettingsGmailRouteWithChildren =
-  AuthenticatedSettingsGmailRoute._addFileChildren(
-    AuthenticatedSettingsGmailRouteChildren,
-  )
-
 interface AuthenticatedSettingsRouteChildren {
   AuthenticatedSettingsAiRoute: typeof AuthenticatedSettingsAiRoute
-  AuthenticatedSettingsGmailRoute: typeof AuthenticatedSettingsGmailRouteWithChildren
+  AuthenticatedSettingsGmailRoute: typeof AuthenticatedSettingsGmailRoute
   AuthenticatedSettingsHubstaffRoute: typeof AuthenticatedSettingsHubstaffRoute
   AuthenticatedSettingsLinearRoute: typeof AuthenticatedSettingsLinearRoute
   AuthenticatedSettingsLocationsRoute: typeof AuthenticatedSettingsLocationsRoute
@@ -558,7 +523,7 @@ interface AuthenticatedSettingsRouteChildren {
 
 const AuthenticatedSettingsRouteChildren: AuthenticatedSettingsRouteChildren = {
   AuthenticatedSettingsAiRoute: AuthenticatedSettingsAiRoute,
-  AuthenticatedSettingsGmailRoute: AuthenticatedSettingsGmailRouteWithChildren,
+  AuthenticatedSettingsGmailRoute: AuthenticatedSettingsGmailRoute,
   AuthenticatedSettingsHubstaffRoute: AuthenticatedSettingsHubstaffRoute,
   AuthenticatedSettingsLinearRoute: AuthenticatedSettingsLinearRoute,
   AuthenticatedSettingsLocationsRoute: AuthenticatedSettingsLocationsRoute,

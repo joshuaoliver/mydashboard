@@ -91,6 +91,9 @@ function GmailSettingsPage() {
       'https://www.googleapis.com/auth/gmail.labels',
     ].join(' ')
 
+    // Store redirect URI in sessionStorage for the callback to use
+    sessionStorage.setItem('gmail_oauth_redirect_uri', redirectUri)
+
     const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth')
     authUrl.searchParams.set('client_id', settings.clientId)
     authUrl.searchParams.set('redirect_uri', redirectUri)
@@ -99,43 +102,9 @@ function GmailSettingsPage() {
     authUrl.searchParams.set('access_type', 'offline')
     authUrl.searchParams.set('prompt', 'consent')
 
-    // Open in popup
-    const width = 500
-    const height = 600
-    const left = window.screenX + (window.outerWidth - width) / 2
-    const top = window.screenY + (window.outerHeight - height) / 2
-
-    const popup = window.open(
-      authUrl.toString(),
-      'gmail_oauth',
-      `width=${width},height=${height},left=${left},top=${top}`
-    )
-
-    // Listen for the callback
-    const handleMessage = async (event: MessageEvent) => {
-      if (event.origin !== window.location.origin) return
-      if (event.data?.type !== 'gmail_oauth_callback') return
-
-      window.removeEventListener('message', handleMessage)
-      popup?.close()
-
-      if (event.data.code) {
-        try {
-          await exchangeCode({
-            code: event.data.code,
-            redirectUri,
-          })
-          window.location.reload()
-        } catch (e: any) {
-          alert('Failed to complete authorization: ' + (e.message || 'Unknown error'))
-        }
-      } else if (event.data.error) {
-        alert('Authorization failed: ' + event.data.error)
-      }
-    }
-
-    window.addEventListener('message', handleMessage)
-  }, [settings?.clientId, redirectUri, exchangeCode])
+    // Redirect in same window (no popup)
+    window.location.href = authUrl.toString()
+  }, [settings?.clientId, redirectUri])
 
   const handleTestConnection = async () => {
     setIsTesting(true)

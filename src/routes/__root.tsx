@@ -27,8 +27,18 @@ function RootComponent() {
   const navigate = useNavigate()
   const location = useLocation()
   
+  // OAuth callback routes - need auth bypass because user might be mid-auth-flow
+  // These handle their own redirect after processing
+  const callbackRoutes = ['/gmail-callback']
+  const isCallbackRoute = callbackRoutes.some(route => location.pathname === route)
+  
+  // Skip all auth/PIN logic for callbacks - render immediately
+  const shouldBypassAuth = isCallbackRoute
+
   // Check PIN unlock state from sessionStorage
   const [isAppUnlocked, setIsAppUnlocked] = React.useState(() => {
+    // Bypass PIN for callback routes/popups
+    if (shouldBypassAuth) return true
     return sessionStorage.getItem('app-unlocked') === 'true'
   })
 
@@ -38,24 +48,16 @@ function RootComponent() {
   // Public routes that don't require authentication
   const publicRoutes = ['/sign-in', '/sign-up']
   const isPublicRoute = publicRoutes.includes(location.pathname)
-  
-  // OAuth callback routes - should not redirect when authenticated
-  // These need special handling because they open in popup windows
-  const callbackRoutes = ['/gmail-callback', '/settings/gmail/callback']
-  const isCallbackRoute = callbackRoutes.some(route => location.pathname.includes(route))
-  
-  // Detect if we're in a popup window (opened by window.open)
-  const isPopupWindow = window.opener !== null
 
   // Handle redirects based on auth state
   React.useEffect(() => {
-    if (!isAppUnlocked || isLoading) return
-    
-    // Never redirect callback routes or popup windows - they handle their own flow
-    if (isCallbackRoute || isPopupWindow) {
-      console.log('Callback/popup route, skipping redirect:', { pathname: location.pathname, isPopupWindow })
+    // Never redirect callback routes - they handle their own flow
+    if (shouldBypassAuth) {
+      console.log('Callback route, skipping all redirects:', { pathname: location.pathname })
       return
     }
+    
+    if (!isAppUnlocked || isLoading) return
 
     console.log('Auth state:', { isAuthenticated, isPublicRoute, pathname: location.pathname })
 
@@ -68,11 +70,16 @@ function RootComponent() {
       console.log('Authenticated on public route, redirecting to dashboard')
       navigate({ to: '/' })
     }
-  }, [isAuthenticated, isPublicRoute, isCallbackRoute, isPopupWindow, navigate, isLoading, isAppUnlocked, location.pathname])
+  }, [isAuthenticated, isPublicRoute, shouldBypassAuth, navigate, isLoading, isAppUnlocked, location.pathname])
 
   // Handle PIN unlock
   const handlePinUnlock = () => {
     setIsAppUnlocked(true)
+  }
+
+  // For callback routes/popups, skip PIN and render immediately
+  if (shouldBypassAuth) {
+    return <Outlet />
   }
 
   // Show PIN entry if not unlocked
