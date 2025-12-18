@@ -174,13 +174,16 @@ export const calculateDailySummaries = internalAction({
 
     let datesProcessed = 0;
 
-    for (let d = new Date(weekAgo); d <= today; d.setDate(d.getDate() + 1)) {
+    // Iterate from weekAgo to today (inclusive)
+    const d = new Date(weekAgo);
+    while (d <= today) {
       const date = d.toISOString().split("T")[0];
       await ctx.runMutation(internal.hubstaffSync.calculateDailySummaryForDate, {
         date,
         hubstaffUserId: settings.selectedUserId,
       });
       datesProcessed++;
+      d.setDate(d.getDate() + 1);
     }
 
     console.log(`Calculated summaries for ${datesProcessed} dates`);
