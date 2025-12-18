@@ -131,6 +131,23 @@ export default defineSchema({
     .index("by_message_id", ["messageId"])      // Lookup by message ID
     .index("by_chat_sortKey", ["chatId", "sortKey"]),  // Query by sortKey for cursor pagination
 
+  // Beeper participants - full participant data for chats (single and group)
+  beeperParticipants: defineTable({
+    chatId: v.string(),              // Which chat this participant belongs to
+    participantId: v.string(),       // Beeper participant ID (e.g., "@mattwondra:local-instagram.localhost")
+    fullName: v.optional(v.string()),
+    username: v.optional(v.string()),
+    phoneNumber: v.optional(v.string()),
+    email: v.optional(v.string()),
+    imgURL: v.optional(v.string()),  // Profile image URL
+    isSelf: v.boolean(),             // Is this the authenticated user?
+    cannotMessage: v.optional(v.boolean()),
+    lastSyncedAt: v.number(),        // When this participant was last updated
+  })
+    .index("by_chat", ["chatId"])              // Get all participants for a chat
+    .index("by_participant", ["participantId"]) // Find chats by participant
+    .index("by_chat_participant", ["chatId", "participantId"]), // Unique lookup for upsert
+
   // Dex CRM integration - sync contacts from Dex
   contacts: defineTable({
     dexId: v.optional(v.string()), // Dex's internal contact ID for sync tracking (optional for user-created contacts)

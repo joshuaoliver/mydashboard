@@ -125,6 +125,77 @@ export const upsertChat = internalMutation({
 });
 
 /**
+ * Helper mutation to upsert participants for a chat
+ * Stores all participant data from the API (both single and group chats)
+ */
+export const upsertParticipants = internalMutation({
+  args: {
+    chatId: v.string(),
+    participants: v.array(v.object({
+      id: v.string(),
+      fullName: v.optional(v.string()),
+      username: v.optional(v.string()),
+      phoneNumber: v.optional(v.string()),
+      email: v.optional(v.string()),
+      imgURL: v.optional(v.string()),
+      isSelf: v.boolean(),
+      cannotMessage: v.optional(v.boolean()),
+    })),
+    lastSyncedAt: v.number(),
+  },
+  handler: async (ctx, args) => {
+    let insertedCount = 0;
+    let updatedCount = 0;
+
+    for (const participant of args.participants) {
+      // Check if participant already exists for this chat
+      const existingParticipant = await ctx.db
+        .query("beeperParticipants")
+        .withIndex("by_chat_participant", (q) => 
+          q.eq("chatId", args.chatId).eq("participantId", participant.id)
+        )
+        .first();
+
+      if (existingParticipant) {
+        // Update existing participant
+        await ctx.db.patch(existingParticipant._id, {
+          fullName: participant.fullName,
+          username: participant.username,
+          phoneNumber: participant.phoneNumber,
+          email: participant.email,
+          imgURL: participant.imgURL,
+          isSelf: participant.isSelf,
+          cannotMessage: participant.cannotMessage,
+          lastSyncedAt: args.lastSyncedAt,
+        });
+        updatedCount++;
+      } else {
+        // Insert new participant
+        await ctx.db.insert("beeperParticipants", {
+          chatId: args.chatId,
+          participantId: participant.id,
+          fullName: participant.fullName,
+          username: participant.username,
+          phoneNumber: participant.phoneNumber,
+          email: participant.email,
+          imgURL: participant.imgURL,
+          isSelf: participant.isSelf,
+          cannotMessage: participant.cannotMessage,
+          lastSyncedAt: args.lastSyncedAt,
+        });
+        insertedCount++;
+      }
+    }
+
+    console.log(
+      `[upsertParticipants] Chat ${args.chatId}: inserted ${insertedCount}, updated ${updatedCount} participants`
+    );
+
+    return { insertedCount, updatedCount };
+  },
+});
+
+/**
  * Helper mutation to sync messages for a chat
  * Uses upsert logic: updates existing messages, inserts new ones
  */
@@ -437,6 +508,27 @@ export const syncBeeperChatsInternal = internalAction({
           internal.beeperSync.upsertChat,
           { chatData }
         );
+
+        // Sync ALL participants to beeperParticipants table (for both single and group chats)
+        if (chat.participants?.items && chat.participants.items.length > 0) {
+          await ctx.runMutation(
+            internal.beeperSync.upsertParticipants,
+            {
+              chatId: chat.id,
+              participants: chat.participants.items.map((p: any) => ({
+                id: p.id,
+                fullName: p.fullName,
+                username: p.username,
+                phoneNumber: p.phoneNumber,
+                email: p.email,
+                imgURL: p.imgURL,
+                isSelf: p.isSelf ?? false,
+                cannotMessage: p.cannotMessage,
+              })),
+              lastSyncedAt: now,
+            }
+          );
+        }
 
         syncedChatsCount++;
 

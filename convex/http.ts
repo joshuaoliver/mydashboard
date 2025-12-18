@@ -1,6 +1,7 @@
 import { httpRouter } from "convex/server";
 import { httpAction } from "./_generated/server";
 import { auth } from "./auth";
+import { internal } from "./_generated/api";
 
 const http = httpRouter();
 
@@ -9,18 +10,27 @@ auth.addHttpRoutes(http);
 /**
  * Image Proxy Endpoint
  * 
- * Proxies Beeper images to the browser by:
- * 1. Converting mxc:// to file:// via /v1/assets/download
- * 2. Extracting media ID from file path
- * 3. Fetching actual image data from Matrix media endpoints
- * 4. Returning image to browser
+ * Proxies Beeper images to the browser with Convex storage caching:
+ * 1. Check if image is already cached in Convex storage
+ * 2. If cached, redirect to the cached URL (fast!)
+ * 3. If not cached:
+ *    a. Convert mxc:// to file:// via /v1/assets/download
+ *    b. Fetch image data from Matrix media endpoints
+ *    c. Store in Convex file storage
+ *    d. Save cache record to database
+ *    e. Return the image
+ * 
+ * Benefits:
+ * - Images persist even when Beeper backend (mobile) is offline
+ * - Faster subsequent loads from Convex CDN
+ * - Deduplication across all users/sessions
  * 
  * Usage: GET /image-proxy?url=mxc://...
  */
 http.route({
   path: "/image-proxy",
   method: "GET",
-  handler: httpAction(async (_ctx, request) => {
+  handler: httpAction(async (ctx, request) => {
     const url = new URL(request.url);
     const srcURL = url.searchParams.get("url");
 
@@ -41,7 +51,17 @@ http.route({
         return Response.redirect(srcURL, 302);
       }
 
-      console.log(`[Image Proxy] Processing: ${srcURL.substring(0, 80)}...`);
+      // Step 0: Check if already cached in Convex storage
+      const cachedUrl = await ctx.runQuery(internal.httpHelpers.getCachedImageUrl, { 
+        sourceUrl: srcURL 
+      });
+      
+      if (cachedUrl) {
+        console.log(`[Image Proxy] ✅ Cache HIT - redirecting to Convex storage`);
+        return Response.redirect(cachedUrl, 302);
+      }
+
+      console.log(`[Image Proxy] Cache MISS - fetching from Beeper: ${srcURL.substring(0, 60)}...`);
 
       // Step 1: Convert mxc:// to file:// using download endpoint
       let fileUrl = srcURL;
@@ -105,10 +125,37 @@ http.route({
             // Get image data and content type
             const imageData = await response.arrayBuffer();
             const contentType = response.headers.get('content-type') || 'image/jpeg';
+            const fileSize = imageData.byteLength;
             
-            console.log(`[Image Proxy] ✅ Returning ${Math.round(imageData.byteLength / 1024)}KB as ${contentType}`);
+            console.log(`[Image Proxy] Fetched ${Math.round(fileSize / 1024)}KB as ${contentType}`);
             
-            // Return the image directly to the browser
+            // Step 4: Store in Convex file storage for future requests
+            try {
+              const blob = new Blob([imageData], { type: contentType });
+              const storageId = await ctx.storage.store(blob);
+              const convexUrl = await ctx.storage.getUrl(storageId);
+              
+              if (convexUrl) {
+                // Save cache record to database
+                await ctx.runMutation(internal.httpHelpers.storeCachedImage, {
+                  sourceUrl: srcURL,
+                  convexStorageId: storageId,
+                  convexUrl,
+                  contentType,
+                  fileSize,
+                });
+                
+                console.log(`[Image Proxy] ✅ Cached to Convex storage: ${storageId}`);
+                
+                // Redirect to the cached URL for future-proof caching
+                return Response.redirect(convexUrl, 302);
+              }
+            } catch (cacheErr) {
+              // Caching failed, but we still have the image data - return it directly
+              console.error(`[Image Proxy] Failed to cache, returning directly:`, cacheErr);
+            }
+            
+            // Return the image directly (fallback if caching failed)
             return new Response(imageData, {
               status: 200,
               headers: {

@@ -8,9 +8,22 @@ interface ProxiedImageProps {
   mimeType?: string
 }
 
-// Beeper Media Server Configuration
+// Beeper Media Server Configuration (for file:// URLs)
 const BEEPER_MEDIA_SERVER = import.meta.env.VITE_BEEPER_MEDIA_SERVER || 'https://beeperimage.bywave.com.au'
 const BEEPER_MEDIA_TOKEN = import.meta.env.VITE_BEEPER_MEDIA_TOKEN || '1c265ccc683ee3a761d38ecadaee812d18a6404a582150044ec3973661e016c9'
+
+// Convex configuration (for mxc:// URLs via /image-proxy endpoint)
+const CONVEX_URL = import.meta.env.VITE_CONVEX_URL || ''
+
+/**
+ * Get the Convex site URL for HTTP endpoints
+ * Converts: https://abc123.convex.cloud/api → https://abc123.convex.site
+ */
+function getConvexSiteUrl(): string {
+  if (!CONVEX_URL) return ''
+  // Convert .convex.cloud/api to .convex.site
+  return CONVEX_URL.replace('.convex.cloud/api', '.convex.site')
+}
 
 /**
  * Image component that handles different image URL types:
@@ -19,11 +32,16 @@ const BEEPER_MEDIA_TOKEN = import.meta.env.VITE_BEEPER_MEDIA_TOKEN || '1c265ccc6
  *    - https://*.convex.cloud/api/storage/...
  *    - Used as-is (fast, reliable)
  * 
- * 2. file:// URLs (message attachments - from Beeper)
+ * 2. file:// URLs (message attachments - from Beeper local cache)
  *    - file:///Users/.../BeeperTexts/media/local.beeper.com/HASH
- *    - Proxied through media server with auth token
+ *    - Proxied through local media server with auth token
  * 
- * 3. Regular HTTP/HTTPS URLs
+ * 3. mxc:// URLs (Matrix Content URIs - Beeper encrypted media)
+ *    - mxc://local.beeper.com/joshuaoliver_HASH?encryptedFileInfoJSON=...
+ *    - Proxied through Convex HTTP endpoint (/image-proxy)
+ *    - Uses Beeper's /v1/assets/download API to resolve
+ * 
+ * 4. Regular HTTP/HTTPS URLs
  *    - Used as-is
  * 
  * Note: Profile pictures are cached to Convex at the backend level (imageCache.ts)
@@ -80,6 +98,29 @@ export function ProxiedImage({ src, alt, className }: ProxiedImageProps) {
           
           // Construct the proxied URL with query string auth
           const proxiedUrl = `${BEEPER_MEDIA_SERVER}/${mediaPath}?token=${BEEPER_MEDIA_TOKEN}`
+          
+          if (isMounted) {
+            setImageUrl(proxiedUrl)
+            setLoading(false)
+          }
+          return
+        }
+
+        // 4. mxc:// or localmxc:// URLs - Matrix Content URIs (Beeper encrypted media)
+        // Format: mxc://local.beeper.com/joshuaoliver_HASH?encryptedFileInfoJSON=...
+        // These need to go through Convex's /image-proxy endpoint which calls Beeper's
+        // /v1/assets/download API to convert mxc:// → file:// and fetch the image
+        if (src.startsWith('mxc://') || src.startsWith('localmxc://')) {
+          const convexSiteUrl = getConvexSiteUrl()
+          
+          if (!convexSiteUrl) {
+            throw new Error('Convex URL not configured - cannot proxy mxc:// URLs')
+          }
+          
+          // Route through Convex HTTP endpoint: /image-proxy?url=mxc://...
+          const proxiedUrl = `${convexSiteUrl}/image-proxy?url=${encodeURIComponent(src)}`
+          
+          console.log(`[ProxiedImage] Routing mxc:// through Convex proxy: ${proxiedUrl.substring(0, 80)}...`)
           
           if (isMounted) {
             setImageUrl(proxiedUrl)
