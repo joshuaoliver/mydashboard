@@ -91,19 +91,51 @@ export async function getOrganizations(
 }
 
 /**
+ * Member object from Hubstaff API - may contain nested user data
+ */
+interface HubstaffMember {
+  id?: number;
+  user_id?: number;
+  name?: string;
+  email?: string;
+  user?: {
+    id: number;
+    name: string;
+    email?: string;
+  };
+}
+
+/**
  * Get users in an organization
  * Note: Hubstaff API returns "members" array, not "users"
+ * Members may have user data at top level or nested in a "user" property
  */
 export async function getOrganizationUsers(
   accessToken: string,
   organizationId: number
 ): Promise<{ users: HubstaffUser[] }> {
-  const response = await makeRequest<{ members?: HubstaffUser[] }>(
+  const response = await makeRequest<{ members?: HubstaffMember[] }>(
     accessToken,
     `/organizations/${organizationId}/members`
   );
-  // Transform the response to match expected interface
-  return { users: response.members || [] };
+  
+  // Transform members to users, handling both nested and flat structures
+  const users: HubstaffUser[] = (response.members || [])
+    .map((member) => {
+      // Try nested user object first, then top-level properties
+      const id = member.user?.id ?? member.user_id ?? member.id;
+      const name = member.user?.name ?? member.name ?? 'Unknown';
+      
+      if (id === undefined) {
+        console.warn('Hubstaff member missing id:', member);
+        return null;
+      }
+      
+      return { id, name };
+    })
+    .filter((user): user is HubstaffUser => user !== null);
+  
+  return { users };
 }
 
 /**

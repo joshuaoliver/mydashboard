@@ -326,11 +326,13 @@ function HubstaffSettingsPage() {
                   <SelectValue placeholder="Select an organization..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {organizations.map((org) => (
-                    <SelectItem key={org.id} value={org.id.toString()}>
-                      {org.name}
-                    </SelectItem>
-                  ))}
+                  {organizations
+                    .filter((org) => org.id != null)
+                    .map((org) => (
+                      <SelectItem key={org.id} value={String(org.id)}>
+                        {org.name}
+                      </SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
               {organizations.length === 0 && (
@@ -354,11 +356,13 @@ function HubstaffSettingsPage() {
                   />
                 </SelectTrigger>
                 <SelectContent>
-                  {users.map((user) => (
-                    <SelectItem key={user.id} value={user.id.toString()}>
-                      {user.name}
-                    </SelectItem>
-                  ))}
+                  {users
+                    .filter((user) => user.id != null)
+                    .map((user) => (
+                      <SelectItem key={user.id} value={String(user.id)}>
+                        {user.name}
+                      </SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
               {users.length === 0 && organizationId && !isLoadingUsers && (
