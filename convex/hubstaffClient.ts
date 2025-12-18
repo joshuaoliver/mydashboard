@@ -91,31 +91,26 @@ export async function getOrganizations(
 }
 
 /**
- * Member object from Hubstaff API - may contain nested user data
- * The API structure can vary, so we handle multiple formats
+ * Member object from Hubstaff API /members endpoint
  */
 interface HubstaffMember {
-  id?: number;
-  user_id?: number;
-  name?: string;
-  email?: string;
-  user?: {
-    id: number;
-    name: string;
-    email?: string;
-  };
+  user_id: number;
+  pay_rate?: number;
+  bill_rate?: number;
+  role?: string;
+  status?: string;
+  // When include[]=users is used, user data is side-loaded separately
 }
 
 /**
  * Get users in an organization
- * Note: Hubstaff API returns "members" array with user data side-loaded
- * We request users to be included via the include[] parameter
+ * Uses the /members endpoint with include[]=users to side-load user details
  */
 export async function getOrganizationUsers(
   accessToken: string,
   organizationId: number
 ): Promise<{ users: HubstaffUser[] }> {
-  // Request with users side-loaded
+  // Use members endpoint with users side-loaded
   const response = await makeRequest<{ 
     members?: HubstaffMember[];
     users?: HubstaffUser[];
@@ -126,33 +121,17 @@ export async function getOrganizationUsers(
   
   console.log("Hubstaff members response:", JSON.stringify(response, null, 2));
   
-  // If users are side-loaded, use them directly
+  // Users are side-loaded in a separate "users" array
   if (response.users && response.users.length > 0) {
-    console.log("Using side-loaded users:", response.users);
     return { users: response.users };
   }
   
-  // Otherwise, transform members to users, handling various structures
-  const users: HubstaffUser[] = (response.members || [])
-    .map((member) => {
-      // Try multiple possible field locations
-      const id = member.user?.id ?? member.user_id ?? member.id;
-      const name = member.user?.name ?? member.name;
-      const email = member.user?.email ?? member.email;
-      
-      if (id === undefined) {
-        console.warn('Hubstaff member missing id:', JSON.stringify(member));
-        return null;
-      }
-      
-      // If no name, try to construct from email or use a descriptive fallback
-      const displayName = name || (email ? email.split('@')[0] : `User #${id}`);
-      
-      return { id, name: displayName, email };
-    })
-    .filter((user): user is HubstaffUser => user !== null);
+  // Fallback: If no side-loaded users, create entries from member user_ids
+  const users: HubstaffUser[] = (response.members || []).map(member => ({
+    id: member.user_id,
+    name: `User #${member.user_id}`,
+  }));
   
-  console.log("Transformed users from members:", users);
   return { users };
 }
 
