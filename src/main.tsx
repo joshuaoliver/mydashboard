@@ -5,6 +5,7 @@ import { QueryClientProvider, QueryClient } from '@tanstack/react-query'
 import { ConvexAuthProvider } from '@convex-dev/auth/react'
 import { ConvexReactClient } from 'convex/react'
 import { ConvexQueryClient } from '@convex-dev/react-query'
+import { ThemeProvider } from '@/components/theme-provider'
 import { createRouter } from './router'
 import './styles/app.css'
 
@@ -54,10 +55,12 @@ if ('serviceWorker' in navigator) {
 // Mount the app - ConvexAuthProvider replaces ConvexProvider
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <ConvexAuthProvider client={convex}>
-      <QueryClientProvider client={queryClient}>
-        <RouterProvider router={router} />
-      </QueryClientProvider>
-    </ConvexAuthProvider>
+    <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+      <ConvexAuthProvider client={convex}>
+        <QueryClientProvider client={queryClient}>
+          <RouterProvider router={router} />
+        </QueryClientProvider>
+      </ConvexAuthProvider>
+    </ThemeProvider>
   </React.StrictMode>
 )
