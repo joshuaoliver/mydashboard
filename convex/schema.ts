@@ -343,7 +343,7 @@ export default defineSchema({
     activityPercent: v.optional(v.number()),
     keyboardSeconds: v.optional(v.number()),
     mouseSeconds: v.optional(v.number()),
-    billable: v.optional(v.boolean()),
+    billableSeconds: v.optional(v.number()),
     syncedAt: v.number(),
   })
     .index("by_date", ["date"])

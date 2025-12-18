@@ -212,7 +212,7 @@ export const upsertTimeEntries = internalMutation({
         keyboard: v.optional(v.number()),
         mouse: v.optional(v.number()),
         input_tracked: v.optional(v.number()),
-        billable: v.optional(v.boolean()),
+        billable: v.optional(v.number()),
         userName: v.string(),
         projectName: v.string(),
         taskName: v.optional(v.string()),
@@ -275,7 +275,7 @@ export const upsertTimeEntries = internalMutation({
             : undefined,
           keyboardSeconds: activity.keyboard,
           mouseSeconds: activity.mouse,
-          billable: activity.billable,
+          billableSeconds: activity.billable,
           syncedAt: now,
         });
         entriesProcessed++;

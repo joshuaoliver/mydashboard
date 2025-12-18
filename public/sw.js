@@ -1,6 +1,6 @@
 // Service Worker for Dashboard PWA
-const CACHE_NAME = 'dashboard-v1';
-const RUNTIME_CACHE = 'dashboard-runtime-v1';
+const CACHE_NAME = 'dashboard-v2';
+const RUNTIME_CACHE = 'dashboard-runtime-v2';
 
 // Assets to cache immediately on install
 const PRECACHE_ASSETS = [
@@ -79,6 +79,14 @@ self.addEventListener('fetch', (event) => {
   // Skip OAuth callback routes - never cache, always go to network
   // Query params are critical for these routes
   if (url.pathname.includes('callback') || url.pathname.includes('gmail-callback')) {
+    return;
+  }
+
+  // Skip SPA navigation requests - TanStack Router handles these client-side
+  // Only intercept actual asset requests, not route navigations
+  if (request.mode === 'navigate') {
+    // For navigation requests, let the browser handle it normally
+    // The server will return index.html which boots the SPA
     return;
   }
 

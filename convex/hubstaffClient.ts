@@ -40,7 +40,7 @@ export interface HubstaffActivity {
   keyboard?: number;      // Keyboard seconds
   mouse?: number;         // Mouse seconds
   input_tracked?: number; // Input tracked seconds
-  billable?: boolean;
+  billable?: number;      // Billable seconds (not boolean)
 }
 
 export interface HubstaffActivitiesResponse {
