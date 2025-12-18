@@ -179,11 +179,11 @@ function GmailStatsPage() {
 
       {/* Current Stats */}
       {latestSnapshot && (
-        <div className="grid gap-4 md:grid-cols-4 mb-6">
+        <div className="grid gap-4 md:grid-cols-2 mb-6">
           <Card>
             <CardHeader className="pb-2">
               <CardDescription>Total Inbox</CardDescription>
-              <CardTitle className="text-3xl flex items-center gap-2">
+              <CardTitle className="text-4xl flex items-center gap-2">
                 {latestSnapshot.totalInbox}
                 {trend !== 0 && (
                   <span
@@ -206,72 +206,12 @@ function GmailStatsPage() {
           <Card>
             <CardHeader className="pb-2">
               <CardDescription>Unread</CardDescription>
-              <CardTitle className="text-3xl text-red-600">
+              <CardTitle className="text-4xl text-red-600">
                 {latestSnapshot.unread}
               </CardTitle>
             </CardHeader>
           </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardDescription>Primary</CardDescription>
-              <CardTitle className="text-3xl">
-                {latestSnapshot.primary ?? '-'}
-              </CardTitle>
-            </CardHeader>
-          </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardDescription>Promotions</CardDescription>
-              <CardTitle className="text-3xl text-gray-500">
-                {latestSnapshot.promotions ?? '-'}
-              </CardTitle>
-            </CardHeader>
-          </Card>
         </div>
-      )}
-
-      {/* Category Breakdown */}
-      {latestSnapshot && (
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle>Categories</CardTitle>
-            <CardDescription>Email distribution by category</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-              <div className="p-3 bg-blue-50 rounded-lg">
-                <p className="text-sm text-blue-600">Primary</p>
-                <p className="text-2xl font-bold text-blue-800">
-                  {latestSnapshot.primary ?? 0}
-                </p>
-              </div>
-              <div className="p-3 bg-purple-50 rounded-lg">
-                <p className="text-sm text-purple-600">Social</p>
-                <p className="text-2xl font-bold text-purple-800">
-                  {latestSnapshot.social ?? 0}
-                </p>
-              </div>
-              <div className="p-3 bg-green-50 rounded-lg">
-                <p className="text-sm text-green-600">Promotions</p>
-                <p className="text-2xl font-bold text-green-800">
-                  {latestSnapshot.promotions ?? 0}
-                </p>
-              </div>
-              <div className="p-3 bg-yellow-50 rounded-lg">
-                <p className="text-sm text-yellow-600">Updates</p>
-                <p className="text-2xl font-bold text-yellow-800">
-                  {latestSnapshot.updates ?? 0}
-                </p>
-              </div>
-              <div className="p-3 bg-gray-50 rounded-lg">
-                <p className="text-sm text-gray-600">Forums</p>
-                <p className="text-2xl font-bold text-gray-800">
-                  {latestSnapshot.forums ?? 0}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
       )}
 
       {/* Daily History Chart (simplified as table for now) */}
@@ -320,11 +260,8 @@ function GmailStatsPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Timestamp</TableHead>
-                  <TableHead className="text-right">Total</TableHead>
+                  <TableHead className="text-right">Total Inbox</TableHead>
                   <TableHead className="text-right">Unread</TableHead>
-                  <TableHead className="text-right">Primary</TableHead>
-                  <TableHead className="text-right">Social</TableHead>
-                  <TableHead className="text-right">Promotions</TableHead>
                   <TableHead className="w-12"></TableHead>
                 </TableRow>
               </TableHeader>
@@ -339,15 +276,6 @@ function GmailStatsPage() {
                     </TableCell>
                     <TableCell className="text-right text-red-600">
                       {snapshot.unread}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {snapshot.primary ?? '-'}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {snapshot.social ?? '-'}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {snapshot.promotions ?? '-'}
                     </TableCell>
                     <TableCell>
                       <Button
