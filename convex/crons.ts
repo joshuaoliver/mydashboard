@@ -30,4 +30,53 @@ crons.interval(
   {}
 );
 
+// ===========================================
+// Stats Dashboard Sync Jobs
+// ===========================================
+
+/**
+ * Gmail inbox sync - every 15 minutes
+ * Stores historical inbox count snapshots
+ */
+crons.interval(
+  "sync-gmail-inbox",
+  { minutes: 15 },
+  internal.gmailSync.syncInbox,
+  {}
+);
+
+/**
+ * Hubstaff time entries sync - every 15 minutes
+ * Fetches time entries for the selected user
+ */
+crons.interval(
+  "sync-hubstaff-entries",
+  { minutes: 15 },
+  internal.hubstaffSync.syncTimeEntries,
+  {}
+);
+
+/**
+ * Hubstaff daily summary calculation - every hour
+ * Recalculates daily summaries from time entries
+ */
+crons.interval(
+  "calc-hubstaff-summaries",
+  { hours: 1 },
+  internal.hubstaffSync.calculateDailySummaries,
+  {}
+);
+
+/**
+ * Linear issues sync - every 15 minutes
+ * Syncs uncompleted issues from all active workspaces
+ * Serves as backup to webhook-based real-time updates
+ */
+crons.interval(
+  "sync-linear-issues",
+  { minutes: 15 },
+  internal.linearSync.syncAllWorkspaces,
+  {}
+);
+
 export default crons;

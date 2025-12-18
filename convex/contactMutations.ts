@@ -1,5 +1,6 @@
-import { mutation, query } from "./_generated/server";
+import { mutation, query, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
+import { internal } from "./_generated/api";
 
 /**
  * Query to find a contact by Instagram username
@@ -448,6 +449,184 @@ export const updateLeadStatus = mutation({
     await ctx.db.patch(args.contactId, update);
 
     return { success: true };
+  },
+});
+
+/**
+ * Re-match all chats to contacts
+ * Call this when contacts are created, updated (instagram/whatsapp/phone fields), or merged
+ * 
+ * This is an internal mutation that scans all beeperChats and updates their contactId
+ * based on current contact data. Runs at sync time, not query time.
+ */
+export const rematchChatsToContacts = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const now = Date.now();
+    let matchedCount = 0;
+    let unmatchedCount = 0;
+    let unchangedCount = 0;
+
+    // Get all single chats (groups don't have contactId)
+    const chats = await ctx.db
+      .query("beeperChats")
+      .withIndex("by_type_archived", (q) => q.eq("type", "single"))
+      .collect();
+
+    console.log(`[rematchChatsToContacts] Processing ${chats.length} single chats`);
+
+    for (const chat of chats) {
+      let newContactId: string | undefined = undefined;
+
+      // 1. Try matching by Instagram username
+      if (chat.username) {
+        const contactByInstagram = await ctx.db
+          .query("contacts")
+          .withIndex("by_instagram", (q) => q.eq("instagram", chat.username!))
+          .first();
+        
+        if (contactByInstagram) {
+          newContactId = contactByInstagram._id;
+        }
+      }
+
+      // 2. Try matching by WhatsApp phone number
+      if (!newContactId && chat.phoneNumber) {
+        const contactByWhatsapp = await ctx.db
+          .query("contacts")
+          .withIndex("by_whatsapp", (q) => q.eq("whatsapp", chat.phoneNumber!))
+          .first();
+        
+        if (contactByWhatsapp) {
+          newContactId = contactByWhatsapp._id;
+        }
+      }
+
+      // Update only if contactId changed
+      const currentContactId = chat.contactId;
+      if (newContactId !== currentContactId) {
+        await ctx.db.patch(chat._id, {
+          contactId: newContactId as any,
+          contactMatchedAt: now,
+        });
+        
+        if (newContactId) {
+          matchedCount++;
+        } else {
+          unmatchedCount++;
+        }
+      } else {
+        unchangedCount++;
+      }
+    }
+
+    console.log(
+      `[rematchChatsToContacts] Complete: ${matchedCount} matched, ${unmatchedCount} unmatched, ${unchangedCount} unchanged`
+    );
+
+    return { matchedCount, unmatchedCount, unchangedCount };
+  },
+});
+
+/**
+ * Re-match chats for a specific contact
+ * Call this when a single contact's identifiers (instagram/whatsapp) are updated
+ * More efficient than full rematch when only one contact changes
+ */
+export const rematchChatsForContact = internalMutation({
+  args: {
+    contactId: v.id("contacts"),
+  },
+  handler: async (ctx, args) => {
+    const now = Date.now();
+    const contact = await ctx.db.get(args.contactId);
+    
+    if (!contact) {
+      return { updated: 0 };
+    }
+
+    let updated = 0;
+
+    // Find chats that should be linked to this contact
+    // 1. By Instagram username
+    if (contact.instagram) {
+      const chatsByInstagram = await ctx.db
+        .query("beeperChats")
+        .withIndex("by_username", (q) => q.eq("username", contact.instagram!))
+        .collect();
+      
+      for (const chat of chatsByInstagram) {
+        if (chat.contactId !== args.contactId) {
+          await ctx.db.patch(chat._id, {
+            contactId: args.contactId,
+            contactMatchedAt: now,
+          });
+          updated++;
+        }
+      }
+    }
+
+    // 2. By WhatsApp phone (search chats with matching phone number)
+    if (contact.whatsapp) {
+      const allSingleChats = await ctx.db
+        .query("beeperChats")
+        .withIndex("by_phone", (q) => q.eq("phoneNumber", contact.whatsapp!))
+        .collect();
+      
+      for (const chat of allSingleChats) {
+        if (chat.contactId !== args.contactId) {
+          await ctx.db.patch(chat._id, {
+            contactId: args.contactId,
+            contactMatchedAt: now,
+          });
+          updated++;
+        }
+      }
+    }
+
+    // Also update any chats that WERE linked to this contact but shouldn't be anymore
+    // (in case the contact's identifiers changed)
+    const linkedChats = await ctx.db
+      .query("beeperChats")
+      .withIndex("by_contact", (q) => q.eq("contactId", args.contactId))
+      .collect();
+    
+    for (const chat of linkedChats) {
+      // Check if this chat still matches this contact
+      const matchesInstagram = contact.instagram && chat.username === contact.instagram;
+      const matchesWhatsapp = contact.whatsapp && chat.phoneNumber === contact.whatsapp;
+      
+      if (!matchesInstagram && !matchesWhatsapp) {
+        // This chat no longer matches - try to find a new match or clear
+        let newContactId: string | undefined = undefined;
+        
+        if (chat.username) {
+          const newMatch = await ctx.db
+            .query("contacts")
+            .withIndex("by_instagram", (q) => q.eq("instagram", chat.username!))
+            .first();
+          if (newMatch) newContactId = newMatch._id;
+        }
+        
+        if (!newContactId && chat.phoneNumber) {
+          const newMatch = await ctx.db
+            .query("contacts")
+            .withIndex("by_whatsapp", (q) => q.eq("whatsapp", chat.phoneNumber!))
+            .first();
+          if (newMatch) newContactId = newMatch._id;
+        }
+        
+        await ctx.db.patch(chat._id, {
+          contactId: newContactId as any,
+          contactMatchedAt: now,
+        });
+        updated++;
+      }
+    }
+
+    console.log(`[rematchChatsForContact] Contact ${args.contactId}: ${updated} chats updated`);
+
+    return { updated };
   },
 });
 

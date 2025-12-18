@@ -4,11 +4,19 @@ import { v } from "convex/values";
 import { createBeeperClient } from "./beeperClient";
 
 /**
+ * Helper to normalize phone numbers for matching
+ */
+const normalizePhone = (phone: string) => phone.replace(/[\s\-\(\)]/g, '');
+
+/**
  * Helper mutation to upsert a single chat into database
  * Returns doc ID and whether messages need syncing
  * 
  * PRESERVES EXISTING METADATA: Only updates fields that have changed
  * Does not override lastMessage, lastMessageFrom, needsReply unless new data is provided
+ * 
+ * CONTACT MATCHING: Matches chat to contacts at sync time (not query time)
+ * This avoids expensive N+1 queries when listing chats
  */
 export const upsertChat = internalMutation({
   args: {
@@ -51,6 +59,39 @@ export const upsertChat = internalMutation({
     let chatDocId;
     let shouldSyncMessages = false;
 
+    // Match contact at sync time (for single chats only)
+    let contactId: string | undefined = undefined;
+    const now = Date.now();
+    
+    if (args.chatData.type === "single") {
+      // 1. Try matching by Instagram username (fast indexed lookup)
+      if (args.chatData.username) {
+        const contactByInstagram = await ctx.db
+          .query("contacts")
+          .withIndex("by_instagram", (q) => q.eq("instagram", args.chatData.username!))
+          .first();
+        
+        if (contactByInstagram) {
+          contactId = contactByInstagram._id;
+        }
+      }
+
+      // 2. Try matching by WhatsApp phone number (fast indexed lookup)
+      if (!contactId && args.chatData.phoneNumber) {
+        const contactByWhatsapp = await ctx.db
+          .query("contacts")
+          .withIndex("by_whatsapp", (q) => q.eq("whatsapp", args.chatData.phoneNumber!))
+          .first();
+        
+        if (contactByWhatsapp) {
+          contactId = contactByWhatsapp._id;
+        }
+      }
+      
+      // Note: We intentionally skip the expensive phones array scan here
+      // If needed, a separate background job can do exhaustive matching
+    }
+
     if (existingChat) {
       // Build selective update - only include fields that are provided
       const updates: any = {
@@ -80,6 +121,17 @@ export const upsertChat = internalMutation({
       if (args.chatData.participantCount !== undefined) updates.participantCount = args.chatData.participantCount;
       if (args.chatData.lastReadMessageSortKey !== undefined) updates.lastReadMessageSortKey = args.chatData.lastReadMessageSortKey;
       if (args.chatData.newestMessageSortKey !== undefined) updates.newestMessageSortKey = args.chatData.newestMessageSortKey;
+      
+      // Update contact matching if we found a match (or if username/phone changed, re-match)
+      if (contactId !== undefined) {
+        updates.contactId = contactId;
+        updates.contactMatchedAt = now;
+      } else if (args.chatData.username !== existingChat.username || 
+                 args.chatData.phoneNumber !== existingChat.phoneNumber) {
+        // Username or phone changed but no match found - clear old contactId
+        updates.contactId = undefined;
+        updates.contactMatchedAt = now;
+      }
       
       // Only update message metadata if provided AND it's newer
       if (args.chatData.lastMessage !== undefined) {
@@ -111,13 +163,20 @@ export const upsertChat = internalMutation({
         `[upsertChat] Chat ${args.chatData.chatId}: ` +
         `lastMessagesSyncedAt=${existingChat.lastMessagesSyncedAt}, ` +
         `lastActivity=${args.chatData.lastActivity}, ` +
-        `shouldSync=${shouldSyncMessages}`
+        `shouldSync=${shouldSyncMessages}, ` +
+        `contactId=${contactId || 'none'}`
       );
     } else {
-      chatDocId = await ctx.db.insert("beeperChats", args.chatData);
+      // New chat - include contactId in initial insert
+      const insertData = {
+        ...args.chatData,
+        contactId: contactId as any,
+        contactMatchedAt: contactId ? now : undefined,
+      };
+      chatDocId = await ctx.db.insert("beeperChats", insertData);
       // New chat - always sync messages
       shouldSyncMessages = true;
-      console.log(`[upsertChat] New chat ${args.chatData.chatId}: will sync messages`);
+      console.log(`[upsertChat] New chat ${args.chatData.chatId}: will sync messages, contactId=${contactId || 'none'}`);
     }
 
     return { chatDocId, shouldSyncMessages };

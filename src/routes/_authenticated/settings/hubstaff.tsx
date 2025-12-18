@@ -1,0 +1,372 @@
+import { createFileRoute } from '@tanstack/react-router'
+import { useSuspenseQuery, useQuery } from '@tanstack/react-query'
+import { convexQuery } from '@convex-dev/react-query'
+import { useConvexMutation, useConvexAction } from '@convex-dev/react-query'
+import { api } from '../../../../convex/_generated/api'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Badge } from '@/components/ui/badge'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import {
+  Clock,
+  CheckCircle2,
+  XCircle,
+  RefreshCw,
+  AlertCircle,
+  Users,
+  Building2,
+} from 'lucide-react'
+import { useState, useEffect } from 'react'
+
+export const Route = createFileRoute('/_authenticated/settings/hubstaff')({
+  component: HubstaffSettingsPage,
+})
+
+function HubstaffSettingsPage() {
+  const { data: settings } = useSuspenseQuery(
+    convexQuery(api.settingsStore.getHubstaffSettings, {})
+  )
+  const { data: stats } = useQuery({
+    ...convexQuery(api.hubstaffSync.getStats, {}),
+    enabled: !!settings?.isConfigured,
+  })
+
+  const saveConfiguration = useConvexAction(api.hubstaffActions.saveConfiguration)
+  const testConnection = useConvexAction(api.hubstaffActions.testConnection)
+  const fetchOrganizations = useConvexAction(api.hubstaffActions.fetchOrganizations)
+  const fetchUsers = useConvexAction(api.hubstaffActions.fetchOrganizationUsers)
+
+  const [refreshToken, setRefreshToken] = useState(settings?.refreshToken ?? '')
+  const [organizationId, setOrganizationId] = useState<number | null>(
+    settings?.organizationId ?? null
+  )
+  const [selectedUserId, setSelectedUserId] = useState<number | null>(
+    settings?.selectedUserId ?? null
+  )
+  const [isSaving, setIsSaving] = useState(false)
+  const [isTesting, setIsTesting] = useState(false)
+  const [isLoadingOrgs, setIsLoadingOrgs] = useState(false)
+  const [isLoadingUsers, setIsLoadingUsers] = useState(false)
+  const [organizations, setOrganizations] = useState<
+    { id: number; name: string }[]
+  >([])
+  const [users, setUsers] = useState<{ id: number; name: string }[]>([])
+  const [testResult, setTestResult] = useState<{
+    success: boolean
+    message: string
+  } | null>(null)
+
+  const isConfigured = settings?.isConfigured ?? false
+
+  // Load organizations when refresh token changes
+  const handleLoadOrganizations = async () => {
+    if (!refreshToken.trim()) {
+      alert('Please enter a refresh token first')
+      return
+    }
+
+    setIsLoadingOrgs(true)
+    try {
+      // First save the token temporarily to test it
+      await saveConfiguration({
+        refreshToken: refreshToken.trim(),
+        organizationId: 0, // Temporary
+      })
+
+      const orgs = await fetchOrganizations({})
+      setOrganizations(orgs.map((o) => ({ id: o.id, name: o.name })))
+
+      if (orgs.length === 1) {
+        setOrganizationId(orgs[0].id)
+      }
+    } catch (e: any) {
+      alert('Failed to load organizations: ' + (e.message || 'Unknown error'))
+    } finally {
+      setIsLoadingOrgs(false)
+    }
+  }
+
+  // Load users when organization is selected
+  useEffect(() => {
+    if (organizationId && refreshToken) {
+      loadUsers(organizationId)
+    }
+  }, [organizationId])
+
+  const loadUsers = async (orgId: number) => {
+    setIsLoadingUsers(true)
+    try {
+      const fetchedUsers = await fetchUsers({ organizationId: orgId })
+      setUsers(fetchedUsers.map((u) => ({ id: u.id, name: u.name })))
+    } catch (e: any) {
+      console.error('Failed to load users:', e)
+    } finally {
+      setIsLoadingUsers(false)
+    }
+  }
+
+  const handleSave = async () => {
+    if (!refreshToken.trim()) {
+      alert('Please enter a refresh token')
+      return
+    }
+    if (!organizationId) {
+      alert('Please select an organization')
+      return
+    }
+    if (!selectedUserId) {
+      alert('Please select a user to track')
+      return
+    }
+
+    setIsSaving(true)
+    try {
+      const selectedOrg = organizations.find((o) => o.id === organizationId)
+      const selectedUser = users.find((u) => u.id === selectedUserId)
+
+      await saveConfiguration({
+        refreshToken: refreshToken.trim(),
+        organizationId,
+        organizationName: selectedOrg?.name,
+        selectedUserId,
+        selectedUserName: selectedUser?.name,
+      })
+
+      alert('Configuration saved successfully!')
+      window.location.reload()
+    } catch (e: any) {
+      alert('Failed to save: ' + (e.message || 'Unknown error'))
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const handleTestConnection = async () => {
+    setIsTesting(true)
+    setTestResult(null)
+    try {
+      const result = await testConnection({})
+      if (result.success) {
+        setTestResult({
+          success: true,
+          message: result.message || 'Connected successfully!',
+        })
+      } else {
+        setTestResult({
+          success: false,
+          message: result.error || 'Connection failed',
+        })
+      }
+    } catch (e: any) {
+      setTestResult({
+        success: false,
+        message: e.message || 'Connection test failed',
+      })
+    } finally {
+      setIsTesting(false)
+    }
+  }
+
+  return (
+    <div className="container mx-auto p-6 max-w-4xl">
+      <div className="mb-6">
+        <div className="flex items-center gap-3">
+          <Clock className="w-8 h-8 text-green-500" />
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">Hubstaff Integration</h1>
+            <p className="text-sm text-gray-600 mt-1">
+              Connect Hubstaff to track your time entries
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Connection Status */}
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle className="flex items-center justify-between">
+            <span>Connection Status</span>
+            {isConfigured ? (
+              <Badge className="bg-green-100 text-green-800">
+                <CheckCircle2 className="w-4 h-4 mr-1" />
+                Connected
+              </Badge>
+            ) : (
+              <Badge className="bg-gray-100 text-gray-800">
+                <XCircle className="w-4 h-4 mr-1" />
+                Not Configured
+              </Badge>
+            )}
+          </CardTitle>
+        </CardHeader>
+        {isConfigured && (
+          <CardContent>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+              <div>
+                <span className="text-gray-500">Organization</span>
+                <p className="text-lg font-semibold">{settings?.organizationName || '-'}</p>
+              </div>
+              <div>
+                <span className="text-gray-500">Tracking User</span>
+                <p className="text-lg font-semibold">{settings?.selectedUserName || '-'}</p>
+              </div>
+              <div>
+                <span className="text-gray-500">Total Entries</span>
+                <p className="text-lg font-semibold">{stats?.totalEntries ?? 0}</p>
+              </div>
+              <div>
+                <span className="text-gray-500">Total Hours</span>
+                <p className="text-lg font-semibold">{stats?.totalHoursAllTime ?? 0}h</p>
+              </div>
+            </div>
+            <div className="mt-4 flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleTestConnection}
+                disabled={isTesting}
+              >
+                <RefreshCw className={`w-4 h-4 mr-2 ${isTesting ? 'animate-spin' : ''}`} />
+                Test Connection
+              </Button>
+            </div>
+            {testResult && (
+              <div
+                className={`mt-3 p-3 rounded-lg ${
+                  testResult.success ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'
+                }`}
+              >
+                {testResult.message}
+              </div>
+            )}
+          </CardContent>
+        )}
+      </Card>
+
+      {/* Setup Instructions */}
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle>Setup Instructions</CardTitle>
+          <CardDescription>
+            You'll need a Hubstaff refresh token to connect
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="p-4 bg-yellow-50 rounded-lg text-sm text-yellow-800">
+            <p className="font-medium mb-2">Getting your Refresh Token:</p>
+            <p>
+              The refresh token is reused from your existing Hubstaff integration in 
+              transdirect-pm. You can find it in the config.json file of that project,
+              or generate a new one through Hubstaff's OAuth flow.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Configuration Form */}
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle>Configuration</CardTitle>
+          <CardDescription>
+            Enter your Hubstaff credentials and select which user to track
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Refresh Token */}
+          <div className="space-y-2">
+            <Label htmlFor="refreshToken">Refresh Token</Label>
+            <div className="flex gap-2">
+              <Input
+                id="refreshToken"
+                placeholder="eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiIs..."
+                value={refreshToken}
+                onChange={(e) => setRefreshToken(e.target.value)}
+                type="password"
+                className="flex-1"
+              />
+              <Button
+                variant="outline"
+                onClick={handleLoadOrganizations}
+                disabled={isLoadingOrgs || !refreshToken.trim()}
+              >
+                {isLoadingOrgs ? (
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Building2 className="w-4 h-4" />
+                )}
+                <span className="ml-2">Load Orgs</span>
+              </Button>
+            </div>
+          </div>
+
+          {/* Organization Selection */}
+          <div className="space-y-2">
+            <Label>Organization</Label>
+            <Select
+              value={organizationId?.toString() ?? ''}
+              onValueChange={(v) => setOrganizationId(parseInt(v))}
+              disabled={organizations.length === 0}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select an organization..." />
+              </SelectTrigger>
+              <SelectContent>
+                {organizations.map((org) => (
+                  <SelectItem key={org.id} value={org.id.toString()}>
+                    {org.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {organizations.length === 0 && (
+              <p className="text-xs text-gray-500">
+                Enter your refresh token and click "Load Orgs" to see organizations
+              </p>
+            )}
+          </div>
+
+          {/* User Selection */}
+          <div className="space-y-2">
+            <Label>User to Track</Label>
+            <Select
+              value={selectedUserId?.toString() ?? ''}
+              onValueChange={(v) => setSelectedUserId(parseInt(v))}
+              disabled={users.length === 0 || isLoadingUsers}
+            >
+              <SelectTrigger>
+                <SelectValue
+                  placeholder={isLoadingUsers ? 'Loading users...' : 'Select a user...'}
+                />
+              </SelectTrigger>
+              <SelectContent>
+                {users.map((user) => (
+                  <SelectItem key={user.id} value={user.id.toString()}>
+                    {user.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {users.length === 0 && organizationId && !isLoadingUsers && (
+              <p className="text-xs text-gray-500">No users found in this organization</p>
+            )}
+          </div>
+
+          {/* Save Button */}
+          <div className="flex gap-2 pt-4">
+            <Button onClick={handleSave} disabled={isSaving || !selectedUserId}>
+              {isSaving ? 'Saving...' : 'Save Configuration'}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}

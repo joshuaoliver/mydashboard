@@ -60,6 +60,10 @@ export default defineSchema({
     cannotMessage: v.optional(v.boolean()),      // Whether messaging is disabled/blocked
     participantCount: v.optional(v.number()),    // Total participant count
     
+    // Contact matching (pre-computed at sync time for fast queries)
+    contactId: v.optional(v.id("contacts")),     // Matched contact from Dex (denormalized for fast lookup)
+    contactMatchedAt: v.optional(v.number()),    // When contact was last matched
+    
     // Activity tracking
     lastActivity: v.number(),        // Timestamp (converted from ISO)
     unreadCount: v.number(),
@@ -90,7 +94,10 @@ export default defineSchema({
     .index("by_activity", ["lastActivity"])    // Sort by recent
     .index("by_chat_id", ["chatId"])           // Lookup by ID
     .index("by_network", ["network"])          // Filter by platform
-    .index("by_username", ["username"]),       // Find by Instagram username
+    .index("by_username", ["username"])        // Find by Instagram username
+    .index("by_phone", ["phoneNumber"])        // Find by WhatsApp/phone number
+    .index("by_type_archived", ["type", "isArchived"]) // Fast filter for chat list queries
+    .index("by_contact", ["contactId"]),       // Find chats by linked contact
 
   // Beeper messages - cached messages per chat (last 20-30 only)
   beeperMessages: defineTable({
@@ -278,4 +285,131 @@ export default defineSchema({
     updatedAt: v.number(),
   })
     .index("by_key", ["key"]),       // Lookup by setting key
+
+  // ===========================================
+  // Stats Dashboard Tables
+  // ===========================================
+
+  // Settings - flexible key-value store for integration configs
+  settings: defineTable({
+    key: v.string(),           // "gmail", "hubstaff", "linear_<workspaceId>"
+    type: v.string(),          // "oauth", "api_key", "config"
+    value: v.any(),            // Flexible JSON for different setting types
+    updatedAt: v.number(),
+  })
+    .index("by_key", ["key"]),
+
+  // Projects - unified concept linking Hubstaff + Linear
+  projects: defineTable({
+    name: v.string(),
+    hubstaffProjectId: v.optional(v.number()),
+    hubstaffProjectName: v.optional(v.string()),
+    linearWorkspaceId: v.optional(v.string()),
+    linearTeamId: v.optional(v.string()),
+    linearTeamName: v.optional(v.string()),
+    isActive: v.boolean(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_name", ["name"])
+    .index("by_hubstaff_project", ["hubstaffProjectId"])
+    .index("by_linear_team", ["linearTeamId"]),
+
+  // Gmail Snapshots - historical inbox counts
+  gmailSnapshots: defineTable({
+    timestamp: v.number(),
+    totalInbox: v.number(),
+    unread: v.number(),
+    primary: v.optional(v.number()),
+    social: v.optional(v.number()),
+    promotions: v.optional(v.number()),
+    updates: v.optional(v.number()),
+    forums: v.optional(v.number()),
+  })
+    .index("by_timestamp", ["timestamp"]),
+
+  // Hubstaff Time Entries - individual time tracking records
+  hubstaffTimeEntries: defineTable({
+    date: v.string(),                    // YYYY-MM-DD
+    hubstaffActivityId: v.optional(v.string()), // Unique activity ID from Hubstaff
+    hubstaffUserId: v.number(),
+    hubstaffUserName: v.string(),
+    projectId: v.optional(v.id("projects")),
+    hubstaffProjectId: v.number(),
+    hubstaffProjectName: v.string(),
+    taskId: v.optional(v.string()),
+    taskName: v.optional(v.string()),
+    trackedSeconds: v.number(),
+    activityPercent: v.optional(v.number()),
+    keyboardSeconds: v.optional(v.number()),
+    mouseSeconds: v.optional(v.number()),
+    billable: v.optional(v.boolean()),
+    syncedAt: v.number(),
+  })
+    .index("by_date", ["date"])
+    .index("by_user_date", ["hubstaffUserId", "date"])
+    .index("by_project_date", ["hubstaffProjectId", "date"])
+    .index("by_activity_id", ["hubstaffActivityId"]),
+
+  // Hubstaff Daily Summary - aggregated stats per day
+  hubstaffDailySummary: defineTable({
+    date: v.string(),
+    hubstaffUserId: v.number(),
+    totalSeconds: v.number(),
+    totalHours: v.number(),
+    projectBreakdown: v.array(v.object({
+      projectId: v.number(),
+      projectName: v.string(),
+      seconds: v.number(),
+    })),
+    calculatedAt: v.number(),
+  })
+    .index("by_date", ["date"])
+    .index("by_user_date", ["hubstaffUserId", "date"]),
+
+  // Linear Issues - synced tasks assigned to user
+  linearIssues: defineTable({
+    linearId: v.string(),              // Linear's issue ID
+    identifier: v.string(),            // Human-readable ID like "ENG-123"
+    workspaceId: v.string(),
+    workspaceName: v.optional(v.string()),
+    teamId: v.string(),
+    teamName: v.string(),
+    projectId: v.optional(v.id("projects")),
+    title: v.string(),
+    description: v.optional(v.string()),
+    status: v.string(),                // "backlog", "todo", "in_progress", etc.
+    statusType: v.string(),            // "backlog", "unstarted", "started", "completed", "canceled"
+    priority: v.number(),              // 0-4
+    priorityLabel: v.string(),         // "Urgent", "High", "Medium", "Low", "No priority"
+    url: v.string(),
+    assigneeId: v.string(),
+    assigneeName: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+    dueDate: v.optional(v.string()),
+    completedAt: v.optional(v.number()),
+    syncedAt: v.number(),
+  })
+    .index("by_linear_id", ["linearId"])
+    .index("by_workspace", ["workspaceId"])
+    .index("by_team", ["teamId"])
+    .index("by_status", ["status"])
+    .index("by_status_type", ["statusType"])
+    .index("by_assignee", ["assigneeId"])
+    .index("by_priority", ["priority"]),
+
+  // Linear Workspaces - configured workspaces with API keys
+  linearWorkspaces: defineTable({
+    workspaceId: v.string(),
+    workspaceName: v.string(),
+    apiKey: v.string(),                // Personal API key for this workspace
+    userId: v.optional(v.string()),    // Auto-detected user ID from API key
+    userName: v.optional(v.string()),
+    isActive: v.boolean(),
+    lastSyncedAt: v.optional(v.number()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_workspace_id", ["workspaceId"]),
 });

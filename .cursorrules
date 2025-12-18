@@ -103,11 +103,17 @@ const addItem = useMutation(api.myFunctions.addNumber)
 addItem({ value: 42 })
 ```
 
+## Package Manager
+- **This project uses Bun exclusively** - Do not use npm or yarn
+- The `preinstall` script will block npm/yarn install attempts
+- Use `bun` instead of `npm` and `bunx` instead of `npx`
+
 ## Development Commands
-- `npm run dev` - Start dev server (Vite + Convex)
-- `npm run build` - Build for production
-- `npm run format` - Format with Prettier
-- `npx tsr generate` - Regenerate route tree (if needed)
+- `bun run dev` - Start dev server (Vite + Convex)
+- `bun run build` - Build for production
+- `bun run format` - Format with Prettier
+- `bunx tsr generate` - Regenerate route tree (if needed)
+- `bun install` - Install dependencies (npm/yarn blocked)
 
 ## Environment Variables
 - `VITE_CONVEX_URL` - Convex backend URL (auto-configured on first run)

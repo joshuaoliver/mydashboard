@@ -11,19 +11,8 @@ import { createGateway } from "@ai-sdk/gateway";
 const BEEPER_API_URL = process.env.BEEPER_API_URL || "https://beeper.bywave.com.au";
 const BEEPER_TOKEN = process.env.BEEPER_TOKEN;
 
-// AI Model configuration - using Vercel AI Gateway
-// Available models (easily switchable):
-// - "google/gemini-3-flash" - NEW! Frontier intelligence at Flash speed (default)
-// - "google/gemini-3-pro-preview" - Gemini 3 Pro preview
-// - "google/gemini-2.5-flash" - Previous gen, fast and cost-effective
-// - "google/gemini-2.5-pro" - Previous gen, more capable
-// - "anthropic/claude-sonnet-4.5" - Anthropic's latest balanced model
-// - "anthropic/claude-opus-4.5" - Anthropic's most capable
-// - "openai/gpt-5" - OpenAI's latest flagship
-// - "openai/gpt-5.2" - OpenAI's newest
-// - "deepseek/deepseek-v3.1" - DeepSeek's latest
-// - "xai/grok-4" - xAI's Grok 4
-const AI_MODEL_ID = "google/gemini-3-flash" as const;
+// Default AI model (used if no setting found in database)
+const DEFAULT_AI_MODEL = "google/gemini-3-flash" as const;
 
 // Type definitions for Beeper API responses
 interface BeeperChat {
@@ -354,7 +343,7 @@ export const generateReplySuggestions = action({
         // Connection types with descriptions
         if (contact.connections && contact.connections.length > 0) {
           contactContext += `\n<connection_types>`;
-          contact.connections.forEach((conn) => {
+          contact.connections.forEach((conn: string) => {
             contactContext += `\n  <connection type="${conn}">${getConnectionDescription(conn)}</connection>`;
           });
           contactContext += `\n</connection_types>`;
@@ -461,16 +450,25 @@ Format as JSON:
 }`;
       }
 
+      // Fetch AI settings from database
+      const aiSettings = await ctx.runQuery(internal.aiSettings.getSettingInternal, {
+        key: "reply-suggestions",
+      });
+      
+      const modelId = aiSettings?.modelId ?? DEFAULT_AI_MODEL;
+      const temperature = aiSettings?.temperature ?? 0.8;
+      
+      console.log(`[generateReplySuggestions] Using model: ${modelId} (temp: ${temperature})`);
+
       // Initialize Vercel AI Gateway client
-      // Using Vercel AI Gateway for unified model access
-      // Model is configured at top of file via AI_MODEL_ID constant
       const gatewayClient = createGateway({
         apiKey: process.env.VERCEL_AI_GATEWAY_API_KEY,
       });
 
       const result = await generateText({
-        model: gatewayClient(AI_MODEL_ID),
+        model: gatewayClient(modelId),
         prompt: prompt,
+        temperature: temperature,
       });
 
       // Parse the AI response
@@ -514,7 +512,7 @@ Format as JSON:
           lastMessageTimestamp: lastMessage.timestamp,
           suggestions,
           conversationContext,
-          modelUsed: AI_MODEL_ID,
+          modelUsed: modelId,
         });
 
         console.log(`[generateReplySuggestions] Saved ${suggestions.length} suggestions to cache for chat ${args.chatId}`);

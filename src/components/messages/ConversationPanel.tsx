@@ -5,8 +5,9 @@ import { useChatStore } from '@/stores/useChatStore'
 import { ChatDetail } from './ChatDetail'
 import { MessageInputPanel } from './MessageInputPanel'
 import { ReplySuggestionsPanel } from './ReplySuggestionsPanel'
+import { ChatDebugPanel } from './ChatDebugPanel'
 import { Button } from '@/components/ui/button'
-import { RefreshCw, ExternalLink, Mail, MailOpen, Archive, MessageCircle } from 'lucide-react'
+import { RefreshCw, ExternalLink, Mail, MailOpen, Archive, MessageCircle, Bug } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 
 export function ConversationPanel() {
@@ -16,6 +17,7 @@ export function ConversationPanel() {
   // Local state
   const [isLoadingFullConversation, setIsLoadingFullConversation] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [showDebugPanel, setShowDebugPanel] = useState(false)
 
   // Query all chats to find the selected one
   const { results: allLoadedChats } = usePaginatedQuery(
@@ -252,8 +254,25 @@ export function ConversationPanel() {
           >
             <Archive className="w-4 h-4" />
           </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setShowDebugPanel(!showDebugPanel)}
+            title="Toggle debug panel"
+            className={showDebugPanel ? 'bg-yellow-100 text-yellow-700' : ''}
+          >
+            <Bug className="w-4 h-4" />
+          </Button>
         </div>
       </div>
+
+      {/* Debug Panel */}
+      {showDebugPanel && selectedChatId && (
+        <ChatDebugPanel 
+          chatId={selectedChatId} 
+          onClose={() => setShowDebugPanel(false)} 
+        />
+      )}
 
       {isLoadingMessages ? (
         <div className="flex items-center justify-center h-full">

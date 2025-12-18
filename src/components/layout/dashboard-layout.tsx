@@ -30,7 +30,9 @@ import {
   LogOut,
   MessageCircle,
   MapPin,
-  Menu
+  Menu,
+  Bot,
+  BarChart3
 } from "lucide-react"
 import { Link, useNavigate } from '@tanstack/react-router'
 import { useAuthActions } from '@convex-dev/auth/react'
@@ -127,6 +129,20 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                   <HeartHandshake className="h-5 w-5" />
                   Sales
                 </Link>
+                <Link 
+                  to="/stats"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={cn(
+                    "flex items-center gap-3 px-4 py-3 rounded-md",
+                    "text-base font-medium transition-all",
+                    "text-slate-300 hover:text-white hover:bg-slate-800/80",
+                    "[&.active]:bg-slate-800 [&.active]:text-white"
+                  )}
+                  activeProps={{ className: "active" }}
+                >
+                  <BarChart3 className="h-5 w-5" />
+                  Stats
+                </Link>
                 <div className="border-t border-slate-700 pt-4 mt-2">
                   <div className="px-4 py-2 text-xs font-semibold text-slate-400 uppercase tracking-wide">
                     Settings
@@ -146,6 +162,14 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                   >
                     <MapPin className="h-5 w-5" />
                     Locations
+                  </Link>
+                  <Link 
+                    to="/settings/ai"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex items-center gap-3 px-4 py-3 rounded-md text-base text-slate-300 hover:text-white hover:bg-slate-800/80 transition-all"
+                  >
+                    <Bot className="h-5 w-5" />
+                    AI Models
                   </Link>
                   <Link 
                     to="/settings"
@@ -246,6 +270,23 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                   </Link>
                 </NavigationMenuItem>
                 <NavigationMenuItem>
+                  <Link 
+                    to="/stats"
+                    className={cn(
+                      "inline-flex items-center gap-2 px-4 py-2 rounded-md",
+                      "text-sm font-medium transition-all",
+                      "text-slate-300 hover:text-white hover:bg-slate-800/80",
+                      "[&.active]:bg-slate-800 [&.active]:text-white"
+                    )}
+                    activeProps={{
+                      className: "active"
+                    }}
+                  >
+                    <BarChart3 className="h-4 w-4" />
+                    Stats
+                  </Link>
+                </NavigationMenuItem>
+                <NavigationMenuItem>
                   <NavigationMenuTrigger className={cn(
                     "inline-flex items-center gap-2 px-4 py-2 rounded-md",
                     "text-sm font-medium transition-all",
@@ -276,6 +317,17 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                           >
                             <MapPin className="h-4 w-4" />
                             Locations
+                          </Link>
+                        </NavigationMenuLink>
+                      </li>
+                      <li>
+                        <NavigationMenuLink asChild>
+                          <Link 
+                            to="/settings/ai"
+                            className="flex items-center gap-2 px-3 py-2 rounded-md text-sm !text-slate-300 hover:!text-white hover:!bg-slate-700 transition-colors w-full"
+                          >
+                            <Bot className="h-4 w-4" />
+                            AI Models
                           </Link>
                         </NavigationMenuLink>
                       </li>

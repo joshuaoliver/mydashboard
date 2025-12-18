@@ -17,12 +17,16 @@ const CONVEX_URL = import.meta.env.VITE_CONVEX_URL || ''
 
 /**
  * Get the Convex site URL for HTTP endpoints
- * Converts: https://abc123.convex.cloud/api → https://abc123.convex.site
+ * Converts: 
+ *   https://abc123.convex.cloud → https://abc123.convex.site
+ *   https://abc123.convex.cloud/api → https://abc123.convex.site
  */
 function getConvexSiteUrl(): string {
   if (!CONVEX_URL) return ''
-  // Convert .convex.cloud/api to .convex.site
-  return CONVEX_URL.replace('.convex.cloud/api', '.convex.site')
+  // Handle both formats: with and without /api suffix
+  return CONVEX_URL
+    .replace('.convex.cloud/api', '.convex.site')
+    .replace('.convex.cloud', '.convex.site')
 }
 
 /**

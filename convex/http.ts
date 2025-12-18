@@ -183,5 +183,93 @@ http.route({
   }),
 });
 
+/**
+ * Linear Webhook Endpoint
+ * 
+ * Receives webhook events from Linear for real-time issue updates.
+ * 
+ * Linear will POST to: https://your-app.convex.site/linear-webhook
+ * 
+ * Supported events:
+ * - Issue created
+ * - Issue updated  
+ * - Issue removed
+ */
+http.route({
+  path: "/linear-webhook",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    try {
+      const body = await request.json();
+      
+      console.log(`[Linear Webhook] Received event: ${body.action} ${body.type}`);
+      
+      // Validate it's an Issue event
+      if (body.type !== "Issue") {
+        console.log(`[Linear Webhook] Skipping non-Issue event: ${body.type}`);
+        return new Response(JSON.stringify({ ok: true, skipped: true }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+
+      // Extract workspace ID from the webhook data
+      // Linear includes organizationId in the webhook payload
+      const workspaceId = body.organizationId;
+      
+      if (!workspaceId) {
+        console.error("[Linear Webhook] No organizationId in payload");
+        return new Response(JSON.stringify({ error: "Missing organizationId" }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+
+      // Process the webhook
+      const result = await ctx.runMutation(internal.linearSync.handleIssueWebhook, {
+        action: body.action, // "create" | "update" | "remove"
+        workspaceId,
+        issue: body.action !== "remove" ? {
+          id: body.data.id,
+          identifier: body.data.identifier,
+          title: body.data.title,
+          description: body.data.description,
+          priority: body.data.priority,
+          priorityLabel: body.data.priorityLabel,
+          createdAt: body.data.createdAt,
+          updatedAt: body.data.updatedAt,
+          completedAt: body.data.completedAt,
+          dueDate: body.data.dueDate,
+          url: body.url,
+          assigneeId: body.data.assigneeId,
+          state: {
+            name: body.data.state?.name || "Unknown",
+            type: body.data.state?.type || "unstarted",
+          },
+          team: {
+            id: body.data.teamId,
+            name: body.data.team?.name || "Unknown",
+          },
+        } : undefined,
+        issueId: body.action === "remove" ? body.data?.id : undefined,
+      });
+
+      console.log(`[Linear Webhook] Processed: ${JSON.stringify(result)}`);
+
+      return new Response(JSON.stringify({ ok: true, result }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : "Unknown error";
+      console.error("[Linear Webhook] Error:", errorMsg);
+      return new Response(JSON.stringify({ error: errorMsg }), {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+  }),
+});
+
 export default http;
 
