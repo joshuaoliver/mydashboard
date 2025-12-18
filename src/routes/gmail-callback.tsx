@@ -1,7 +1,13 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useAction } from 'convex/react'
 import { api } from '../../convex/_generated/api'
+
+type GmailCallbackSearch = {
+  code?: string
+  error?: string
+  scope?: string
+}
 
 /**
  * Gmail OAuth Callback Route
@@ -16,20 +22,27 @@ import { api } from '../../convex/_generated/api'
  */
 export const Route = createFileRoute('/gmail-callback')({
   component: GmailCallbackPage,
+  validateSearch: (search: Record<string, unknown>): GmailCallbackSearch => ({
+    code: typeof search.code === 'string' ? search.code : undefined,
+    error: typeof search.error === 'string' ? search.error : undefined,
+    scope: typeof search.scope === 'string' ? search.scope : undefined,
+  }),
 })
 
 function GmailCallbackPage() {
   const navigate = useNavigate()
+  const { code, error } = Route.useSearch()
   const exchangeCode = useAction(api.gmailActions.exchangeCodeForTokens)
   const [status, setStatus] = useState<'processing' | 'success' | 'error'>('processing')
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const hasProcessed = useRef(false)
 
   useEffect(() => {
-    const handleCallback = async () => {
-      const params = new URLSearchParams(window.location.search)
-      const code = params.get('code')
-      const error = params.get('error')
+    // Prevent double-processing in React strict mode
+    if (hasProcessed.current) return
+    hasProcessed.current = true
 
+    const handleCallback = async () => {
       console.log('[Gmail Callback] Processing', { hasCode: !!code, error })
 
       if (error) {
@@ -67,7 +80,7 @@ function GmailCallbackPage() {
     }
 
     handleCallback()
-  }, [exchangeCode, navigate])
+  }, [code, error, exchangeCode, navigate])
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-slate-900">
