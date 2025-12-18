@@ -1,13 +1,40 @@
-import * as React from 'react'
-import { createRoot } from 'react-dom/client'
+import React from 'react'
+import ReactDOM from 'react-dom/client'
 import { RouterProvider } from '@tanstack/react-router'
-import { QueryClientProvider } from '@tanstack/react-query'
+import { QueryClientProvider, QueryClient } from '@tanstack/react-query'
 import { ConvexAuthProvider } from '@convex-dev/auth/react'
-import { createRouter, queryClient, convexQueryClient } from './router'
+import { ConvexReactClient } from 'convex/react'
+import { ConvexQueryClient } from '@convex-dev/react-query'
+import { createRouter } from './router'
 import './styles/app.css'
 
-// Create router
-const router = createRouter()
+const CONVEX_URL = import.meta.env.VITE_CONVEX_URL as string
+if (!CONVEX_URL) {
+  throw new Error('Missing VITE_CONVEX_URL environment variable')
+}
+
+// Create the Convex client (single instance)
+const convex = new ConvexReactClient(CONVEX_URL)
+
+// Create ConvexQueryClient for React Query integration
+const convexQueryClient = new ConvexQueryClient(convex)
+
+// Create QueryClient with Convex integration
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      queryKeyHashFn: convexQueryClient.hashFn(),
+      queryFn: convexQueryClient.queryFn(),
+      gcTime: 5 * 60 * 1000,
+      staleTime: 0,
+    },
+  },
+})
+
+convexQueryClient.connect(queryClient)
+
+// Create router with queryClient context
+const router = createRouter(queryClient)
 
 // Register service worker for PWA
 if ('serviceWorker' in navigator) {
@@ -21,13 +48,13 @@ if ('serviceWorker' in navigator) {
     })
 }
 
-// Mount the app
-createRoot(document.getElementById('root')!).render(
+// Mount the app - ConvexAuthProvider replaces ConvexProvider
+ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <QueryClientProvider client={queryClient}>
-      <ConvexAuthProvider client={convexQueryClient.convexClient}>
+    <ConvexAuthProvider client={convex}>
+      <QueryClientProvider client={queryClient}>
         <RouterProvider router={router} />
-      </ConvexAuthProvider>
-    </QueryClientProvider>
+      </QueryClientProvider>
+    </ConvexAuthProvider>
   </React.StrictMode>
 )

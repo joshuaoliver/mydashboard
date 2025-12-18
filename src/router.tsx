@@ -1,34 +1,12 @@
 import { createRouter as createTanStackRouter } from '@tanstack/react-router'
 import { QueryClient } from '@tanstack/react-query'
 import { routerWithQueryClient } from '@tanstack/react-router-with-query'
-import { ConvexQueryClient } from '@convex-dev/react-query'
 import { routeTree } from './routeTree.gen'
-
-const CONVEX_URL = import.meta.env.VITE_CONVEX_URL!
-if (!CONVEX_URL) {
-  console.error('Missing VITE_CONVEX_URL environment variable')
-}
-
-// Create singleton instances for the SPA
-export const convexQueryClient = new ConvexQueryClient(CONVEX_URL)
-
-export const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      queryKeyHashFn: convexQueryClient.hashFn(),
-      queryFn: convexQueryClient.queryFn(),
-      gcTime: 5 * 60 * 1000, // 5 minutes
-      staleTime: 0, // Let Convex handle real-time updates
-    },
-  },
-})
-
-convexQueryClient.connect(queryClient)
 
 // Singleton router instance
 let router: ReturnType<typeof createTanStackRouter> | undefined
 
-export function createRouter() {
+export function createRouter(queryClient: QueryClient) {
   if (!router) {
     router = routerWithQueryClient(
       createTanStackRouter({

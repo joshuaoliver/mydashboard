@@ -4,10 +4,9 @@ import {
   useNavigate,
   useLocation,
 } from '@tanstack/react-router'
-import { QueryClient, useQuery } from '@tanstack/react-query'
-import { convexQuery } from '@convex-dev/react-query'
+import { QueryClient } from '@tanstack/react-query'
+import { useConvexAuth } from 'convex/react'
 import * as React from 'react'
-import { api } from '../../convex/_generated/api'
 import { PinEntry } from '@/components/auth/PinEntry'
 
 export const Route = createRootRouteWithContext<{
@@ -33,28 +32,29 @@ function RootComponent() {
     return sessionStorage.getItem('app-unlocked') === 'true'
   })
 
+  // Use Convex's built-in auth hook - this updates reactively
+  const { isAuthenticated, isLoading } = useConvexAuth()
+
   // Public routes that don't require authentication
   const publicRoutes = ['/sign-in', '/sign-up']
   const isPublicRoute = publicRoutes.includes(location.pathname)
-
-  // Check auth state (only after PIN unlock)
-  const { data: user, isLoading } = useQuery({
-    ...convexQuery(api.auth.currentUser, {}),
-    enabled: isAppUnlocked,
-  })
 
   // Handle redirects based on auth state
   React.useEffect(() => {
     if (!isAppUnlocked || isLoading) return
 
-    if (!user && !isPublicRoute) {
+    console.log('Auth state:', { isAuthenticated, isPublicRoute, pathname: location.pathname })
+
+    if (!isAuthenticated && !isPublicRoute) {
+      console.log('Not authenticated, redirecting to sign-in')
       navigate({ to: '/sign-in' })
     }
 
-    if (user && isPublicRoute) {
+    if (isAuthenticated && isPublicRoute) {
+      console.log('Authenticated on public route, redirecting to dashboard')
       navigate({ to: '/' })
     }
-  }, [user, isPublicRoute, navigate, isLoading, isAppUnlocked])
+  }, [isAuthenticated, isPublicRoute, navigate, isLoading, isAppUnlocked, location.pathname])
 
   // Handle PIN unlock
   const handlePinUnlock = () => {

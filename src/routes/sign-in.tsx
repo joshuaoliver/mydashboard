@@ -1,13 +1,11 @@
 import { createFileRoute, useNavigate, Link } from '@tanstack/react-router'
 import { useAuthActions } from '@convex-dev/auth/react'
+import { useConvexAuth } from 'convex/react'
 import { useState, useEffect } from 'react'
-import { useQuery } from '@tanstack/react-query'
-import { convexQuery } from '@convex-dev/react-query'
 import { Button } from '~/components/ui/button'
 import { Card } from '~/components/ui/card'
 import { Input } from '~/components/ui/input'
 import { Label } from '~/components/ui/label'
-import { api } from '../../convex/_generated/api'
 
 export const Route = createFileRoute('/sign-in')({
   component: SignInPage,
@@ -18,34 +16,22 @@ function SignInPage() {
   const navigate = useNavigate()
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
-  const [signedIn, setSignedIn] = useState(false)
   
-  // Check auth state
-  const { data: user } = useQuery(convexQuery(api.auth.currentUser, {}))
+  // Use Convex's reactive auth hook
+  const { isAuthenticated, isLoading: isAuthLoading } = useConvexAuth()
 
-  // Debug: Log localStorage auth tokens on mount
+  // Debug: Log auth state changes
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const authKeys = Object.keys(localStorage).filter(k => 
-        k.includes('convex') || k.includes('auth') || k.includes('token')
-      )
-      console.log('=== Auth Debug Info ===')
-      console.log('LocalStorage auth-related keys:', authKeys)
-      authKeys.forEach(key => {
-        const value = localStorage.getItem(key)
-        console.log(`${key}:`, value ? `${value.substring(0, 50)}...` : 'null')
-      })
-      console.log('======================')
-    }
-  }, [])
+    console.log('Auth state:', { isAuthenticated, isAuthLoading })
+  }, [isAuthenticated, isAuthLoading])
 
   // Redirect to dashboard when authenticated
   useEffect(() => {
-    if (user && signedIn) {
+    if (isAuthenticated && !isAuthLoading) {
       console.log('User authenticated, redirecting to dashboard')
       navigate({ to: '/' })
     }
-  }, [user, signedIn, navigate])
+  }, [isAuthenticated, isAuthLoading, navigate])
 
   const clearAuthStorage = () => {
     if (typeof window !== 'undefined') {
@@ -57,6 +43,7 @@ function SignInPage() {
         console.log('Removing:', key)
         localStorage.removeItem(key)
       })
+      sessionStorage.clear()
       console.log('Auth storage cleared! Please refresh the page.')
       setError('Auth storage cleared! Please refresh the page and try again.')
     }
@@ -73,13 +60,24 @@ function SignInPage() {
       console.log('Attempting sign in...')
       await signIn('password', formData)
       console.log('Sign in successful, waiting for auth state to update...')
-      setSignedIn(true)
-      // Keep loading state - will redirect when user data loads
+      // Don't setIsLoading(false) - keep showing loading until redirect
     } catch (err) {
       console.error('Sign in error:', err)
       setError(err instanceof Error ? err.message : 'Sign in failed')
       setIsLoading(false)
     }
+  }
+
+  // Show loading if checking initial auth state
+  if (isAuthLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-blue-500 border-r-transparent" />
+          <p className="mt-4 text-gray-600">Checking authentication...</p>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -156,4 +154,3 @@ function SignInPage() {
     </div>
   )
 }
-
