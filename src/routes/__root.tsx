@@ -36,13 +36,26 @@ function RootComponent() {
   const { isAuthenticated, isLoading } = useConvexAuth()
 
   // Public routes that don't require authentication
-  // Note: OAuth callback routes need to be here to prevent redirect race conditions
-  const publicRoutes = ['/sign-in', '/sign-up', '/gmail-callback']
+  const publicRoutes = ['/sign-in', '/sign-up']
   const isPublicRoute = publicRoutes.includes(location.pathname)
+  
+  // OAuth callback routes - should not redirect when authenticated
+  // These need special handling because they open in popup windows
+  const callbackRoutes = ['/gmail-callback', '/settings/gmail/callback']
+  const isCallbackRoute = callbackRoutes.some(route => location.pathname.includes(route))
+  
+  // Detect if we're in a popup window (opened by window.open)
+  const isPopupWindow = window.opener !== null
 
   // Handle redirects based on auth state
   React.useEffect(() => {
     if (!isAppUnlocked || isLoading) return
+    
+    // Never redirect callback routes or popup windows - they handle their own flow
+    if (isCallbackRoute || isPopupWindow) {
+      console.log('Callback/popup route, skipping redirect:', { pathname: location.pathname, isPopupWindow })
+      return
+    }
 
     console.log('Auth state:', { isAuthenticated, isPublicRoute, pathname: location.pathname })
 
@@ -55,7 +68,7 @@ function RootComponent() {
       console.log('Authenticated on public route, redirecting to dashboard')
       navigate({ to: '/' })
     }
-  }, [isAuthenticated, isPublicRoute, navigate, isLoading, isAppUnlocked, location.pathname])
+  }, [isAuthenticated, isPublicRoute, isCallbackRoute, isPopupWindow, navigate, isLoading, isAppUnlocked, location.pathname])
 
   // Handle PIN unlock
   const handlePinUnlock = () => {
