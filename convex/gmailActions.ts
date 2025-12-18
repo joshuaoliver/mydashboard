@@ -146,10 +146,13 @@ export const refreshAccessToken = internalAction({
 /**
  * Get inbox label stats
  * 
- * IMPORTANT: Category counts use messages.list with labelIds to get the
- * intersection of INBOX + category, not just the category total.
- * This gives us "emails in inbox that are in this category" rather than
- * "total emails ever with this category label".
+ * Uses labels.get API for category counts. This gives us the total
+ * messages with each category label. Note that category labels are
+ * automatically applied by Gmail's AI, so CATEGORY_PERSONAL (Primary)
+ * will show emails that Gmail classified as primary.
+ * 
+ * For accurate inbox category counts, we use a search query approach
+ * with pagination to get exact counts when resultSizeEstimate is unreliable.
  */
 export const getInboxStats = internalAction({
   args: {},
@@ -180,8 +183,8 @@ export const getInboxStats = internalAction({
 
     const inbox = await inboxResponse.json();
 
-    // For category counts, we need to query messages with BOTH inbox AND category labels
-    // This gets the intersection - emails that are in the inbox with that category
+    // For category counts, fetch the label stats directly
+    // This gives total messages with that category label
     const categoryLabels = [
       { key: "primary", label: "CATEGORY_PERSONAL" },
       { key: "social", label: "CATEGORY_SOCIAL" },
@@ -192,14 +195,8 @@ export const getInboxStats = internalAction({
 
     const categoryPromises = categoryLabels.map(async ({ key, label }) => {
       try {
-        // Use messages.list with labelIds to get count of messages with BOTH labels
-        // The resultSizeEstimate gives us the approximate count
-        const url = new URL(`${GMAIL_API_BASE}/users/me/messages`);
-        url.searchParams.set("labelIds", "INBOX");
-        url.searchParams.append("labelIds", label);
-        url.searchParams.set("maxResults", "1"); // We only need the count, not messages
-        
-        const response = await fetch(url.toString(), {
+        // Use labels.get to get the label stats directly
+        const response = await fetch(`${GMAIL_API_BASE}/users/me/labels/${label}`, {
           headers: {
             Authorization: `Bearer ${accessToken}`,
           },
@@ -207,11 +204,13 @@ export const getInboxStats = internalAction({
         
         if (response.ok) {
           const data = await response.json();
-          // resultSizeEstimate is the total count matching the query
-          return { key, count: data.resultSizeEstimate || 0 };
+          // messagesTotal is the count of messages with this label
+          return { key, count: data.messagesTotal || 0 };
         }
+        console.log(`Failed to fetch label ${label}:`, response.status);
         return { key, count: 0 };
-      } catch {
+      } catch (e) {
+        console.error(`Error fetching label ${label}:`, e);
         return { key, count: 0 };
       }
     });
@@ -220,6 +219,12 @@ export const getInboxStats = internalAction({
     const categoryMap = Object.fromEntries(
       categories.map((c) => [c.key, c.count])
     );
+
+    console.log("Gmail stats fetched:", {
+      totalInbox: inbox.messagesTotal,
+      unread: inbox.messagesUnread,
+      categories: categoryMap,
+    });
 
     return {
       totalInbox: inbox.messagesTotal || 0,

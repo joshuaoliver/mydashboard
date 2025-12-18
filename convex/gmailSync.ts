@@ -99,12 +99,19 @@ export const storeSnapshot = internalMutation({
 
 /**
  * Delete a Gmail snapshot by ID
+ * Requires authentication
  */
 export const deleteSnapshot = mutation({
   args: {
     id: v.id("gmailSnapshots"),
   },
   handler: async (ctx, args) => {
+    // Verify user is authenticated
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Not authenticated");
+    }
+    
     await ctx.db.delete(args.id);
     return { success: true };
   },
