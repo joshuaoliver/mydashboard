@@ -21,6 +21,7 @@ import {
   XCircle,
   RefreshCw,
   Building2,
+  Calendar,
 } from 'lucide-react'
 import { useState, useEffect } from 'react'
 
@@ -41,6 +42,7 @@ function HubstaffSettingsPage() {
   const testConnection = useConvexAction(api.hubstaffActions.testConnection)
   const fetchOrganizations = useConvexAction(api.hubstaffActions.fetchOrganizations)
   const fetchUsers = useConvexAction(api.hubstaffActions.fetchOrganizationUsers)
+  const backfillData = useConvexAction(api.hubstaffSync.backfillHistoricalData)
 
   const [refreshToken, setRefreshToken] = useState('')
   const [organizationId, setOrganizationId] = useState<number | null>(null)
@@ -54,6 +56,11 @@ function HubstaffSettingsPage() {
   >([])
   const [users, setUsers] = useState<{ id: number; name: string }[]>([])
   const [testResult, setTestResult] = useState<{
+    success: boolean
+    message: string
+  } | null>(null)
+  const [isBackfilling, setIsBackfilling] = useState(false)
+  const [backfillResult, setBackfillResult] = useState<{
     success: boolean
     message: string
   } | null>(null)
@@ -387,6 +394,103 @@ function HubstaffSettingsPage() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Backfill Historical Data */}
+        {isConfigured && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Calendar className="w-5 h-5" />
+                Load Historical Data
+              </CardTitle>
+              <CardDescription>
+                Import your past time entries from Hubstaff
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                This will fetch and store your time entries from the last 30 days. 
+                Use this when first setting up or if you're missing data.
+              </p>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  onClick={async () => {
+                    setIsBackfilling(true)
+                    setBackfillResult(null)
+                    try {
+                      const result = await backfillData({ days: 30 })
+                      if (result.success) {
+                        setBackfillResult({
+                          success: true,
+                          message: result.message || 'Backfill completed successfully!',
+                        })
+                      } else {
+                        setBackfillResult({
+                          success: false,
+                          message: result.error || 'Backfill failed',
+                        })
+                      }
+                    } catch (e: any) {
+                      setBackfillResult({
+                        success: false,
+                        message: e.message || 'Backfill failed',
+                      })
+                    } finally {
+                      setIsBackfilling(false)
+                    }
+                  }}
+                  disabled={isBackfilling}
+                >
+                  <Calendar className={`w-4 h-4 mr-2 ${isBackfilling ? 'animate-pulse' : ''}`} />
+                  {isBackfilling ? 'Loading...' : 'Load Last 30 Days'}
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={async () => {
+                    setIsBackfilling(true)
+                    setBackfillResult(null)
+                    try {
+                      const result = await backfillData({ days: 90 })
+                      if (result.success) {
+                        setBackfillResult({
+                          success: true,
+                          message: result.message || 'Backfill completed successfully!',
+                        })
+                      } else {
+                        setBackfillResult({
+                          success: false,
+                          message: result.error || 'Backfill failed',
+                        })
+                      }
+                    } catch (e: any) {
+                      setBackfillResult({
+                        success: false,
+                        message: e.message || 'Backfill failed',
+                      })
+                    } finally {
+                      setIsBackfilling(false)
+                    }
+                  }}
+                  disabled={isBackfilling}
+                >
+                  {isBackfilling ? 'Loading...' : 'Load Last 90 Days'}
+                </Button>
+              </div>
+              {backfillResult && (
+                <div
+                  className={`p-3 rounded-lg text-sm border ${
+                    backfillResult.success
+                      ? 'bg-green-500/10 text-green-500 border-green-500/20'
+                      : 'bg-destructive/10 text-destructive border-destructive/20'
+                  }`}
+                >
+                  {backfillResult.message}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
       </div>
     </div>
   )

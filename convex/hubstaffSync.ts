@@ -561,3 +561,118 @@ export const triggerManualSync = action({
     }
   },
 });
+
+/**
+ * Backfill historical data - loads the last N days of time entries
+ * Called manually from settings page
+ */
+export const backfillHistoricalData = action({
+  args: {
+    days: v.optional(v.number()), // Default 30 days
+  },
+  handler: async (ctx, args): Promise<{
+    success: boolean;
+    message?: string;
+    entriesProcessed?: number;
+    datesProcessed?: number;
+    error?: string;
+  }> => {
+    const days = args.days ?? 30;
+    console.log(`[Hubstaff] Starting backfill for last ${days} days...`);
+
+    // Get Hubstaff settings
+    const settings: HubstaffSettings | null = await ctx.runQuery(
+      internal.settingsStore.getHubstaffSettingsInternal, 
+      {}
+    );
+
+    if (!settings?.isConfigured || !settings?.selectedUserId) {
+      return { 
+        success: false, 
+        error: "Hubstaff not configured" 
+      };
+    }
+
+    try {
+      // Calculate date range in Sydney timezone
+      const endDate = getTodaySydney();
+      const startDate = getDaysAgoSydney(days);
+
+      console.log(`[Hubstaff] Backfilling from ${startDate} to ${endDate} (Sydney time)`);
+
+      // Get active projects to filter by
+      const projects: Project[] = await ctx.runQuery(
+        internal.projectsStore.listActiveProjectsInternal, 
+        {}
+      );
+      const hubstaffProjectIds: number[] = projects
+        .filter((p: Project) => p.hubstaffProjectId)
+        .map((p: Project) => p.hubstaffProjectId as number);
+
+      // Fetch activities from Hubstaff API
+      const activities: HubstaffActivitiesResponse = await ctx.runAction(
+        internal.hubstaffActions.fetchActivities, 
+        {
+          startDate,
+          endDate,
+          userIds: [settings.selectedUserId],
+          projectIds: hubstaffProjectIds.length > 0 ? hubstaffProjectIds : undefined,
+        }
+      );
+
+      if (!activities.daily_activities?.length) {
+        return { 
+          success: true, 
+          message: `No activities found for the last ${days} days`,
+          entriesProcessed: 0 
+        };
+      }
+
+      // Create lookup maps for side-loaded data
+      const userMap = new Map<number, HubstaffUser>(
+        (activities.users || []).map((u: HubstaffUser) => [u.id, u])
+      );
+      const projectMap = new Map<number, HubstaffProject>(
+        (activities.projects || []).map((p: HubstaffProject) => [p.id, p])
+      );
+      const taskMap = new Map<number, HubstaffTask>(
+        (activities.tasks || []).map((t: HubstaffTask) => [t.id, t])
+      );
+
+      // Store entries
+      const result = await ctx.runMutation(internal.hubstaffSync.upsertTimeEntries, {
+        activities: activities.daily_activities.map((activity: HubstaffActivity) => ({
+          ...activity,
+          userName: userMap.get(activity.user_id)?.name || `User ${activity.user_id}`,
+          projectName: projectMap.get(activity.project_id)?.name || `Project ${activity.project_id}`,
+          taskName: activity.task_id ? taskMap.get(activity.task_id)?.summary : undefined,
+        })),
+        selectedUserId: settings.selectedUserId,
+      });
+
+      // Calculate daily summaries for all affected dates
+      const uniqueDates = new Set(activities.daily_activities.map((a: HubstaffActivity) => a.date));
+      for (const date of uniqueDates) {
+        await ctx.runMutation(internal.hubstaffSync.calculateDailySummaryForDate, {
+          date,
+          hubstaffUserId: settings.selectedUserId,
+        });
+      }
+
+      console.log(`[Hubstaff] Backfill complete: ${result.entriesProcessed} entries across ${uniqueDates.size} days`);
+
+      return {
+        success: true,
+        message: `Loaded ${result.entriesProcessed} entries across ${uniqueDates.size} days`,
+        entriesProcessed: result.entriesProcessed,
+        datesProcessed: uniqueDates.size,
+      };
+    } catch (error) {
+      console.error("[Hubstaff] Backfill error:", error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : "Unknown error",
+      };
+    }
+  },
+});
