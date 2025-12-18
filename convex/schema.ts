@@ -263,4 +263,19 @@ export default defineSchema({
     cachedAt: v.number(),            // When cached to Convex
   })
     .index("by_source_url", ["sourceUrl"]), // Quick lookup by original URL
+
+  // AI Settings - configurable AI models and preferences per use case
+  aiSettings: defineTable({
+    key: v.string(),                 // Unique setting key (e.g., "reply-suggestions", "contact-summary")
+    displayName: v.string(),         // Human-readable name for UI
+    description: v.optional(v.string()), // Description of what this setting controls
+    modelId: v.string(),             // Model ID (e.g., "google/gemini-3-flash", "openai/gpt-5")
+    promptName: v.optional(v.string()), // Reference to prompts table by name (for prompt-based use cases)
+    temperature: v.optional(v.number()), // Temperature setting (0-2)
+    maxTokens: v.optional(v.number()),   // Max tokens for response
+    isEnabled: v.boolean(),          // Whether this AI feature is enabled
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_key", ["key"]),       // Lookup by setting key
 });

@@ -3,7 +3,7 @@
 import { action } from "./_generated/server";
 import { v } from "convex/values";
 import { generateText } from "ai";
-import { createOpenAI } from "@ai-sdk/openai";
+import { createGateway } from "@ai-sdk/gateway";
 
 // Beeper API configuration (from environment variables)
 // Using bywave proxy instead of localhost so Convex (cloud-hosted) can access it
@@ -269,9 +269,9 @@ export const generateReplySuggestions = action({
   }),
   handler: async (_ctx, args) => {
     try {
-      // Validate OpenAI API key
-      if (!process.env.OPENAI_API_KEY) {
-        throw new Error("OPENAI_API_KEY environment variable is not set");
+      // Validate Vercel AI Gateway API key
+      if (!process.env.VERCEL_AI_GATEWAY_API_KEY) {
+        throw new Error("VERCEL_AI_GATEWAY_API_KEY environment variable is not set");
       }
 
       // Note: Auth disabled for now - this is a personal dashboard
@@ -334,13 +334,13 @@ Format your response as JSON with this structure:
   ]
 }`;
 
-      // Initialize OpenAI client
-      const openai = createOpenAI({
-        apiKey: process.env.OPENAI_API_KEY,
+      // Initialize Vercel AI Gateway client
+      const gatewayClient = createGateway({
+        apiKey: process.env.VERCEL_AI_GATEWAY_API_KEY,
       });
 
       const result = await generateText({
-        model: openai("gpt-4o-mini"),
+        model: gatewayClient("google/gemini-3-flash"), // Frontier intelligence at Flash speed
         prompt: prompt,
         temperature: 0.8, // Slightly higher for creative variety
       });
@@ -377,13 +377,13 @@ Format your response as JSON with this structure:
     } catch (error) {
       console.error("[generateReplySuggestions] Error:", error);
       
-      // Check for OpenAI-specific errors
+      // Check for API-specific errors
       if (error instanceof Error) {
         if (error.message.includes("API key")) {
-          throw new Error("OpenAI API key is invalid or not configured");
+          throw new Error("Vercel AI Gateway API key is invalid or not configured");
         }
         if (error.message.includes("rate limit")) {
-          throw new Error("OpenAI rate limit exceeded. Please try again later.");
+          throw new Error("Rate limit exceeded. Please try again later.");
         }
       }
       

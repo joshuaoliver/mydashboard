@@ -77,7 +77,7 @@ function createRouterInstance() {
   return routerInstance
 }
 
-export function createRouter() {
+function createRouter() {
   // On the client, reuse the same router instance
   if (typeof document !== 'undefined') {
     if (!clientRouter) {

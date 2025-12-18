@@ -153,59 +153,57 @@ export const upsertParticipants = internalMutation({
     const normalizePhone = (phone: string) => phone.replace(/[\s\-\(\)]/g, '');
 
     for (const participant of args.participants) {
-      // Skip self - no need to match yourself to contacts
-      if (participant.isSelf) {
-        continue;
-      }
-
-      // Try to match participant to an existing contact
+      // Try to match participant to an existing contact (skip self for matching)
       let contactId: string | undefined = undefined;
 
-      // 1. Try matching by Instagram username
-      if (participant.username) {
-        const contactByInstagram = await ctx.db
-          .query("contacts")
-          .withIndex("by_instagram", (q) => q.eq("instagram", participant.username!))
-          .first();
-        
-        if (contactByInstagram) {
-          contactId = contactByInstagram._id;
-        }
-      }
-
-      // 2. Try matching by WhatsApp phone number
-      if (!contactId && participant.phoneNumber) {
-        const contactByWhatsapp = await ctx.db
-          .query("contacts")
-          .withIndex("by_whatsapp", (q) => q.eq("whatsapp", participant.phoneNumber!))
-          .first();
-        
-        if (contactByWhatsapp) {
-          contactId = contactByWhatsapp._id;
-        } else {
-          // Fall back to searching phones array
-          const searchPhone = normalizePhone(participant.phoneNumber);
-          const allContactsWithPhones = await ctx.db
+      // Only try to match non-self participants to contacts
+      if (!participant.isSelf) {
+        // 1. Try matching by Instagram username
+        if (participant.username) {
+          const contactByInstagram = await ctx.db
             .query("contacts")
-            .filter((q) => q.neq(q.field("phones"), undefined))
-            .collect();
-
-          const matchedContact = allContactsWithPhones.find((c) => {
-            if (!c.phones) return false;
-            return c.phones.some((p) => normalizePhone(p.phone) === searchPhone);
-          });
-
-          if (matchedContact) {
-            contactId = matchedContact._id;
+            .withIndex("by_instagram", (q) => q.eq("instagram", participant.username!))
+            .first();
+          
+          if (contactByInstagram) {
+            contactId = contactByInstagram._id;
           }
         }
+
+        // 2. Try matching by WhatsApp phone number
+        if (!contactId && participant.phoneNumber) {
+          const contactByWhatsapp = await ctx.db
+            .query("contacts")
+            .withIndex("by_whatsapp", (q) => q.eq("whatsapp", participant.phoneNumber!))
+            .first();
+          
+          if (contactByWhatsapp) {
+            contactId = contactByWhatsapp._id;
+          } else {
+            // Fall back to searching phones array
+            const searchPhone = normalizePhone(participant.phoneNumber);
+            const allContactsWithPhones = await ctx.db
+              .query("contacts")
+              .filter((q) => q.neq(q.field("phones"), undefined))
+              .collect();
+
+            const matchedContact = allContactsWithPhones.find((c) => {
+              if (!c.phones) return false;
+              return c.phones.some((p) => normalizePhone(p.phone) === searchPhone);
+            });
+
+            if (matchedContact) {
+              contactId = matchedContact._id;
+            }
+          }
+        }
+
+        if (contactId) {
+          matchedCount++;
+        }
       }
 
-      if (contactId) {
-        matchedCount++;
-      }
-
-      // Check if participant already exists for this chat
+      // Check if participant already exists for this chat (store ALL participants including self)
       const existingParticipant = await ctx.db
         .query("beeperParticipants")
         .withIndex("by_chat_participant", (q) => 

@@ -4,12 +4,26 @@ import { action } from "./_generated/server";
 import { api, internal } from "./_generated/api";
 import { v } from "convex/values";
 import { generateText } from "ai";
-import { createOpenAI } from "@ai-sdk/openai";
+import { createGateway } from "@ai-sdk/gateway";
 
 // Beeper API configuration (from environment variables)
 // Using bywave proxy instead of localhost so Convex (cloud-hosted) can access it
 const BEEPER_API_URL = process.env.BEEPER_API_URL || "https://beeper.bywave.com.au";
 const BEEPER_TOKEN = process.env.BEEPER_TOKEN;
+
+// AI Model configuration - using Vercel AI Gateway
+// Available models (easily switchable):
+// - "google/gemini-3-flash" - NEW! Frontier intelligence at Flash speed (default)
+// - "google/gemini-3-pro-preview" - Gemini 3 Pro preview
+// - "google/gemini-2.5-flash" - Previous gen, fast and cost-effective
+// - "google/gemini-2.5-pro" - Previous gen, more capable
+// - "anthropic/claude-sonnet-4.5" - Anthropic's latest balanced model
+// - "anthropic/claude-opus-4.5" - Anthropic's most capable
+// - "openai/gpt-5" - OpenAI's latest flagship
+// - "openai/gpt-5.2" - OpenAI's newest
+// - "deepseek/deepseek-v3.1" - DeepSeek's latest
+// - "xai/grok-4" - xAI's Grok 4
+const AI_MODEL_ID = "google/gemini-3-flash" as const;
 
 // Type definitions for Beeper API responses
 interface BeeperChat {
@@ -447,13 +461,15 @@ Format as JSON:
 }`;
       }
 
-      // Initialize OpenAI client
-      const openai = createOpenAI({
-        apiKey: process.env.OPENAI_API_KEY,
+      // Initialize Vercel AI Gateway client
+      // Using Vercel AI Gateway for unified model access
+      // Model is configured at top of file via AI_MODEL_ID constant
+      const gatewayClient = createGateway({
+        apiKey: process.env.VERCEL_AI_GATEWAY_API_KEY,
       });
 
       const result = await generateText({
-        model: openai("gpt-5"), // Using GPT-5 for best results
+        model: gatewayClient(AI_MODEL_ID),
         prompt: prompt,
       });
 
@@ -498,7 +514,7 @@ Format as JSON:
           lastMessageTimestamp: lastMessage.timestamp,
           suggestions,
           conversationContext,
-          modelUsed: "gpt-5",
+          modelUsed: AI_MODEL_ID,
         });
 
         console.log(`[generateReplySuggestions] Saved ${suggestions.length} suggestions to cache for chat ${args.chatId}`);
