@@ -49,9 +49,10 @@ function GmailSettingsPage() {
   const hasCredentials = !!(settings?.clientId && settings?.clientSecret)
 
   // Get the redirect URI for OAuth
+  // Using /gmail-callback (a public route) to avoid auth redirect race conditions
   const redirectUri =
     typeof window !== 'undefined'
-      ? `${window.location.origin}/settings/gmail/callback`
+      ? `${window.location.origin}/gmail-callback`
       : ''
 
   const handleSaveCredentials = async () => {

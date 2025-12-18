@@ -36,7 +36,8 @@ function RootComponent() {
   const { isAuthenticated, isLoading } = useConvexAuth()
 
   // Public routes that don't require authentication
-  const publicRoutes = ['/sign-in', '/sign-up']
+  // Note: OAuth callback routes need to be here to prevent redirect race conditions
+  const publicRoutes = ['/sign-in', '/sign-up', '/gmail-callback']
   const isPublicRoute = publicRoutes.includes(location.pathname)
 
   // Handle redirects based on auth state

@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SignUpRouteImport } from './routes/sign-up'
 import { Route as SignInRouteImport } from './routes/sign-in'
+import { Route as GmailCallbackRouteImport } from './routes/gmail-callback'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
 import { Route as AuthenticatedStatsRouteImport } from './routes/_authenticated/stats'
@@ -42,6 +43,11 @@ const SignUpRoute = SignUpRouteImport.update({
 const SignInRoute = SignInRouteImport.update({
   id: '/sign-in',
   path: '/sign-in',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GmailCallbackRoute = GmailCallbackRouteImport.update({
+  id: '/gmail-callback',
+  path: '/gmail-callback',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedRoute = AuthenticatedRouteImport.update({
@@ -167,6 +173,7 @@ const AuthenticatedSettingsGmailCallbackRoute =
   } as any)
 
 export interface FileRoutesByFullPath {
+  '/gmail-callback': typeof GmailCallbackRoute
   '/sign-in': typeof SignInRoute
   '/sign-up': typeof SignUpRoute
   '/contacts': typeof AuthenticatedContactsRouteWithChildren
@@ -192,6 +199,7 @@ export interface FileRoutesByFullPath {
   '/settings/gmail/callback': typeof AuthenticatedSettingsGmailCallbackRoute
 }
 export interface FileRoutesByTo {
+  '/gmail-callback': typeof GmailCallbackRoute
   '/sign-in': typeof SignInRoute
   '/sign-up': typeof SignUpRoute
   '/messages': typeof AuthenticatedMessagesRoute
@@ -216,6 +224,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_authenticated': typeof AuthenticatedRouteWithChildren
+  '/gmail-callback': typeof GmailCallbackRoute
   '/sign-in': typeof SignInRoute
   '/sign-up': typeof SignUpRoute
   '/_authenticated/contacts': typeof AuthenticatedContactsRouteWithChildren
@@ -243,6 +252,7 @@ export interface FileRoutesById {
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
+    | '/gmail-callback'
     | '/sign-in'
     | '/sign-up'
     | '/contacts'
@@ -268,6 +278,7 @@ export interface FileRouteTypes {
     | '/settings/gmail/callback'
   fileRoutesByTo: FileRoutesByTo
   to:
+    | '/gmail-callback'
     | '/sign-in'
     | '/sign-up'
     | '/messages'
@@ -291,6 +302,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/_authenticated'
+    | '/gmail-callback'
     | '/sign-in'
     | '/sign-up'
     | '/_authenticated/contacts'
@@ -318,6 +330,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
+  GmailCallbackRoute: typeof GmailCallbackRoute
   SignInRoute: typeof SignInRoute
   SignUpRoute: typeof SignUpRoute
 }
@@ -336,6 +349,13 @@ declare module '@tanstack/react-router' {
       path: '/sign-in'
       fullPath: '/sign-in'
       preLoaderRoute: typeof SignInRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/gmail-callback': {
+      id: '/gmail-callback'
+      path: '/gmail-callback'
+      fullPath: '/gmail-callback'
+      preLoaderRoute: typeof GmailCallbackRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated': {
@@ -593,6 +613,7 @@ const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
 
 const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
+  GmailCallbackRoute: GmailCallbackRoute,
   SignInRoute: SignInRoute,
   SignUpRoute: SignUpRoute,
 }
