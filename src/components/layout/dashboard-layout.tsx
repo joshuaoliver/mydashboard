@@ -28,11 +28,12 @@ import {
   Users,
   HeartHandshake,
   LogOut,
-  MessageCircle,
-  MapPin,
   Menu,
-  Bot,
-  BarChart3
+  BarChart3,
+  Mail,
+  Clock,
+  LayoutList,
+  FolderKanban
 } from "lucide-react"
 import { ModeToggle } from "@/components/ui/mode-toggle"
 import { Link, useNavigate } from '@tanstack/react-router'
@@ -149,28 +150,36 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                     Settings
                   </div>
                   <Link 
-                    to="/settings/prompts"
+                    to="/settings/gmail"
                     onClick={() => setMobileMenuOpen(false)}
                     className="flex items-center gap-3 px-4 py-3 rounded-md text-base text-slate-300 hover:text-white hover:bg-slate-800/80 transition-all"
                   >
-                    <MessageCircle className="h-5 w-5" />
-                    Prompts
+                    <Mail className="h-5 w-5" />
+                    Gmail Settings
                   </Link>
                   <Link 
-                    to="/settings/locations"
+                    to="/settings/hubstaff"
                     onClick={() => setMobileMenuOpen(false)}
                     className="flex items-center gap-3 px-4 py-3 rounded-md text-base text-slate-300 hover:text-white hover:bg-slate-800/80 transition-all"
                   >
-                    <MapPin className="h-5 w-5" />
-                    Locations
+                    <Clock className="h-5 w-5" />
+                    Hubstaff Settings
                   </Link>
                   <Link 
-                    to="/settings/ai"
+                    to="/settings/linear"
                     onClick={() => setMobileMenuOpen(false)}
                     className="flex items-center gap-3 px-4 py-3 rounded-md text-base text-slate-300 hover:text-white hover:bg-slate-800/80 transition-all"
                   >
-                    <Bot className="h-5 w-5" />
-                    AI Models
+                    <LayoutList className="h-5 w-5" />
+                    Linear Settings
+                  </Link>
+                  <Link 
+                    to="/settings/projects"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex items-center gap-3 px-4 py-3 rounded-md text-base text-slate-300 hover:text-white hover:bg-slate-800/80 transition-all"
+                  >
+                    <FolderKanban className="h-5 w-5" />
+                    Project Settings
                   </Link>
                   <Link 
                     to="/settings"
@@ -178,7 +187,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                     className="flex items-center gap-3 px-4 py-3 rounded-md text-base text-slate-300 hover:text-white hover:bg-slate-800/80 transition-all"
                   >
                     <Settings className="h-5 w-5" />
-                    Settings
+                    General Settings
                   </Link>
                 </div>
                 <div className="border-t border-slate-700 pt-4 mt-2">
@@ -298,37 +307,48 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                     Settings
                   </NavigationMenuTrigger>
                   <NavigationMenuContent className="bg-slate-800 border-slate-700 z-[100]">
-                    <ul className="grid w-[200px] gap-1 p-2">
+                    <ul className="grid w-[220px] gap-1 p-2">
                       <li>
                         <NavigationMenuLink asChild>
                           <Link 
-                            to="/settings/prompts"
+                            to="/settings/gmail"
                             className="flex flex-row items-center gap-2 px-3 py-2 rounded-md text-sm text-slate-300 hover:text-white hover:bg-slate-700 transition-colors w-full"
                           >
-                            <MessageCircle className="h-4 w-4 flex-shrink-0" />
-                            <span>Prompts</span>
+                            <Mail className="h-4 w-4 flex-shrink-0" />
+                            <span>Gmail Settings</span>
                           </Link>
                         </NavigationMenuLink>
                       </li>
                       <li>
                         <NavigationMenuLink asChild>
                           <Link 
-                            to="/settings/locations"
+                            to="/settings/hubstaff"
                             className="flex flex-row items-center gap-2 px-3 py-2 rounded-md text-sm text-slate-300 hover:text-white hover:bg-slate-700 transition-colors w-full"
                           >
-                            <MapPin className="h-4 w-4 flex-shrink-0" />
-                            <span>Locations</span>
+                            <Clock className="h-4 w-4 flex-shrink-0" />
+                            <span>Hubstaff Settings</span>
                           </Link>
                         </NavigationMenuLink>
                       </li>
                       <li>
                         <NavigationMenuLink asChild>
                           <Link 
-                            to="/settings/ai"
+                            to="/settings/linear"
                             className="flex flex-row items-center gap-2 px-3 py-2 rounded-md text-sm text-slate-300 hover:text-white hover:bg-slate-700 transition-colors w-full"
                           >
-                            <Bot className="h-4 w-4 flex-shrink-0" />
-                            <span>AI Models</span>
+                            <LayoutList className="h-4 w-4 flex-shrink-0" />
+                            <span>Linear Settings</span>
+                          </Link>
+                        </NavigationMenuLink>
+                      </li>
+                      <li>
+                        <NavigationMenuLink asChild>
+                          <Link 
+                            to="/settings/projects"
+                            className="flex flex-row items-center gap-2 px-3 py-2 rounded-md text-sm text-slate-300 hover:text-white hover:bg-slate-700 transition-colors w-full"
+                          >
+                            <FolderKanban className="h-4 w-4 flex-shrink-0" />
+                            <span>Project Settings</span>
                           </Link>
                         </NavigationMenuLink>
                       </li>
@@ -339,7 +359,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                             className="flex flex-row items-center gap-2 px-3 py-2 rounded-md text-sm text-slate-300 hover:text-white hover:bg-slate-700 transition-colors w-full"
                           >
                             <Settings className="h-4 w-4 flex-shrink-0" />
-                            <span>Settings</span>
+                            <span>General Settings</span>
                           </Link>
                         </NavigationMenuLink>
                       </li>

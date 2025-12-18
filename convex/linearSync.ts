@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { internalAction, internalMutation, query } from "./_generated/server";
+import { action, internalAction, internalMutation, query } from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { LinearIssue } from "./linearClient";
 
@@ -489,5 +489,52 @@ export const getStats = query({
       byStatusType,
       lastSyncedAt: issues.length > 0 ? Math.max(...issues.map((i) => i.syncedAt)) : null,
     };
+  },
+});
+
+// ==========================================
+// Manual Trigger Actions
+// ==========================================
+
+/**
+ * Manually trigger a Linear issues sync (public action wrapper)
+ */
+export const triggerManualSync = action({
+  args: {},
+  handler: async (ctx): Promise<{
+    success: boolean;
+    message?: string;
+    totalIssuesProcessed?: number;
+    error?: string;
+  }> => {
+    try {
+      const result = await ctx.runAction(internal.linearSync.syncAllWorkspaces, {});
+      
+      if (result.skipped) {
+        return { 
+          success: false, 
+          error: "No Linear workspaces configured. Go to Settings > Linear to set up." 
+        };
+      }
+      
+      if (result.success) {
+        const workspaceCount = result.workspaces?.length || 0;
+        return { 
+          success: true, 
+          message: `Synced successfully: ${result.totalIssuesProcessed} issues from ${workspaceCount} workspace(s)`,
+          totalIssuesProcessed: result.totalIssuesProcessed 
+        };
+      }
+      
+      return { 
+        success: false, 
+        error: "Unknown error" 
+      };
+    } catch (error) {
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : "Unknown error" 
+      };
+    }
   },
 });

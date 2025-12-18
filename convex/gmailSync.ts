@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { internalAction, internalMutation, query } from "./_generated/server";
+import { action, internalAction, internalMutation, query } from "./_generated/server";
 import { internal } from "./_generated/api";
 
 /**
@@ -229,5 +229,51 @@ export const getStats = query({
       currentInbox: newest.totalInbox,
       currentUnread: newest.unread,
     };
+  },
+});
+
+// ==========================================
+// Manual Trigger Actions
+// ==========================================
+
+/**
+ * Manually trigger a Gmail inbox sync (public action wrapper)
+ */
+export const triggerManualSync = action({
+  args: {},
+  handler: async (ctx): Promise<{
+    success: boolean;
+    message?: string;
+    stats?: { totalInbox: number; unread: number };
+    error?: string;
+  }> => {
+    try {
+      const result = await ctx.runAction(internal.gmailSync.syncInbox, {});
+      
+      if ("skipped" in result && result.skipped) {
+        return { 
+          success: false, 
+          error: "Gmail is not configured. Go to Settings > Gmail to set up." 
+        };
+      }
+      
+      if ("success" in result && result.success) {
+        return { 
+          success: true, 
+          message: `Synced successfully: ${result.stats.totalInbox} total emails, ${result.stats.unread} unread`,
+          stats: result.stats 
+        };
+      }
+      
+      return { 
+        success: false, 
+        error: ("error" in result && result.error) || "Unknown error" 
+      };
+    } catch (error) {
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : "Unknown error" 
+      };
+    }
   },
 });

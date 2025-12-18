@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { internalAction, internalMutation, query } from "./_generated/server";
+import { action, internalAction, internalMutation, query } from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { 
   HubstaffActivity, 
@@ -512,5 +512,51 @@ export const getStats = query({
       newestEntry: newest.date,
       totalHoursAllTime: Math.round(totalHoursAllTime * 100) / 100,
     };
+  },
+});
+
+// ==========================================
+// Manual Trigger Actions
+// ==========================================
+
+/**
+ * Manually trigger a Hubstaff time entries sync (public action wrapper)
+ */
+export const triggerManualSync = action({
+  args: {},
+  handler: async (ctx): Promise<{
+    success: boolean;
+    message?: string;
+    entriesProcessed?: number;
+    error?: string;
+  }> => {
+    try {
+      const result = await ctx.runAction(internal.hubstaffSync.syncTimeEntries, {});
+      
+      if (result.skipped) {
+        return { 
+          success: false, 
+          error: "Hubstaff is not configured. Go to Settings > Hubstaff to set up." 
+        };
+      }
+      
+      if (result.success) {
+        return { 
+          success: true, 
+          message: `Synced successfully: ${result.entriesProcessed} entries processed`,
+          entriesProcessed: result.entriesProcessed 
+        };
+      }
+      
+      return { 
+        success: false, 
+        error: result.error || "Unknown error" 
+      };
+    } catch (error) {
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : "Unknown error" 
+      };
+    }
   },
 });

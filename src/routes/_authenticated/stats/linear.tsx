@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
-import { convexQuery } from '@convex-dev/react-query'
+import { convexQuery, useConvexAction } from '@convex-dev/react-query'
 import { api } from '../../../../convex/_generated/api'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -15,19 +15,43 @@ import {
   ArrowUpCircle,
   MinusCircle,
   ArrowDownCircle,
+  RefreshCw,
 } from 'lucide-react'
+import { useState } from 'react'
 
 export const Route = createFileRoute('/_authenticated/stats/linear')({
   component: LinearStatsPage,
 })
 
 function LinearStatsPage() {
+  const [isRefreshing, setIsRefreshing] = useState(false)
+  const [refreshResult, setRefreshResult] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
+
+  const triggerSync = useConvexAction(api.linearSync.triggerManualSync)
+
   const { data: issuesByWorkspace } = useQuery(
     convexQuery(api.linearSync.getIssuesByWorkspace, {})
   )
   const { data: stats } = useQuery(convexQuery(api.linearSync.getStats, {}))
 
   const hasWorkspaces = (stats?.totalWorkspaces ?? 0) > 0
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true)
+    setRefreshResult(null)
+    try {
+      const result = await triggerSync({})
+      if (result.success) {
+        setRefreshResult({ type: 'success', message: result.message || 'Synced successfully!' })
+      } else {
+        setRefreshResult({ type: 'error', message: result.error || 'Sync failed' })
+      }
+    } catch (e: unknown) {
+      setRefreshResult({ type: 'error', message: e instanceof Error ? e.message : 'Unknown error' })
+    } finally {
+      setIsRefreshing(false)
+    }
+  }
 
   // Priority icons and colors
   const priorityConfig: Record<
@@ -100,13 +124,35 @@ function LinearStatsPage() {
               </p>
             </div>
           </div>
-          <Link to="/settings/linear">
-            <Button variant="outline" size="sm">
-              <Settings className="w-4 h-4 mr-2" />
-              Settings
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleRefresh}
+              disabled={isRefreshing}
+            >
+              <RefreshCw className={`w-4 h-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+              {isRefreshing ? 'Syncing...' : 'Refresh'}
             </Button>
-          </Link>
+            <Link to="/settings/linear">
+              <Button variant="outline" size="sm">
+                <Settings className="w-4 h-4 mr-2" />
+                Settings
+              </Button>
+            </Link>
+          </div>
         </div>
+        {refreshResult && (
+          <div
+            className={`mt-4 p-3 rounded-lg text-sm border ${
+              refreshResult.type === 'success'
+                ? 'bg-green-50 text-green-700 border-green-200'
+                : 'bg-red-50 text-red-700 border-red-200'
+            }`}
+          >
+            {refreshResult.message}
+          </div>
+        )}
       </div>
 
       {/* Priority Summary */}

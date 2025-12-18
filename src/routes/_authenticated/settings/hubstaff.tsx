@@ -61,9 +61,12 @@ function HubstaffSettingsPage() {
   const isConfigured = settings?.isConfigured ?? false
 
   // Sync state from settings when they load
+  // IMPORTANT: Always sync the refresh token from settings because Hubstaff uses
+  // rotating refresh tokens - after each use, a new one is issued and the old one is invalid
   useEffect(() => {
     if (settings) {
-      if (settings.refreshToken && !refreshToken) {
+      // Always use the latest refresh token from the database
+      if (settings.refreshToken) {
         setRefreshToken(settings.refreshToken)
       }
       if (settings.organizationId && !organizationId) {
@@ -84,12 +87,18 @@ function HubstaffSettingsPage() {
 
     setIsLoadingOrgs(true)
     try {
-      // First save the token temporarily to test it
-      await saveConfiguration({
+      // Save the token first so the backend can use it for fetching orgs
+      // This also validates the token and stores the new access token
+      const result = await saveConfiguration({
         refreshToken: refreshToken.trim(),
-        organizationId: 0, // Temporary
+        organizationId: 0, // Temporary - will be updated when user selects one
       })
 
+      if (!result.success) {
+        throw new Error('Failed to save token')
+      }
+
+      // Now fetch organizations using the stored token
       const orgs = await fetchOrganizations({})
       setOrganizations(orgs.map((o) => ({ id: o.id, name: o.name })))
 

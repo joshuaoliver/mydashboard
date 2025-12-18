@@ -287,6 +287,11 @@ export const triggerManualSync = action({
 
 /**
  * Save Hubstaff configuration
+ * 
+ * Hubstaff uses ROTATING refresh tokens - each time you use one, they issue a new one
+ * and the old one becomes invalid. We handle this by:
+ * 1. Checking if we already have a valid access token (skip refresh if so)
+ * 2. Always saving the new refresh token when we get one
  */
 export const saveConfiguration = action({
   args: {
@@ -297,28 +302,72 @@ export const saveConfiguration = action({
     selectedUserName: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    // Test the refresh token first
     try {
-      const tokens = await refreshAccessToken(args.refreshToken);
+      // Check if we already have a valid access token stored
+      const existingSettings = await ctx.runQuery(internal.settingsStore.getHubstaffSettingsInternal, {});
+      
+      // If we have a valid access token that hasn't expired, just update the config fields
+      // Don't try to refresh - we want to avoid rotating the token unnecessarily
+      if (
+        existingSettings?.accessToken &&
+        existingSettings?.tokenExpiry &&
+        existingSettings.tokenExpiry > Date.now() + 300000 // Valid for at least 5 minutes
+      ) {
+        console.log("Hubstaff: Using existing valid access token (expires in", 
+          Math.round((existingSettings.tokenExpiry - Date.now()) / 60000), "minutes)");
+        
+        // Update config without touching the tokens
+        await ctx.runMutation(internal.settingsStore.setSettingInternal, {
+          key: "hubstaff",
+          type: "config",
+          value: {
+            ...existingSettings,
+            organizationId: args.organizationId,
+            organizationName: args.organizationName,
+            selectedUserId: args.selectedUserId,
+            selectedUserName: args.selectedUserName,
+            isConfigured: args.organizationId > 0 && (args.selectedUserId ?? 0) > 0,
+          },
+        });
 
-      // Save configuration
+        return { success: true };
+      }
+
+      // Need to refresh the token - use the provided token OR the stored one
+      // (The stored one might be newer due to token rotation)
+      const tokenToUse = existingSettings?.refreshToken || args.refreshToken;
+      
+      console.log("Hubstaff: Refreshing token (using", 
+        tokenToUse === args.refreshToken ? "provided token" : "stored token", ")...");
+      
+      const tokens = await refreshAccessToken(tokenToUse);
+      
+      // IMPORTANT: Save the NEW refresh token if one was returned
+      const newRefreshToken = tokens.refresh_token || tokenToUse;
+      if (tokens.refresh_token) {
+        console.log("Hubstaff: Got new refresh token from Hubstaff (token rotation)");
+      }
+
+      // Save configuration with new tokens
       await ctx.runMutation(internal.settingsStore.setSettingInternal, {
         key: "hubstaff",
         type: "config",
         value: {
-          refreshToken: tokens.refresh_token || args.refreshToken,
+          refreshToken: newRefreshToken,
           accessToken: tokens.access_token,
           tokenExpiry: Date.now() + tokens.expires_in * 1000,
           organizationId: args.organizationId,
           organizationName: args.organizationName,
           selectedUserId: args.selectedUserId,
           selectedUserName: args.selectedUserName,
-          isConfigured: true,
+          isConfigured: args.organizationId > 0 && (args.selectedUserId ?? 0) > 0,
         },
       });
 
+      console.log("Hubstaff: Configuration saved successfully");
       return { success: true };
     } catch (error) {
+      console.error("Hubstaff saveConfiguration error:", error);
       throw new Error(
         `Failed to validate refresh token: ${error instanceof Error ? error.message : "Unknown error"}`
       );
