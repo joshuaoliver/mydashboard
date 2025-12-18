@@ -191,8 +191,11 @@ export async function getOrganizationActivities(
 }
 
 /**
- * Refresh access token using refresh token
+ * Refresh access token using refresh token (Personal Access Token)
  * Uses OpenID Connect discovery endpoint
+ * 
+ * Note: Hubstaff Personal Access Tokens work like refresh tokens but don't rotate.
+ * They're obtained from Hubstaff > Account Settings > Personal Access Tokens.
  */
 export async function refreshAccessToken(
   refreshToken: string
@@ -213,6 +216,7 @@ export async function refreshAccessToken(
   const discoveryConfig = await discoveryResponse.json();
 
   // Step 2: Exchange refresh token for access token
+  // For Personal Access Tokens, only grant_type and refresh_token are needed
   const tokenResponse = await fetch(discoveryConfig.token_endpoint, {
     method: "POST",
     headers: {
@@ -227,7 +231,7 @@ export async function refreshAccessToken(
   if (!tokenResponse.ok) {
     const error = await tokenResponse.text();
     console.error("Token refresh failed:", error);
-    throw new Error(`Failed to refresh Hubstaff token: ${tokenResponse.status}`);
+    throw new Error(`Failed to refresh Hubstaff token: ${tokenResponse.status} - ${error}`);
   }
 
   return tokenResponse.json();

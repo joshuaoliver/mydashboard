@@ -145,6 +145,11 @@ export const refreshAccessToken = internalAction({
 
 /**
  * Get inbox label stats
+ * 
+ * IMPORTANT: Category counts use messages.list with labelIds to get the
+ * intersection of INBOX + category, not just the category total.
+ * This gives us "emails in inbox that are in this category" rather than
+ * "total emails ever with this category label".
  */
 export const getInboxStats = internalAction({
   args: {},
@@ -160,7 +165,7 @@ export const getInboxStats = internalAction({
     // Get fresh access token
     const accessToken = await ctx.runAction(internal.gmailActions.refreshAccessToken, {}) as string;
 
-    // Fetch INBOX label
+    // Fetch INBOX label for total counts
     const inboxResponse = await fetch(`${GMAIL_API_BASE}/users/me/labels/INBOX`, {
       headers: {
         Authorization: `Bearer ${accessToken}`,
@@ -175,45 +180,55 @@ export const getInboxStats = internalAction({
 
     const inbox = await inboxResponse.json();
 
-    // Fetch category labels in parallel
+    // For category counts, we need to query messages with BOTH inbox AND category labels
+    // This gets the intersection - emails that are in the inbox with that category
     const categoryLabels = [
-      "CATEGORY_PERSONAL",
-      "CATEGORY_SOCIAL",
-      "CATEGORY_PROMOTIONS",
-      "CATEGORY_UPDATES",
-      "CATEGORY_FORUMS",
+      { key: "primary", label: "CATEGORY_PERSONAL" },
+      { key: "social", label: "CATEGORY_SOCIAL" },
+      { key: "promotions", label: "CATEGORY_PROMOTIONS" },
+      { key: "updates", label: "CATEGORY_UPDATES" },
+      { key: "forums", label: "CATEGORY_FORUMS" },
     ];
 
-    const categoryPromises = categoryLabels.map(async (label) => {
+    const categoryPromises = categoryLabels.map(async ({ key, label }) => {
       try {
-        const response = await fetch(`${GMAIL_API_BASE}/users/me/labels/${label}`, {
+        // Use messages.list with labelIds to get count of messages with BOTH labels
+        // The resultSizeEstimate gives us the approximate count
+        const url = new URL(`${GMAIL_API_BASE}/users/me/messages`);
+        url.searchParams.set("labelIds", "INBOX");
+        url.searchParams.append("labelIds", label);
+        url.searchParams.set("maxResults", "1"); // We only need the count, not messages
+        
+        const response = await fetch(url.toString(), {
           headers: {
             Authorization: `Bearer ${accessToken}`,
           },
         });
+        
         if (response.ok) {
           const data = await response.json();
-          return { label, count: data.messagesTotal || 0 };
+          // resultSizeEstimate is the total count matching the query
+          return { key, count: data.resultSizeEstimate || 0 };
         }
-        return { label, count: 0 };
+        return { key, count: 0 };
       } catch {
-        return { label, count: 0 };
+        return { key, count: 0 };
       }
     });
 
     const categories = await Promise.all(categoryPromises);
     const categoryMap = Object.fromEntries(
-      categories.map((c) => [c.label, c.count])
+      categories.map((c) => [c.key, c.count])
     );
 
     return {
       totalInbox: inbox.messagesTotal || 0,
       unread: inbox.messagesUnread || 0,
-      primary: categoryMap["CATEGORY_PERSONAL"],
-      social: categoryMap["CATEGORY_SOCIAL"],
-      promotions: categoryMap["CATEGORY_PROMOTIONS"],
-      updates: categoryMap["CATEGORY_UPDATES"],
-      forums: categoryMap["CATEGORY_FORUMS"],
+      primary: categoryMap["primary"],
+      social: categoryMap["social"],
+      promotions: categoryMap["promotions"],
+      updates: categoryMap["updates"],
+      forums: categoryMap["forums"],
     };
   },
 });

@@ -43,7 +43,7 @@ export const getAccessToken = internalAction({
 
     console.log("Refreshing Hubstaff access token...");
 
-    // Refresh the token
+    // Refresh the token using personal access token
     const tokens = await refreshAccessToken(settings.refreshToken);
 
     // Update stored tokens

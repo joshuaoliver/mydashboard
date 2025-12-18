@@ -1,10 +1,9 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { useQuery } from '@tanstack/react-query'
-import { convexQuery, useConvexAction } from '@convex-dev/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { convexQuery, useConvexAction, useConvexMutation } from '@convex-dev/react-query'
 import { api } from '../../../../convex/_generated/api'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import {
   Table,
   TableBody,
@@ -21,18 +20,23 @@ import {
   TrendingUp,
   TrendingDown,
   RefreshCw,
+  Trash2,
 } from 'lucide-react'
 import { useState } from 'react'
+import type { Id } from '../../../../convex/_generated/dataModel'
 
 export const Route = createFileRoute('/_authenticated/stats/gmail')({
   component: GmailStatsPage,
 })
 
 function GmailStatsPage() {
+  const queryClient = useQueryClient()
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [refreshResult, setRefreshResult] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
+  const [deletingId, setDeletingId] = useState<Id<"gmailSnapshots"> | null>(null)
 
   const triggerSync = useConvexAction(api.gmailSync.triggerManualSync)
+  const { mutateAsync: deleteSnapshot } = useConvexMutation(api.gmailSync.deleteSnapshot)
 
   const { data: settings } = useQuery(
     convexQuery(api.settingsStore.getGmailSettings, {})
@@ -76,6 +80,19 @@ function GmailStatsPage() {
       setRefreshResult({ type: 'error', message: e instanceof Error ? e.message : 'Unknown error' })
     } finally {
       setIsRefreshing(false)
+    }
+  }
+
+  const handleDeleteSnapshot = async (id: Id<"gmailSnapshots">) => {
+    if (!confirm('Delete this snapshot? This cannot be undone.')) return
+    setDeletingId(id)
+    try {
+      await deleteSnapshot({ id })
+      queryClient.invalidateQueries()
+    } catch (e) {
+      console.error('Failed to delete snapshot:', e)
+    } finally {
+      setDeletingId(null)
     }
   }
 
@@ -308,6 +325,7 @@ function GmailStatsPage() {
                   <TableHead className="text-right">Primary</TableHead>
                   <TableHead className="text-right">Social</TableHead>
                   <TableHead className="text-right">Promotions</TableHead>
+                  <TableHead className="w-12"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -330,6 +348,17 @@ function GmailStatsPage() {
                     </TableCell>
                     <TableCell className="text-right">
                       {snapshot.promotions ?? '-'}
+                    </TableCell>
+                    <TableCell>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                        onClick={() => handleDeleteSnapshot(snapshot._id)}
+                        disabled={deletingId === snapshot._id}
+                      >
+                        <Trash2 className={`h-4 w-4 ${deletingId === snapshot._id ? 'animate-pulse' : ''}`} />
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))}

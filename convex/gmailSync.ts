@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { action, internalAction, internalMutation, query } from "./_generated/server";
+import { action, internalAction, internalMutation, mutation, query } from "./_generated/server";
 import { internal } from "./_generated/api";
 
 /**
@@ -94,6 +94,19 @@ export const storeSnapshot = internalMutation({
       forums: args.forums,
     });
     return id;
+  },
+});
+
+/**
+ * Delete a Gmail snapshot by ID
+ */
+export const deleteSnapshot = mutation({
+  args: {
+    id: v.id("gmailSnapshots"),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.delete(args.id);
+    return { success: true };
   },
 });
 
