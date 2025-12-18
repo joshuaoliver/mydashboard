@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
 import { convexQuery } from '@convex-dev/react-query'
-import { useConvexMutation, useConvexAction } from '@convex-dev/react-query'
+import { useConvexAction } from '@convex-dev/react-query'
 import { api } from '../../../../convex/_generated/api'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -20,8 +20,6 @@ import {
   CheckCircle2,
   XCircle,
   RefreshCw,
-  AlertCircle,
-  Users,
   Building2,
 } from 'lucide-react'
 import { useState, useEffect } from 'react'
@@ -141,7 +139,6 @@ function HubstaffSettingsPage() {
       })
 
       alert('Configuration saved successfully!')
-      window.location.reload()
     } catch (e: any) {
       alert('Failed to save: ' + (e.message || 'Unknown error'))
     } finally {
@@ -176,197 +173,197 @@ function HubstaffSettingsPage() {
   }
 
   return (
-    <div className="container mx-auto p-6 max-w-4xl">
-      <div className="mb-6">
+    <div className="p-6">
+      <div className="space-y-6 max-w-4xl">
+        {/* Header */}
         <div className="flex items-center gap-3">
           <Clock className="w-8 h-8 text-green-500" />
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Hubstaff Integration</h1>
-            <p className="text-sm text-gray-600 mt-1">
+            <h1 className="text-2xl font-bold">Hubstaff Integration</h1>
+            <p className="text-muted-foreground mt-1">
               Connect Hubstaff to track your time entries
             </p>
           </div>
         </div>
-      </div>
 
-      {/* Connection Status */}
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between">
-            <span>Connection Status</span>
-            {isConfigured ? (
-              <Badge className="bg-green-100 text-green-800">
-                <CheckCircle2 className="w-4 h-4 mr-1" />
-                Connected
-              </Badge>
-            ) : (
-              <Badge className="bg-gray-100 text-gray-800">
-                <XCircle className="w-4 h-4 mr-1" />
-                Not Configured
-              </Badge>
-            )}
-          </CardTitle>
-        </CardHeader>
-        {isConfigured && (
-          <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-              <div>
-                <span className="text-gray-500">Organization</span>
-                <p className="text-lg font-semibold">{settings?.organizationName || '-'}</p>
+        {/* Connection Status */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center justify-between">
+              <span>Connection Status</span>
+              {isConfigured ? (
+                <Badge variant="outline" className="text-green-500 border-green-500">
+                  <CheckCircle2 className="w-4 h-4 mr-1" />
+                  Connected
+                </Badge>
+              ) : (
+                <Badge variant="secondary">
+                  <XCircle className="w-4 h-4 mr-1" />
+                  Not Configured
+                </Badge>
+              )}
+            </CardTitle>
+          </CardHeader>
+          {isConfigured && (
+            <CardContent>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                <div>
+                  <span className="text-muted-foreground">Organization</span>
+                  <p className="text-lg font-semibold">{settings?.organizationName || '-'}</p>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Tracking User</span>
+                  <p className="text-lg font-semibold">{settings?.selectedUserName || '-'}</p>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Total Entries</span>
+                  <p className="text-lg font-semibold">{stats?.totalEntries ?? 0}</p>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Total Hours</span>
+                  <p className="text-lg font-semibold">{stats?.totalHoursAllTime ?? 0}h</p>
+                </div>
               </div>
-              <div>
-                <span className="text-gray-500">Tracking User</span>
-                <p className="text-lg font-semibold">{settings?.selectedUserName || '-'}</p>
+              <div className="mt-4 flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleTestConnection}
+                  disabled={isTesting}
+                >
+                  <RefreshCw className={`w-4 h-4 mr-2 ${isTesting ? 'animate-spin' : ''}`} />
+                  Test Connection
+                </Button>
               </div>
-              <div>
-                <span className="text-gray-500">Total Entries</span>
-                <p className="text-lg font-semibold">{stats?.totalEntries ?? 0}</p>
-              </div>
-              <div>
-                <span className="text-gray-500">Total Hours</span>
-                <p className="text-lg font-semibold">{stats?.totalHoursAllTime ?? 0}h</p>
-              </div>
-            </div>
-            <div className="mt-4 flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleTestConnection}
-                disabled={isTesting}
-              >
-                <RefreshCw className={`w-4 h-4 mr-2 ${isTesting ? 'animate-spin' : ''}`} />
-                Test Connection
-              </Button>
-            </div>
-            {testResult && (
-              <div
-                className={`mt-3 p-3 rounded-lg ${
-                  testResult.success ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'
-                }`}
-              >
-                {testResult.message}
-              </div>
-            )}
-          </CardContent>
-        )}
-      </Card>
+              {testResult && (
+                <div
+                  className={`mt-3 p-3 rounded-lg text-sm border ${
+                    testResult.success ? 'bg-green-500/10 text-green-500 border-green-500/20' : 'bg-destructive/10 text-destructive border-destructive/20'
+                  }`}
+                >
+                  {testResult.message}
+                </div>
+              )}
+            </CardContent>
+          )}
+        </Card>
 
-      {/* Setup Instructions */}
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle>Setup Instructions</CardTitle>
-          <CardDescription>
-            You'll need a Hubstaff refresh token to connect
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="p-4 bg-yellow-50 rounded-lg text-sm text-yellow-800">
-            <p className="font-medium mb-2">Getting your Refresh Token:</p>
-            <p>
-              The refresh token is reused from your existing Hubstaff integration in 
-              transdirect-pm. You can find it in the config.json file of that project,
-              or generate a new one through Hubstaff's OAuth flow.
-            </p>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Configuration Form */}
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle>Configuration</CardTitle>
-          <CardDescription>
-            Enter your Hubstaff credentials and select which user to track
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {/* Refresh Token */}
-          <div className="space-y-2">
-            <Label htmlFor="refreshToken">Refresh Token</Label>
-            <div className="flex gap-2">
-              <Input
-                id="refreshToken"
-                placeholder="eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiIs..."
-                value={refreshToken}
-                onChange={(e) => setRefreshToken(e.target.value)}
-                type="password"
-                className="flex-1"
-              />
-              <Button
-                variant="outline"
-                onClick={handleLoadOrganizations}
-                disabled={isLoadingOrgs || !refreshToken.trim()}
-              >
-                {isLoadingOrgs ? (
-                  <RefreshCw className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Building2 className="w-4 h-4" />
-                )}
-                <span className="ml-2">Load Orgs</span>
-              </Button>
-            </div>
-          </div>
-
-          {/* Organization Selection */}
-          <div className="space-y-2">
-            <Label>Organization</Label>
-            <Select
-              value={organizationId?.toString() ?? ''}
-              onValueChange={(v) => setOrganizationId(parseInt(v))}
-              disabled={organizations.length === 0}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select an organization..." />
-              </SelectTrigger>
-              <SelectContent>
-                {organizations.map((org) => (
-                  <SelectItem key={org.id} value={org.id.toString()}>
-                    {org.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {organizations.length === 0 && (
-              <p className="text-xs text-gray-500">
-                Enter your refresh token and click "Load Orgs" to see organizations
+        {/* Setup Instructions */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Setup Instructions</CardTitle>
+            <CardDescription>
+              You'll need a Hubstaff refresh token to connect
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-lg text-sm text-amber-500">
+              <p className="font-medium mb-2">Getting your Refresh Token:</p>
+              <p>
+                The refresh token is reused from your existing Hubstaff integration in 
+                transdirect-pm. You can find it in the config.json file of that project,
+                or generate a new one through Hubstaff's OAuth flow.
               </p>
-            )}
-          </div>
+            </div>
+          </CardContent>
+        </Card>
 
-          {/* User Selection */}
-          <div className="space-y-2">
-            <Label>User to Track</Label>
-            <Select
-              value={selectedUserId?.toString() ?? ''}
-              onValueChange={(v) => setSelectedUserId(parseInt(v))}
-              disabled={users.length === 0 || isLoadingUsers}
-            >
-              <SelectTrigger>
-                <SelectValue
-                  placeholder={isLoadingUsers ? 'Loading users...' : 'Select a user...'}
+        {/* Configuration Form */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Configuration</CardTitle>
+            <CardDescription>
+              Enter your Hubstaff credentials and select which user to track
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {/* Refresh Token */}
+            <div className="space-y-2">
+              <Label>Refresh Token</Label>
+              <div className="flex gap-2">
+                <Input
+                  placeholder="eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiIs..."
+                  value={refreshToken}
+                  onChange={(e) => setRefreshToken(e.target.value)}
+                  type="password"
+                  className="flex-1"
                 />
-              </SelectTrigger>
-              <SelectContent>
-                {users.map((user) => (
-                  <SelectItem key={user.id} value={user.id.toString()}>
-                    {user.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {users.length === 0 && organizationId && !isLoadingUsers && (
-              <p className="text-xs text-gray-500">No users found in this organization</p>
-            )}
-          </div>
+                <Button
+                  variant="outline"
+                  onClick={handleLoadOrganizations}
+                  disabled={isLoadingOrgs || !refreshToken.trim()}
+                >
+                  {isLoadingOrgs ? (
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Building2 className="w-4 h-4" />
+                  )}
+                  <span className="ml-2">Load Orgs</span>
+                </Button>
+              </div>
+            </div>
 
-          {/* Save Button */}
-          <div className="flex gap-2 pt-4">
-            <Button onClick={handleSave} disabled={isSaving || !selectedUserId}>
-              {isSaving ? 'Saving...' : 'Save Configuration'}
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+            {/* Organization Selection */}
+            <div className="space-y-2">
+              <Label>Organization</Label>
+              <Select
+                value={organizationId?.toString() ?? ''}
+                onValueChange={(v) => setOrganizationId(parseInt(v))}
+                disabled={organizations.length === 0}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select an organization..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {organizations.map((org) => (
+                    <SelectItem key={org.id} value={org.id.toString()}>
+                      {org.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {organizations.length === 0 && (
+                <p className="text-xs text-muted-foreground">
+                  Enter your refresh token and click "Load Orgs" to see organizations
+                </p>
+              )}
+            </div>
+
+            {/* User Selection */}
+            <div className="space-y-2">
+              <Label>User to Track</Label>
+              <Select
+                value={selectedUserId?.toString() ?? ''}
+                onValueChange={(v) => setSelectedUserId(parseInt(v))}
+                disabled={users.length === 0 || isLoadingUsers}
+              >
+                <SelectTrigger>
+                  <SelectValue
+                    placeholder={isLoadingUsers ? 'Loading users...' : 'Select a user...'}
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  {users.map((user) => (
+                    <SelectItem key={user.id} value={user.id.toString()}>
+                      {user.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {users.length === 0 && organizationId && !isLoadingUsers && (
+                <p className="text-xs text-muted-foreground">No users found in this organization</p>
+              )}
+            </div>
+
+            {/* Save Button */}
+            <div className="flex gap-2 pt-4">
+              <Button onClick={handleSave} disabled={isSaving || !selectedUserId}>
+                {isSaving ? 'Saving...' : 'Save Configuration'}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   )
 }

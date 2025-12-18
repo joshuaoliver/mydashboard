@@ -1,10 +1,12 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
-import { convexQuery, useConvexMutation } from '@convex-dev/react-query'
+import { convexQuery } from '@convex-dev/react-query'
 import { useMutation } from 'convex/react'
 import { api } from '../../../../convex/_generated/api'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { Label } from '@/components/ui/label'
 import { 
   Select,
   SelectContent,
@@ -13,7 +15,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Bot, Sparkles, RefreshCw, Check } from 'lucide-react'
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 
 export const Route = createFileRoute('/_authenticated/settings/ai')({
   component: AISettingsPage,
@@ -71,23 +73,24 @@ function AISettingsPage() {
 
   return (
     <div className="p-6">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-slate-100">AI Model Settings</h1>
-        <p className="text-slate-400 mt-1">
-          Configure which AI models to use for different features. Uses Vercel AI Gateway.
-        </p>
-      </div>
-
       <div className="space-y-6 max-w-3xl">
+        {/* Header */}
+        <div>
+          <h1 className="text-2xl font-bold">AI Model Settings</h1>
+          <p className="text-muted-foreground mt-1">
+            Configure which AI models to use for different features. Uses Vercel AI Gateway.
+          </p>
+        </div>
+
         {/* Initialize defaults if no settings exist */}
         {!hasSettings && (
-          <Card className="bg-slate-800/50 border-slate-700">
+          <Card>
             <CardHeader>
               <div className="flex items-center gap-2">
                 <Sparkles className="w-5 h-5 text-amber-500" />
-                <CardTitle className="text-slate-100">Initialize AI Settings</CardTitle>
+                <CardTitle>Initialize AI Settings</CardTitle>
               </div>
-              <CardDescription className="text-slate-400">
+              <CardDescription>
                 No AI settings found. Click below to create default settings.
               </CardDescription>
             </CardHeader>
@@ -95,9 +98,8 @@ function AISettingsPage() {
               <Button
                 onClick={handleInitialize}
                 disabled={isInitializing}
-                className="gap-2"
               >
-                <RefreshCw className={`w-4 h-4 ${isInitializing ? 'animate-spin' : ''}`} />
+                <RefreshCw className={`w-4 h-4 mr-2 ${isInitializing ? 'animate-spin' : ''}`} />
                 {isInitializing ? 'Initializing...' : 'Initialize Defaults'}
               </Button>
             </CardContent>
@@ -106,51 +108,50 @@ function AISettingsPage() {
 
         {/* Settings cards */}
         {(settings ?? []).map((setting) => (
-          <Card key={setting._id} className="bg-slate-800/50 border-slate-700">
+          <Card key={setting._id}>
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <Bot className="w-5 h-5 text-blue-400" />
-                  <CardTitle className="text-slate-100">{setting.displayName}</CardTitle>
+                  <Bot className="w-5 h-5 text-blue-500" />
+                  <CardTitle>{setting.displayName}</CardTitle>
                 </div>
                 {savedKeys.has(setting.key) && (
-                  <div className="flex items-center gap-1 text-green-400 text-sm">
-                    <Check className="w-4 h-4" />
+                  <Badge variant="outline" className="text-green-500 border-green-500">
+                    <Check className="w-3 h-3 mr-1" />
                     Saved
-                  </div>
+                  </Badge>
                 )}
               </div>
               {setting.description && (
-                <CardDescription className="text-slate-400">
+                <CardDescription>
                   {setting.description}
                 </CardDescription>
               )}
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-300">Model</label>
+                <Label>Model</Label>
                 <Select
                   value={setting.modelId}
                   onValueChange={(value) => handleModelChange(setting.key, value)}
                 >
-                  <SelectTrigger className="w-full bg-slate-900 border-slate-600 text-slate-100">
+                  <SelectTrigger>
                     <SelectValue placeholder="Select a model" />
                   </SelectTrigger>
-                  <SelectContent className="bg-slate-800 border-slate-700">
+                  <SelectContent>
                     {Object.entries(modelsByProvider).map(([provider, models]) => (
                       <div key={provider}>
-                        <div className="px-2 py-1.5 text-xs font-semibold text-slate-400 uppercase tracking-wide">
+                        <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
                           {provider}
                         </div>
                         {models.map((model) => (
                           <SelectItem
                             key={model.id}
                             value={model.id}
-                            className="text-slate-100 focus:bg-slate-700 focus:text-slate-100"
                           >
                             <div className="flex flex-col">
                               <span>{model.name}</span>
-                              <span className="text-xs text-slate-400">{model.description}</span>
+                              <span className="text-xs text-muted-foreground">{model.description}</span>
                             </div>
                           </SelectItem>
                         ))}
@@ -161,15 +162,15 @@ function AISettingsPage() {
               </div>
 
               {/* Show current model info */}
-              <div className="flex items-center gap-2 text-sm text-slate-400">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <span>Current:</span>
-                <code className="bg-slate-900 px-2 py-0.5 rounded text-slate-300">
+                <code className="bg-muted px-2 py-0.5 rounded">
                   {setting.modelId}
                 </code>
               </div>
 
               {/* Temperature and prompt info if available */}
-              <div className="flex gap-4 text-sm text-slate-500">
+              <div className="flex gap-4 text-sm text-muted-foreground">
                 {setting.temperature !== undefined && (
                   <span>Temperature: {setting.temperature}</span>
                 )}
@@ -182,18 +183,18 @@ function AISettingsPage() {
         ))}
 
         {/* Info card */}
-        <Card className="bg-slate-800/30 border-slate-700">
+        <Card>
           <CardHeader>
-            <CardTitle className="text-slate-300 text-sm">About Vercel AI Gateway</CardTitle>
+            <CardTitle className="text-sm">About Vercel AI Gateway</CardTitle>
           </CardHeader>
-          <CardContent className="text-sm text-slate-400 space-y-2">
+          <CardContent className="text-sm text-muted-foreground space-y-2">
             <p>
               This dashboard uses the <strong>Vercel AI Gateway</strong> to access AI models from multiple providers through a single API.
             </p>
             <p>
               Available providers: Google (Gemini), Anthropic (Claude), OpenAI (GPT), DeepSeek, xAI (Grok), Meta (Llama), Mistral, and more.
             </p>
-            <p className="text-slate-500">
+            <p>
               Model changes take effect immediately for new requests.
             </p>
           </CardContent>

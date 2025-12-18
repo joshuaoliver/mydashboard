@@ -33,67 +33,70 @@ function ProjectsPage() {
   const [editingProject, setEditingProject] = useState<NonNullable<typeof projects>[0] | null>(null)
 
   return (
-    <div className="container mx-auto p-6">
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Projects</h1>
-          <p className="text-sm text-gray-600 mt-1">
-            Manage projects that link Hubstaff time tracking with Linear issues
-          </p>
+    <div className="p-6">
+      <div className="space-y-6 max-w-4xl">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold">Projects</h1>
+            <p className="text-muted-foreground mt-1">
+              Manage projects that link Hubstaff time tracking with Linear issues
+            </p>
+          </div>
+          <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="w-4 h-4 mr-2" />
+                New Project
+              </Button>
+            </DialogTrigger>
+            <ProjectFormDialog
+              onClose={() => setIsCreateDialogOpen(false)}
+              isOpen={isCreateDialogOpen}
+            />
+          </Dialog>
         </div>
-        <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="w-4 h-4 mr-2" />
-              New Project
-            </Button>
-          </DialogTrigger>
-          <ProjectFormDialog
-            onClose={() => setIsCreateDialogOpen(false)}
-            isOpen={isCreateDialogOpen}
-          />
+
+        {(projects?.length ?? 0) === 0 ? (
+          <Card>
+            <CardContent className="flex flex-col items-center justify-center py-12">
+              <FolderKanban className="w-12 h-12 text-muted-foreground mb-4" />
+              <p className="text-muted-foreground mb-2">No projects yet</p>
+              <p className="text-sm text-muted-foreground mb-4">
+                Create a project to link Hubstaff and Linear data
+              </p>
+              <Button onClick={() => setIsCreateDialogOpen(true)}>
+                <Plus className="w-4 h-4 mr-2" />
+                Create Project
+              </Button>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {(projects ?? []).map((project) => (
+              <ProjectCard
+                key={project._id}
+                project={project}
+                onEdit={() => setEditingProject(project)}
+              />
+            ))}
+          </div>
+        )}
+
+        {/* Edit Dialog */}
+        <Dialog
+          open={editingProject !== null}
+          onOpenChange={(open) => !open && setEditingProject(null)}
+        >
+          {editingProject && (
+            <ProjectFormDialog
+              project={editingProject}
+              onClose={() => setEditingProject(null)}
+              isOpen={true}
+            />
+          )}
         </Dialog>
       </div>
-
-      {projects.length === 0 ? (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <FolderKanban className="w-12 h-12 text-gray-400 mb-4" />
-            <p className="text-gray-600 mb-2">No projects yet</p>
-            <p className="text-sm text-gray-500 mb-4">
-              Create a project to link Hubstaff and Linear data
-            </p>
-            <Button onClick={() => setIsCreateDialogOpen(true)}>
-              <Plus className="w-4 h-4 mr-2" />
-              Create Project
-            </Button>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {(projects ?? []).map((project) => (
-            <ProjectCard
-              key={project._id}
-              project={project}
-              onEdit={() => setEditingProject(project)}
-            />
-          ))}
-        </div>
-      )}
-
-      {/* Edit Dialog */}
-      <Dialog
-        open={editingProject !== null}
-        onOpenChange={(open) => !open && setEditingProject(null)}
-      >
-        {editingProject && (
-          <ProjectFormDialog
-            project={editingProject}
-            onClose={() => setEditingProject(null)}
-            isOpen={true}
-          />
-        )}
-      </Dialog>
     </div>
   )
 }
@@ -136,23 +139,22 @@ function ProjectCard({
     <Card className={!project.isActive ? 'opacity-60' : ''}>
       <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
         <div className="flex items-center gap-2">
-          <FolderKanban className="w-5 h-5 text-blue-600" />
+          <FolderKanban className="w-5 h-5 text-blue-500" />
           <CardTitle className="text-lg font-semibold">{project.name}</CardTitle>
         </div>
         <div className="flex items-center gap-1">
           <Button
             variant="ghost"
-            size="sm"
+            size="icon"
             onClick={onEdit}
-            className="h-8 w-8 p-0 text-gray-600 hover:text-gray-900"
           >
             <Pencil className="w-4 h-4" />
           </Button>
           <Button
             variant="ghost"
-            size="sm"
+            size="icon"
             onClick={handleDelete}
-            className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
+            className="text-destructive hover:text-destructive"
           >
             <Trash2 className="w-4 h-4" />
           </Button>
@@ -161,31 +163,31 @@ function ProjectCard({
       <CardContent className="space-y-3">
         {/* Hubstaff Link */}
         <div className="flex items-center gap-2 text-sm">
-          <Clock className="w-4 h-4 text-green-600" />
+          <Clock className="w-4 h-4 text-green-500" />
           {project.hubstaffProjectName ? (
-            <span className="text-gray-700">{project.hubstaffProjectName}</span>
+            <span>{project.hubstaffProjectName}</span>
           ) : (
-            <span className="text-gray-400 italic">No Hubstaff project</span>
+            <span className="text-muted-foreground italic">No Hubstaff project</span>
           )}
         </div>
 
         {/* Linear Link */}
         <div className="flex items-center gap-2 text-sm">
-          <LayoutList className="w-4 h-4 text-purple-600" />
+          <LayoutList className="w-4 h-4 text-purple-500" />
           {project.linearTeamName ? (
-            <span className="text-gray-700">{project.linearTeamName}</span>
+            <span>{project.linearTeamName}</span>
           ) : (
-            <span className="text-gray-400 italic">No Linear team</span>
+            <span className="text-muted-foreground italic">No Linear team</span>
           )}
         </div>
 
         {/* Active Toggle */}
         <div className="flex items-center justify-between pt-2 border-t">
-          <span className="text-sm text-gray-600">Active</span>
+          <span className="text-sm text-muted-foreground">Active</span>
           <Switch checked={project.isActive} onCheckedChange={handleToggleActive} />
         </div>
 
-        <CardDescription className="text-xs text-gray-500">
+        <CardDescription className="text-xs">
           Created {new Date(project.createdAt).toLocaleDateString()}
         </CardDescription>
       </CardContent>
@@ -283,9 +285,8 @@ function ProjectFormDialog({
       <div className="space-y-4 py-4">
         {/* Project Name */}
         <div className="space-y-2">
-          <Label htmlFor="name">Project Name *</Label>
+          <Label>Project Name *</Label>
           <Input
-            id="name"
             placeholder="My Project"
             value={name}
             onChange={(e) => setName(e.target.value)}
@@ -294,18 +295,15 @@ function ProjectFormDialog({
         </div>
 
         {/* Hubstaff Section */}
-        <div className="space-y-3 p-3 bg-green-50 rounded-lg">
+        <div className="space-y-3 p-3 bg-green-500/10 border border-green-500/20 rounded-lg">
           <div className="flex items-center gap-2">
-            <Clock className="w-4 h-4 text-green-600" />
-            <span className="font-medium text-green-800">Hubstaff</span>
+            <Clock className="w-4 h-4 text-green-500" />
+            <span className="font-medium text-green-500">Hubstaff</span>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
-              <Label htmlFor="hubstaffId" className="text-xs">
-                Project ID
-              </Label>
+              <Label className="text-xs text-muted-foreground">Project ID</Label>
               <Input
-                id="hubstaffId"
                 placeholder="12345"
                 value={hubstaffProjectId}
                 onChange={(e) => setHubstaffProjectId(e.target.value)}
@@ -313,11 +311,8 @@ function ProjectFormDialog({
               />
             </div>
             <div className="space-y-1">
-              <Label htmlFor="hubstaffName" className="text-xs">
-                Project Name
-              </Label>
+              <Label className="text-xs text-muted-foreground">Project Name</Label>
               <Input
-                id="hubstaffName"
                 placeholder="Hubstaff project name"
                 value={hubstaffProjectName}
                 onChange={(e) => setHubstaffProjectName(e.target.value)}
@@ -327,18 +322,15 @@ function ProjectFormDialog({
         </div>
 
         {/* Linear Section */}
-        <div className="space-y-3 p-3 bg-purple-50 rounded-lg">
+        <div className="space-y-3 p-3 bg-purple-500/10 border border-purple-500/20 rounded-lg">
           <div className="flex items-center gap-2">
-            <LayoutList className="w-4 h-4 text-purple-600" />
-            <span className="font-medium text-purple-800">Linear</span>
+            <LayoutList className="w-4 h-4 text-purple-500" />
+            <span className="font-medium text-purple-500">Linear</span>
           </div>
           <div className="space-y-3">
             <div className="space-y-1">
-              <Label htmlFor="linearWorkspace" className="text-xs">
-                Workspace ID
-              </Label>
+              <Label className="text-xs text-muted-foreground">Workspace ID</Label>
               <Input
-                id="linearWorkspace"
                 placeholder="workspace-slug"
                 value={linearWorkspaceId}
                 onChange={(e) => setLinearWorkspaceId(e.target.value)}
@@ -346,22 +338,16 @@ function ProjectFormDialog({
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
-                <Label htmlFor="linearTeamId" className="text-xs">
-                  Team ID
-                </Label>
+                <Label className="text-xs text-muted-foreground">Team ID</Label>
                 <Input
-                  id="linearTeamId"
                   placeholder="team-id"
                   value={linearTeamId}
                   onChange={(e) => setLinearTeamId(e.target.value)}
                 />
               </div>
               <div className="space-y-1">
-                <Label htmlFor="linearTeamName" className="text-xs">
-                  Team Name
-                </Label>
+                <Label className="text-xs text-muted-foreground">Team Name</Label>
                 <Input
-                  id="linearTeamName"
                   placeholder="Engineering"
                   value={linearTeamName}
                   onChange={(e) => setLinearTeamName(e.target.value)}
@@ -373,8 +359,8 @@ function ProjectFormDialog({
 
         {/* Active Toggle */}
         <div className="flex items-center justify-between">
-          <Label htmlFor="active">Active</Label>
-          <Switch id="active" checked={isActive} onCheckedChange={setIsActive} />
+          <Label>Active</Label>
+          <Switch checked={isActive} onCheckedChange={setIsActive} />
         </div>
       </div>
 

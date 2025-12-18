@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import { Badge } from '@/components/ui/badge'
 import { 
   Dialog, 
   DialogContent, 
@@ -31,7 +32,7 @@ import {
   Code2,
   Save
 } from 'lucide-react'
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import type { Id } from '../../../../convex/_generated/dataModel'
 
 export const Route = createFileRoute('/_authenticated/settings/prompts')({
@@ -165,8 +166,8 @@ function PromptsPage() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-slate-100">AI Prompts</h1>
-            <p className="text-slate-400 mt-1">
+            <h1 className="text-2xl font-bold">AI Prompts</h1>
+            <p className="text-muted-foreground mt-1">
               Manage and customize AI prompt templates used throughout the app
             </p>
           </div>
@@ -175,62 +176,55 @@ function PromptsPage() {
               variant="outline" 
               onClick={handleInitialize}
               disabled={isInitializing}
-              className="gap-2 bg-slate-800 border-slate-600 text-slate-300 hover:bg-slate-700 hover:text-slate-100"
             >
-              <RefreshCw className={`h-4 w-4 ${isInitializing ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`h-4 w-4 mr-2 ${isInitializing ? 'animate-spin' : ''}`} />
               Initialize Defaults
             </Button>
             <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
               <DialogTrigger asChild>
-                <Button className="gap-2">
-                  <Plus className="h-4 w-4" />
+                <Button>
+                  <Plus className="h-4 w-4 mr-2" />
                   New Prompt
                 </Button>
               </DialogTrigger>
-              <DialogContent className="bg-slate-800 border-slate-700 text-slate-100 max-w-2xl">
+              <DialogContent className="max-w-2xl">
                 <DialogHeader>
                   <DialogTitle>Create New Prompt</DialogTitle>
-                  <DialogDescription className="text-slate-400">
+                  <DialogDescription>
                     Create a new AI prompt template. Use template variables like {'{{chatName}}'} for dynamic content.
                   </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label className="text-slate-300">Name (unique key)</Label>
+                    <div className="space-y-2">
+                      <Label>Name (unique key)</Label>
                       <Input 
                         placeholder="reply-suggestions" 
                         value={formData.name} 
                         onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                        className="bg-slate-900 border-slate-600 text-slate-100 mt-1"
                       />
                     </div>
-                    <div>
-                      <Label className="text-slate-300">Display Title</Label>
+                    <div className="space-y-2">
+                      <Label>Display Title</Label>
                       <Input 
                         placeholder="AI Reply Suggestions" 
                         value={formData.title} 
                         onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                        className="bg-slate-900 border-slate-600 text-slate-100 mt-1"
                       />
                     </div>
                   </div>
-                  <div>
-                    <Label className="text-slate-300">Prompt Template</Label>
+                  <div className="space-y-2">
+                    <Label>Prompt Template</Label>
                     <Textarea 
                       placeholder="Enter your prompt template here..."
                       value={formData.description} 
                       onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                      className="bg-slate-900 border-slate-600 text-slate-100 mt-1 min-h-[300px] font-mono text-sm"
+                      className="min-h-[300px] font-mono text-sm"
                     />
                   </div>
                 </div>
                 <DialogFooter>
-                  <Button 
-                    variant="outline" 
-                    onClick={() => setIsCreateDialogOpen(false)}
-                    className="bg-slate-700 border-slate-600 text-slate-300 hover:bg-slate-600"
-                  >
+                  <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
                     Cancel
                   </Button>
                   <Button onClick={handleCreate}>Create Prompt</Button>
@@ -241,39 +235,37 @@ function PromptsPage() {
         </div>
 
         {/* Template Variables Reference */}
-        <Card className="bg-slate-800/30 border-slate-700">
+        <Card>
           <CardHeader className="pb-3">
             <div className="flex items-center gap-2">
-              <Code2 className="h-4 w-4 text-blue-400" />
-              <CardTitle className="text-sm text-slate-300">Template Variables</CardTitle>
+              <Code2 className="h-4 w-4 text-blue-500" />
+              <CardTitle className="text-sm">Template Variables</CardTitle>
             </div>
           </CardHeader>
           <CardContent>
             <div className="flex flex-wrap gap-2">
               {TEMPLATE_VARIABLES.map((v) => (
-                <button
+                <Badge
                   key={v.name}
+                  variant="secondary"
+                  className="cursor-pointer font-mono text-xs hover:bg-accent"
                   onClick={() => copyToClipboard(v.name)}
-                  className="group relative px-2 py-1 bg-slate-900 border border-slate-600 rounded text-xs font-mono text-blue-400 hover:bg-slate-800 hover:border-blue-500 transition-colors"
                   title={v.description}
                 >
                   {v.name}
-                  <span className="absolute -top-8 left-1/2 -translate-x-1/2 px-2 py-1 bg-slate-700 text-slate-200 text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
-                    {v.description}
-                  </span>
-                </button>
+                </Badge>
               ))}
             </div>
-            <p className="text-xs text-slate-500 mt-2">Click to copy. Hover for description.</p>
+            <p className="text-xs text-muted-foreground mt-2">Click to copy. Hover for description.</p>
           </CardContent>
         </Card>
 
         {/* Prompts List */}
         {(prompts?.length ?? 0) === 0 ? (
-          <Card className="bg-slate-800/50 border-slate-700">
+          <Card>
             <CardContent className="py-12 text-center">
-              <MessageSquare className="h-12 w-12 text-slate-600 mx-auto mb-4" />
-              <p className="text-slate-400 mb-4">No prompts yet</p>
+              <MessageSquare className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+              <p className="text-muted-foreground mb-4">No prompts yet</p>
               <Button onClick={handleInitialize} disabled={isInitializing}>
                 <RefreshCw className={`h-4 w-4 mr-2 ${isInitializing ? 'animate-spin' : ''}`} />
                 Initialize Default Prompts
@@ -295,29 +287,25 @@ function PromptsPage() {
               return (
                 <Card 
                   key={prompt._id} 
-                  className={`bg-slate-800/50 border-slate-700 transition-all ${
-                    isEditing ? 'ring-2 ring-blue-500/50' : ''
-                  }`}
+                  className={isEditing ? 'ring-2 ring-primary/50' : ''}
                 >
                   <CardHeader className="pb-3">
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex-1">
                         {isEditing ? (
                           <div className="grid grid-cols-2 gap-4">
-                            <div>
-                              <Label className="text-slate-400 text-xs">Name</Label>
+                            <div className="space-y-2">
+                              <Label className="text-xs text-muted-foreground">Name</Label>
                               <Input 
                                 value={ed.name} 
                                 onChange={(e) => updateField(prompt._id, 'name', e.target.value)}
-                                className="bg-slate-900 border-slate-600 text-slate-100 mt-1"
                               />
                             </div>
-                            <div>
-                              <Label className="text-slate-400 text-xs">Title</Label>
+                            <div className="space-y-2">
+                              <Label className="text-xs text-muted-foreground">Title</Label>
                               <Input 
                                 value={ed.title} 
                                 onChange={(e) => updateField(prompt._id, 'title', e.target.value)}
-                                className="bg-slate-900 border-slate-600 text-slate-100 mt-1"
                               />
                             </div>
                           </div>
@@ -327,19 +315,19 @@ function PromptsPage() {
                             onClick={() => setExpandedPromptId(isExpanded ? null : prompt._id)}
                           >
                             <div className="flex items-center gap-3">
-                              <CardTitle className="text-slate-100">{prompt.title}</CardTitle>
+                              <CardTitle>{prompt.title}</CardTitle>
                               {isSaved && (
-                                <span className="flex items-center gap-1 text-green-400 text-xs">
-                                  <Check className="h-3 w-3" />
+                                <Badge variant="outline" className="text-green-500 border-green-500">
+                                  <Check className="h-3 w-3 mr-1" />
                                   Saved
-                                </span>
+                                </Badge>
                               )}
                             </div>
-                            <CardDescription className="mt-1">
-                              <code className="text-xs bg-slate-900 text-slate-400 px-2 py-0.5 rounded">
+                            <CardDescription className="mt-1 flex items-center gap-3">
+                              <code className="text-xs bg-muted px-2 py-0.5 rounded">
                                 {prompt.name}
                               </code>
-                              <span className="text-slate-500 ml-3 text-xs">
+                              <span className="text-xs">
                                 Updated {new Date(prompt.updatedAt).toLocaleDateString()}
                               </span>
                             </CardDescription>
@@ -351,18 +339,16 @@ function PromptsPage() {
                           <>
                             <Button 
                               variant="ghost" 
-                              size="sm" 
+                              size="icon" 
                               onClick={() => savePrompt(prompt._id)}
                               disabled={isSaving}
-                              className="text-green-400 hover:text-green-300 hover:bg-green-900/20"
                             >
-                              <Save className={`h-4 w-4 ${isSaving ? 'animate-pulse' : ''}`} />
+                              <Save className={`h-4 w-4 text-green-500 ${isSaving ? 'animate-pulse' : ''}`} />
                             </Button>
                             <Button 
                               variant="ghost" 
-                              size="sm" 
+                              size="icon" 
                               onClick={() => setEditingPromptId(null)}
-                              className="text-slate-400 hover:text-slate-300"
                             >
                               <X className="h-4 w-4" />
                             </Button>
@@ -371,9 +357,8 @@ function PromptsPage() {
                           <>
                             <Button 
                               variant="ghost" 
-                              size="sm" 
+                              size="icon" 
                               onClick={() => setExpandedPromptId(isExpanded ? null : prompt._id)}
-                              className="text-slate-400 hover:text-slate-300"
                             >
                               {isExpanded ? (
                                 <ChevronUp className="h-4 w-4" />
@@ -383,17 +368,16 @@ function PromptsPage() {
                             </Button>
                             <Button 
                               variant="ghost" 
-                              size="sm" 
+                              size="icon" 
                               onClick={() => startEditing(prompt)}
-                              className="text-slate-400 hover:text-slate-300"
                             >
                               <Pencil className="h-4 w-4" />
                             </Button>
                             <Button 
                               variant="ghost" 
-                              size="sm" 
+                              size="icon" 
                               onClick={() => handleDelete(prompt._id)}
-                              className="text-red-400 hover:text-red-300 hover:bg-red-900/20"
+                              className="text-destructive hover:text-destructive"
                             >
                               <Trash2 className="h-4 w-4" />
                             </Button>
@@ -408,36 +392,37 @@ function PromptsPage() {
                       {isEditing ? (
                         <div className="space-y-3">
                           {/* Variable insertion buttons when editing */}
-                          <div className="flex flex-wrap gap-1">
-                            <span className="text-xs text-slate-500 mr-2">Insert:</span>
+                          <div className="flex flex-wrap gap-1 items-center">
+                            <span className="text-xs text-muted-foreground mr-2">Insert:</span>
                             {TEMPLATE_VARIABLES.map((v) => (
-                              <button
+                              <Badge
                                 key={v.name}
+                                variant="outline"
+                                className="cursor-pointer font-mono text-xs hover:bg-accent"
                                 onClick={() => insertVariable(prompt._id, v.name)}
-                                className="px-1.5 py-0.5 bg-slate-900 border border-slate-700 rounded text-xs font-mono text-blue-400 hover:bg-slate-800 hover:border-blue-500 transition-colors"
                                 title={v.description}
                               >
                                 {v.name.replace(/\{\{|\}\}/g, '')}
-                              </button>
+                              </Badge>
                             ))}
                           </div>
                           <Textarea 
                             value={ed.description} 
                             onChange={(e) => updateField(prompt._id, 'description', e.target.value)}
-                            className="bg-slate-900 border-slate-600 text-slate-100 min-h-[500px] font-mono text-sm leading-relaxed"
+                            className="min-h-[500px] font-mono text-sm leading-relaxed"
                           />
                         </div>
                       ) : (
                         <div className="relative">
                           <Button
                             variant="ghost"
-                            size="sm"
+                            size="icon"
                             onClick={() => copyToClipboard(prompt.description)}
-                            className="absolute top-2 right-2 text-slate-500 hover:text-slate-300"
+                            className="absolute top-2 right-2"
                           >
                             <Copy className="h-4 w-4" />
                           </Button>
-                          <pre className="text-sm text-slate-300 whitespace-pre-wrap font-mono bg-slate-900/50 p-4 rounded-lg border border-slate-700 max-h-[400px] overflow-auto">
+                          <pre className="text-sm whitespace-pre-wrap font-mono bg-muted p-4 rounded-lg max-h-[400px] overflow-auto">
                             {prompt.description}
                           </pre>
                         </div>
