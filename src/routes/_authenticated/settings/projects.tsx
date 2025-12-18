@@ -36,12 +36,6 @@ function ProjectsPage() {
   const { data: projects } = useQuery(
     convexQuery(api.projectsStore.listProjects, {})
   )
-  const { data: hubstaffSettings } = useQuery(
-    convexQuery(api.settingsStore.getHubstaffSettings, {})
-  )
-  const { data: linearWorkspaces } = useQuery(
-    convexQuery(api.linearActions.listWorkspaces, {})
-  )
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
   const [editingProject, setEditingProject] = useState<NonNullable<typeof projects>[0] | null>(null)
   const [isSyncSectionOpen, setIsSyncSectionOpen] = useState(false)
@@ -288,7 +282,9 @@ function ProjectCard({
   const deleteProject = useConvexMutation(api.projectsStore.deleteProject)
   const toggleActive = useConvexMutation(api.projectsStore.toggleProjectActive)
 
-  const handleDelete = () => {
+  const handleDelete = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    e.preventDefault()
     if (confirm(`Delete project "${project.name}"?`)) {
       deleteProject({ id: project._id }).catch((e) =>
         alert(e.message || 'Failed to delete')
@@ -296,69 +292,86 @@ function ProjectCard({
     }
   }
 
-  const handleToggleActive = () => {
+  const handleToggleActive = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    e.preventDefault()
     toggleActive({ id: project._id }).catch((e) =>
       alert(e.message || 'Failed to toggle')
     )
   }
 
+  const handleEditClick = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    e.preventDefault()
+    onEdit()
+  }
+
   return (
-    <Card className={!project.isActive ? 'opacity-60' : ''}>
-      <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
-        <div className="flex items-center gap-2">
-          <FolderKanban className="w-5 h-5 text-blue-500" />
-          <CardTitle className="text-lg font-semibold">{project.name}</CardTitle>
-        </div>
-        <div className="flex items-center gap-1">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={onEdit}
-          >
-            <Pencil className="w-4 h-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={handleDelete}
-            className="text-destructive hover:text-destructive"
-          >
-            <Trash2 className="w-4 h-4" />
-          </Button>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        {/* Hubstaff Link */}
-        <div className="flex items-center gap-2 text-sm">
-          <Clock className="w-4 h-4 text-green-500" />
-          {project.hubstaffProjectName ? (
-            <span>{project.hubstaffProjectName}</span>
-          ) : (
-            <span className="text-muted-foreground italic">No Hubstaff project</span>
-          )}
-        </div>
+    <Link to="/settings/projects/$projectId" params={{ projectId: project._id }}>
+      <Card className={`cursor-pointer hover:border-blue-500/50 transition-colors ${!project.isActive ? 'opacity-60' : ''}`}>
+        <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
+          <div className="flex items-center gap-2">
+            <FolderKanban className="w-5 h-5 text-blue-500" />
+            <CardTitle className="text-lg font-semibold">{project.name}</CardTitle>
+          </div>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleEditClick}
+            >
+              <Pencil className="w-4 h-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleDelete}
+              className="text-destructive hover:text-destructive"
+            >
+              <Trash2 className="w-4 h-4" />
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {/* Hubstaff Link */}
+          <div className="flex items-center gap-2 text-sm">
+            <Clock className="w-4 h-4 text-green-500" />
+            {project.hubstaffProjectName ? (
+              <span>{project.hubstaffProjectName}</span>
+            ) : (
+              <span className="text-muted-foreground italic">No Hubstaff project</span>
+            )}
+          </div>
 
-        {/* Linear Link */}
-        <div className="flex items-center gap-2 text-sm">
-          <LayoutList className="w-4 h-4 text-purple-500" />
-          {project.linearTeamName ? (
-            <span>{project.linearTeamName}</span>
-          ) : (
-            <span className="text-muted-foreground italic">No Linear team</span>
-          )}
-        </div>
+          {/* Linear Link */}
+          <div className="flex items-center gap-2 text-sm">
+            <LayoutList className="w-4 h-4 text-purple-500" />
+            {project.linearTeamName ? (
+              <span>{project.linearTeamName}</span>
+            ) : (
+              <span className="text-muted-foreground italic">No Linear team</span>
+            )}
+          </div>
 
-        {/* Active Toggle */}
-        <div className="flex items-center justify-between pt-2 border-t">
-          <span className="text-sm text-muted-foreground">Active</span>
-          <Switch checked={project.isActive} onCheckedChange={handleToggleActive} />
-        </div>
+          {/* Active Toggle */}
+          <div className="flex items-center justify-between pt-2 border-t">
+            <span className="text-sm text-muted-foreground">Active</span>
+            <Switch 
+              checked={project.isActive} 
+              onCheckedChange={() => {}}
+              onClick={handleToggleActive}
+            />
+          </div>
 
-        <CardDescription className="text-xs">
-          Created {new Date(project.createdAt).toLocaleDateString()}
-        </CardDescription>
-      </CardContent>
-    </Card>
+          <div className="flex items-center justify-between">
+            <CardDescription className="text-xs">
+              Created {new Date(project.createdAt).toLocaleDateString()}
+            </CardDescription>
+            <ChevronRight className="w-4 h-4 text-muted-foreground" />
+          </div>
+        </CardContent>
+      </Card>
+    </Link>
   )
 }
 
@@ -394,6 +407,83 @@ function ProjectFormDialog({
   )
   const [isActive, setIsActive] = useState(project?.isActive ?? true)
   const [isSubmitting, setIsSubmitting] = useState(false)
+
+  // Hubstaff project data
+  const { data: hubstaffSettings } = useQuery(
+    convexQuery(api.settingsStore.getHubstaffSettings, {})
+  )
+  const fetchHubstaffProjects = useConvexAction(api.hubstaffActions.fetchOrganizationProjects)
+  const [hubstaffProjects, setHubstaffProjects] = useState<{ id: number; name: string }[]>([])
+  const [isLoadingHubstaff, setIsLoadingHubstaff] = useState(false)
+
+  // Linear teams data
+  const fetchLinearTeams = useConvexAction(api.linearActions.fetchAllTeams)
+  const [linearTeamsData, setLinearTeamsData] = useState<{
+    workspaceId: string;
+    workspaceName: string;
+    teams: { id: string; name: string; key: string }[];
+  }[]>([])
+  const [isLoadingLinear, setIsLoadingLinear] = useState(false)
+
+  // Load Hubstaff projects when dialog opens
+  useEffect(() => {
+    if (isOpen && hubstaffSettings?.organizationId && hubstaffProjects.length === 0) {
+      setIsLoadingHubstaff(true)
+      fetchHubstaffProjects({ organizationId: hubstaffSettings.organizationId })
+        .then((projects) => {
+          setHubstaffProjects(projects.map((p) => ({ id: p.id, name: p.name })))
+        })
+        .catch(console.error)
+        .finally(() => setIsLoadingHubstaff(false))
+    }
+  }, [isOpen, hubstaffSettings?.organizationId])
+
+  // Load Linear teams when dialog opens
+  useEffect(() => {
+    if (isOpen && linearTeamsData.length === 0) {
+      setIsLoadingLinear(true)
+      fetchLinearTeams({})
+        .then((data) => {
+          setLinearTeamsData(data)
+        })
+        .catch(console.error)
+        .finally(() => setIsLoadingLinear(false))
+    }
+  }, [isOpen])
+
+  // Handle Hubstaff project selection
+  const handleHubstaffProjectChange = (value: string) => {
+    if (value === 'none') {
+      setHubstaffProjectId('')
+      setHubstaffProjectName('')
+    } else {
+      const projectId = parseInt(value)
+      const selectedProject = hubstaffProjects.find((p) => p.id === projectId)
+      if (selectedProject) {
+        setHubstaffProjectId(value)
+        setHubstaffProjectName(selectedProject.name)
+      }
+    }
+  }
+
+  // Handle Linear team selection
+  const handleLinearTeamChange = (value: string) => {
+    if (value === 'none') {
+      setLinearTeamId('')
+      setLinearTeamName('')
+      setLinearWorkspaceId('')
+    } else {
+      // Value format: workspaceId|teamId
+      const [workspaceId, teamId] = value.split('|')
+      const workspace = linearTeamsData.find((w) => w.workspaceId === workspaceId)
+      const team = workspace?.teams.find((t) => t.id === teamId)
+      if (team && workspace) {
+        setLinearTeamId(teamId)
+        setLinearTeamName(team.name)
+        setLinearWorkspaceId(workspaceId)
+      }
+    }
+  }
 
   const createProject = useConvexMutation(api.projectsStore.createProject)
   const updateProject = useConvexMutation(api.projectsStore.updateProject)
@@ -438,6 +528,11 @@ function ProjectFormDialog({
     }
   }
 
+  // Build the Linear team select value
+  const linearSelectValue = linearTeamId && linearWorkspaceId
+    ? `${linearWorkspaceId}|${linearTeamId}`
+    : 'none'
+
   return (
     <DialogContent className="sm:max-w-[500px]">
       <DialogHeader>
@@ -465,63 +560,90 @@ function ProjectFormDialog({
         <div className="space-y-3 p-3 bg-green-500/10 border border-green-500/20 rounded-lg">
           <div className="flex items-center gap-2">
             <Clock className="w-4 h-4 text-green-500" />
-            <span className="font-medium text-green-500">Hubstaff</span>
+            <span className="font-medium text-green-600">Hubstaff Project</span>
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">Project ID</Label>
-              <Input
-                placeholder="12345"
-                value={hubstaffProjectId}
-                onChange={(e) => setHubstaffProjectId(e.target.value)}
-                type="number"
-              />
+          
+          {hubstaffSettings?.isConfigured ? (
+            <div className="space-y-2">
+              <Select
+                value={hubstaffProjectId || 'none'}
+                onValueChange={handleHubstaffProjectChange}
+                disabled={isLoadingHubstaff}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={isLoadingHubstaff ? 'Loading projects...' : 'Select a project...'} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">
+                    <span className="text-muted-foreground italic">No project</span>
+                  </SelectItem>
+                  {hubstaffProjects.map((project) => (
+                    <SelectItem key={project.id} value={project.id.toString()}>
+                      {project.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {hubstaffProjectName && (
+                <p className="text-xs text-muted-foreground">
+                  Selected: {hubstaffProjectName} (ID: {hubstaffProjectId})
+                </p>
+              )}
             </div>
-            <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">Project Name</Label>
-              <Input
-                placeholder="Hubstaff project name"
-                value={hubstaffProjectName}
-                onChange={(e) => setHubstaffProjectName(e.target.value)}
-              />
-            </div>
-          </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              Configure Hubstaff in <Link to="/settings/hubstaff" className="text-green-500 underline">Settings</Link> to select a project.
+            </p>
+          )}
         </div>
 
         {/* Linear Section */}
         <div className="space-y-3 p-3 bg-purple-500/10 border border-purple-500/20 rounded-lg">
           <div className="flex items-center gap-2">
             <LayoutList className="w-4 h-4 text-purple-500" />
-            <span className="font-medium text-purple-500">Linear</span>
+            <span className="font-medium text-purple-600">Linear Team</span>
           </div>
-          <div className="space-y-3">
-            <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">Workspace ID</Label>
-              <Input
-                placeholder="workspace-slug"
-                value={linearWorkspaceId}
-                onChange={(e) => setLinearWorkspaceId(e.target.value)}
-              />
+          
+          {linearTeamsData.length > 0 || isLoadingLinear ? (
+            <div className="space-y-2">
+              <Select
+                value={linearSelectValue}
+                onValueChange={handleLinearTeamChange}
+                disabled={isLoadingLinear}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={isLoadingLinear ? 'Loading teams...' : 'Select a team...'} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">
+                    <span className="text-muted-foreground italic">No team</span>
+                  </SelectItem>
+                  {linearTeamsData.map((workspace) => (
+                    workspace.teams.map((team) => (
+                      <SelectItem
+                        key={`${workspace.workspaceId}|${team.id}`}
+                        value={`${workspace.workspaceId}|${team.id}`}
+                      >
+                        <span className="flex items-center gap-2">
+                          <span className="text-muted-foreground text-xs">[{workspace.workspaceName}]</span>
+                          {team.name}
+                        </span>
+                      </SelectItem>
+                    ))
+                  ))}
+                </SelectContent>
+              </Select>
+              {linearTeamName && (
+                <p className="text-xs text-muted-foreground">
+                  Selected: {linearTeamName} (ID: {linearTeamId})
+                </p>
+              )}
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">Team ID</Label>
-                <Input
-                  placeholder="team-id"
-                  value={linearTeamId}
-                  onChange={(e) => setLinearTeamId(e.target.value)}
-                />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">Team Name</Label>
-                <Input
-                  placeholder="Engineering"
-                  value={linearTeamName}
-                  onChange={(e) => setLinearTeamName(e.target.value)}
-                />
-              </div>
-            </div>
-          </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              Configure Linear in <Link to="/settings/linear" className="text-purple-500 underline">Settings</Link> to select a team.
+            </p>
+          )}
         </div>
 
         {/* Active Toggle */}

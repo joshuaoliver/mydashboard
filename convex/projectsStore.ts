@@ -1,6 +1,5 @@
 import { v } from "convex/values";
 import { query, mutation, internalQuery } from "./_generated/server";
-import { Id } from "./_generated/dataModel";
 
 /**
  * Projects Store - unified projects linking Hubstaff + Linear
@@ -241,5 +240,67 @@ export const toggleProjectActive = mutation({
     });
 
     return !existing.isActive;
+  },
+});
+
+// ==========================================
+// Project Detail Queries
+// ==========================================
+
+/**
+ * Get time entries for a specific project
+ */
+export const getProjectTimeEntries = query({
+  args: {
+    projectId: v.id("projects"),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const project = await ctx.db.get(args.projectId);
+    if (!project || !project.hubstaffProjectId) {
+      return [];
+    }
+
+    const limit = args.limit ?? 50;
+
+    const entries = await ctx.db
+      .query("hubstaffTimeEntries")
+      .withIndex("by_project_date", (q) =>
+        q.eq("hubstaffProjectId", project.hubstaffProjectId!)
+      )
+      .order("desc")
+      .take(limit);
+
+    return entries;
+  },
+});
+
+/**
+ * Get Linear issues for a specific project
+ */
+export const getProjectLinearIssues = query({
+  args: {
+    projectId: v.id("projects"),
+  },
+  handler: async (ctx, args) => {
+    const project = await ctx.db.get(args.projectId);
+    if (!project || !project.linearTeamId) {
+      return [];
+    }
+
+    const issues = await ctx.db
+      .query("linearIssues")
+      .withIndex("by_team", (q) => q.eq("teamId", project.linearTeamId!))
+      .collect();
+
+    // Sort by priority (higher first) then by updated date
+    issues.sort((a, b) => {
+      if (a.priority !== b.priority) {
+        return b.priority - a.priority;
+      }
+      return b.updatedAt - a.updatedAt;
+    });
+
+    return issues;
   },
 });

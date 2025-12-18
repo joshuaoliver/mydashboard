@@ -793,16 +793,8 @@ export const syncBeeperChatsInternal = internalAction({
       );
 
       // Cache ALL profile images that don't have them yet (run in background)
-      // This doesn't block the sync response - processes all uncached images in parallel batches
-      ctx.runAction(api.imageCache.cacheAllProfileImages, {})
-        .then(result => {
-          if (result.processed > 0) {
-            console.log(`[Beeper Sync] Image caching: ${result.success}/${result.processed} cached successfully, ${result.failed} failed`);
-          }
-        })
-        .catch(err => {
-          console.error('[Beeper Sync] Image caching error:', err);
-        });
+      // Schedule as a separate action so it doesn't block the sync response
+      await ctx.scheduler.runAfter(0, api.imageCache.cacheAllProfileImages, {});
 
       return {
         success: true,

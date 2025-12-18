@@ -165,6 +165,94 @@ export const testConnection = action({
 });
 
 /**
+ * Trigger a manual sync with configurable date range
+ */
+export const triggerManualSync = action({
+  args: {
+    daysBack: v.optional(v.number()),
+  },
+  handler: async (ctx, args): Promise<{
+    success: boolean;
+    entriesProcessed?: number;
+    datesProcessed?: number;
+    error?: string;
+  }> => {
+    const daysBack = args.daysBack ?? 7;
+    
+    const settings = await ctx.runQuery(internal.settingsStore.getHubstaffSettingsInternal, {});
+    
+    if (!settings?.isConfigured || !settings?.selectedUserId) {
+      return { success: false, error: "Hubstaff not configured" };
+    }
+
+    try {
+      const today = new Date();
+      const startDay = new Date(today);
+      startDay.setDate(startDay.getDate() - daysBack);
+
+      const startDate = startDay.toISOString().split("T")[0];
+      const endDate = today.toISOString().split("T")[0];
+
+      console.log(`Manual Hubstaff sync: ${startDate} to ${endDate} (${daysBack} days)`);
+
+      // Get active projects to filter by
+      const projects = await ctx.runQuery(internal.projectsStore.listActiveProjectsInternal, {});
+      const hubstaffProjectIds: number[] = projects
+        .filter((p: any) => p.hubstaffProjectId)
+        .map((p: any) => p.hubstaffProjectId as number);
+
+      // Fetch activities from Hubstaff API
+      const activities = await ctx.runAction(internal.hubstaffActions.fetchActivities, {
+        startDate,
+        endDate,
+        userIds: [settings.selectedUserId],
+        projectIds: hubstaffProjectIds.length > 0 ? hubstaffProjectIds : undefined,
+      });
+
+      if (!activities.daily_activities?.length) {
+        return { success: true, entriesProcessed: 0, datesProcessed: 0 };
+      }
+
+      // Create lookup maps
+      const userMap = new Map((activities.users || []).map((u: any) => [u.id, u]));
+      const projectMap = new Map((activities.projects || []).map((p: any) => [p.id, p]));
+      const taskMap = new Map((activities.tasks || []).map((t: any) => [t.id, t]));
+
+      // Store entries
+      const result = await ctx.runMutation(internal.hubstaffSync.upsertTimeEntries, {
+        activities: activities.daily_activities.map((activity: any) => ({
+          ...activity,
+          userName: (userMap.get(activity.user_id) as any)?.name || `User ${activity.user_id}`,
+          projectName: (projectMap.get(activity.project_id) as any)?.name || `Project ${activity.project_id}`,
+          taskName: activity.task_id ? (taskMap.get(activity.task_id) as any)?.summary : undefined,
+        })),
+        selectedUserId: settings.selectedUserId,
+      });
+
+      // Recalculate summaries for affected dates
+      const affectedDates = [...new Set(activities.daily_activities.map((a: any) => a.date))];
+      for (const date of affectedDates) {
+        await ctx.runMutation(internal.hubstaffSync.calculateDailySummaryForDate, {
+          date: date as string,
+          hubstaffUserId: settings.selectedUserId,
+        });
+      }
+
+      return {
+        success: true,
+        entriesProcessed: result.entriesProcessed,
+        datesProcessed: affectedDates.length,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : "Unknown error",
+      };
+    }
+  },
+});
+
+/**
  * Save Hubstaff configuration
  */
 export const saveConfiguration = action({

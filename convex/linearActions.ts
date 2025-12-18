@@ -302,4 +302,118 @@ export const fetchMyIssues = internalAction({
   },
 });
 
+/**
+ * Trigger a manual sync of all workspaces
+ */
+export const triggerManualSync = action({
+  args: {},
+  handler: async (ctx): Promise<{
+    success: boolean;
+    totalIssuesProcessed?: number;
+    workspaces?: { workspace: string; issues: number; error?: string }[];
+    error?: string;
+  }> => {
+    console.log("Manual Linear sync triggered...");
+
+    const workspaces = await ctx.runQuery(internal.linearActions.listActiveWorkspacesInternal, {});
+
+    if (workspaces.length === 0) {
+      return { success: false, error: "No active workspaces configured" };
+    }
+
+    try {
+      let totalIssuesProcessed = 0;
+      const results: { workspace: string; issues: number; error?: string }[] = [];
+
+      const allIssuesData = await ctx.runAction(internal.linearActions.fetchMyIssues, {});
+
+      for (const workspaceData of allIssuesData) {
+        try {
+          const result = await ctx.runMutation(internal.linearSync.upsertIssues, {
+            workspaceId: workspaceData.workspaceId,
+            workspaceName: workspaceData.workspaceName,
+            issues: workspaceData.issues.map((issue: any) => ({
+              linearId: issue.id,
+              identifier: issue.identifier,
+              title: issue.title,
+              description: issue.description,
+              priority: issue.priority,
+              priorityLabel: issue.priorityLabel,
+              createdAt: new Date(issue.createdAt).getTime(),
+              updatedAt: new Date(issue.updatedAt).getTime(),
+              completedAt: issue.completedAt ? new Date(issue.completedAt).getTime() : undefined,
+              dueDate: issue.dueDate,
+              url: issue.url,
+              assigneeId: issue.assignee?.id || "",
+              assigneeName: issue.assignee?.name,
+              status: issue.state.name,
+              statusType: issue.state.type,
+              teamId: issue.team.id,
+              teamName: issue.team.name,
+            })),
+          });
+
+          totalIssuesProcessed += result.issuesUpserted;
+          results.push({
+            workspace: workspaceData.workspaceName,
+            issues: result.issuesUpserted,
+          });
+        } catch (error) {
+          results.push({
+            workspace: workspaceData.workspaceName,
+            issues: 0,
+            error: error instanceof Error ? error.message : "Unknown error",
+          });
+        }
+      }
+
+      return {
+        success: true,
+        totalIssuesProcessed,
+        workspaces: results,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : "Unknown error",
+      };
+    }
+  },
+});
+
+/**
+ * Fetch all teams from all active workspaces (for project creation dropdown)
+ */
+export const fetchAllTeams = action({
+  args: {},
+  handler: async (ctx): Promise<{
+    workspaceId: string;
+    workspaceName: string;
+    teams: { id: string; name: string; key: string }[];
+  }[]> => {
+    const workspaces = await ctx.runQuery(internal.linearActions.listActiveWorkspacesInternal, {});
+
+    const allTeams: {
+      workspaceId: string;
+      workspaceName: string;
+      teams: { id: string; name: string; key: string }[];
+    }[] = [];
+
+    for (const workspace of workspaces) {
+      try {
+        const teams = await getTeams(workspace.apiKey);
+        allTeams.push({
+          workspaceId: workspace.workspaceId,
+          workspaceName: workspace.workspaceName,
+          teams,
+        });
+      } catch (error) {
+        console.error(`Failed to fetch teams for ${workspace.workspaceName}:`, error);
+      }
+    }
+
+    return allTeams;
+  },
+});
+
 // Note: listWorkspacesInternal removed - use listWorkspaces query directly
