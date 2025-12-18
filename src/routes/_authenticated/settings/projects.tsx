@@ -1,7 +1,7 @@
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, Link } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
 import { convexQuery } from '@convex-dev/react-query'
-import { useConvexMutation } from '@convex-dev/react-query'
+import { useConvexMutation, useConvexAction } from '@convex-dev/react-query'
 import { api } from '../../../../convex/_generated/api'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -17,8 +17,15 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog'
-import { Plus, Trash2, FolderKanban, Clock, LayoutList, Pencil } from 'lucide-react'
-import { useState } from 'react'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { Plus, Trash2, FolderKanban, Clock, LayoutList, Pencil, RefreshCw, ChevronRight, Calendar, Play, Settings } from 'lucide-react'
+import { useState, useEffect } from 'react'
 import type { Id } from '../../../../convex/_generated/dataModel'
 
 export const Route = createFileRoute('/_authenticated/settings/projects')({
@@ -29,8 +36,15 @@ function ProjectsPage() {
   const { data: projects } = useQuery(
     convexQuery(api.projectsStore.listProjects, {})
   )
+  const { data: hubstaffSettings } = useQuery(
+    convexQuery(api.settingsStore.getHubstaffSettings, {})
+  )
+  const { data: linearWorkspaces } = useQuery(
+    convexQuery(api.linearActions.listWorkspaces, {})
+  )
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
   const [editingProject, setEditingProject] = useState<NonNullable<typeof projects>[0] | null>(null)
+  const [isSyncSectionOpen, setIsSyncSectionOpen] = useState(false)
 
   return (
     <div className="p-6">
@@ -43,19 +57,30 @@ function ProjectsPage() {
               Manage projects that link Hubstaff time tracking with Linear issues
             </p>
           </div>
-          <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="w-4 h-4 mr-2" />
-                New Project
-              </Button>
-            </DialogTrigger>
-            <ProjectFormDialog
-              onClose={() => setIsCreateDialogOpen(false)}
-              isOpen={isCreateDialogOpen}
-            />
-          </Dialog>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => setIsSyncSectionOpen(!isSyncSectionOpen)}>
+              <Settings className="w-4 h-4 mr-2" />
+              Sync Settings
+            </Button>
+            <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+              <DialogTrigger asChild>
+                <Button>
+                  <Plus className="w-4 h-4 mr-2" />
+                  New Project
+                </Button>
+              </DialogTrigger>
+              <ProjectFormDialog
+                onClose={() => setIsCreateDialogOpen(false)}
+                isOpen={isCreateDialogOpen}
+              />
+            </Dialog>
+          </div>
         </div>
+
+        {/* Sync Settings Section */}
+        {isSyncSectionOpen && (
+          <SyncSettingsSection />
+        )}
 
         {(projects?.length ?? 0) === 0 ? (
           <Card>
@@ -98,6 +123,148 @@ function ProjectsPage() {
         </Dialog>
       </div>
     </div>
+  )
+}
+
+// ============================================
+// Sync Settings Section
+// ============================================
+
+function SyncSettingsSection() {
+  const triggerHubstaffSync = useConvexAction(api.hubstaffActions.triggerManualSync)
+  const triggerLinearSync = useConvexAction(api.linearActions.triggerManualSync)
+  
+  const [isSyncingHubstaff, setIsSyncingHubstaff] = useState(false)
+  const [isSyncingLinear, setIsSyncingLinear] = useState(false)
+  const [hubstaffDaysBack, setHubstaffDaysBack] = useState(7)
+  const [syncResult, setSyncResult] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
+
+  const handleHubstaffSync = async () => {
+    setIsSyncingHubstaff(true)
+    setSyncResult(null)
+    try {
+      const result = await triggerHubstaffSync({ daysBack: hubstaffDaysBack })
+      setSyncResult({
+        type: 'success',
+        message: `Hubstaff sync complete! Processed ${result.entriesProcessed ?? 0} entries.`
+      })
+    } catch (e) {
+      setSyncResult({
+        type: 'error',
+        message: `Hubstaff sync failed: ${e instanceof Error ? e.message : 'Unknown error'}`
+      })
+    } finally {
+      setIsSyncingHubstaff(false)
+    }
+  }
+
+  const handleLinearSync = async () => {
+    setIsSyncingLinear(true)
+    setSyncResult(null)
+    try {
+      const result = await triggerLinearSync({})
+      setSyncResult({
+        type: 'success',
+        message: `Linear sync complete! Processed ${result.totalIssuesProcessed ?? 0} issues.`
+      })
+    } catch (e) {
+      setSyncResult({
+        type: 'error',
+        message: `Linear sync failed: ${e instanceof Error ? e.message : 'Unknown error'}`
+      })
+    } finally {
+      setIsSyncingLinear(false)
+    }
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <RefreshCw className="w-5 h-5" />
+          Sync Settings
+        </CardTitle>
+        <CardDescription>
+          Manually trigger syncs and configure historical data fetching
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {syncResult && (
+          <div className={`rounded-lg p-3 text-sm border ${
+            syncResult.type === 'success'
+              ? 'bg-green-500/10 border-green-500/20 text-green-600'
+              : 'bg-destructive/10 border-destructive/20 text-destructive'
+          }`}>
+            {syncResult.message}
+          </div>
+        )}
+
+        <div className="grid gap-4 md:grid-cols-2">
+          {/* Hubstaff Sync */}
+          <div className="p-4 bg-green-500/10 border border-green-500/20 rounded-lg space-y-3">
+            <div className="flex items-center gap-2">
+              <Clock className="w-5 h-5 text-green-500" />
+              <span className="font-semibold text-green-600">Hubstaff Sync</span>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Sync time entries from Hubstaff
+            </p>
+            <div className="flex items-center gap-2">
+              <Label className="text-sm whitespace-nowrap">Days back:</Label>
+              <Select
+                value={hubstaffDaysBack.toString()}
+                onValueChange={(v) => setHubstaffDaysBack(parseInt(v))}
+              >
+                <SelectTrigger className="w-24">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="1">1 day</SelectItem>
+                  <SelectItem value="7">7 days</SelectItem>
+                  <SelectItem value="14">14 days</SelectItem>
+                  <SelectItem value="30">30 days</SelectItem>
+                  <SelectItem value="60">60 days</SelectItem>
+                  <SelectItem value="90">90 days</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <Button
+              onClick={handleHubstaffSync}
+              disabled={isSyncingHubstaff}
+              className="w-full"
+              variant="outline"
+            >
+              <Play className={`w-4 h-4 mr-2 ${isSyncingHubstaff ? 'animate-spin' : ''}`} />
+              {isSyncingHubstaff ? 'Syncing...' : 'Run Sync'}
+            </Button>
+          </div>
+
+          {/* Linear Sync */}
+          <div className="p-4 bg-purple-500/10 border border-purple-500/20 rounded-lg space-y-3">
+            <div className="flex items-center gap-2">
+              <LayoutList className="w-5 h-5 text-purple-500" />
+              <span className="font-semibold text-purple-600">Linear Sync</span>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Sync issues from all active Linear workspaces
+            </p>
+            <Button
+              onClick={handleLinearSync}
+              disabled={isSyncingLinear}
+              className="w-full mt-auto"
+              variant="outline"
+            >
+              <Play className={`w-4 h-4 mr-2 ${isSyncingLinear ? 'animate-spin' : ''}`} />
+              {isSyncingLinear ? 'Syncing...' : 'Run Sync'}
+            </Button>
+          </div>
+        </div>
+
+        <p className="text-xs text-muted-foreground">
+          <strong>Note:</strong> These syncs run automatically every 15 minutes. Use manual sync for immediate updates or to fetch historical data.
+        </p>
+      </CardContent>
+    </Card>
   )
 }
 

@@ -40,6 +40,15 @@ function RootComponent() {
   
   // Skip all auth/PIN logic for callbacks - render immediately
   const shouldBypassAuth = isCallbackRoute
+  
+  // Debug: Log on every render to track what's happening
+  console.log('[Root] Render:', { 
+    routerPath: location.pathname, 
+    windowPath: window.location.pathname,
+    windowSearch: window.location.search,
+    isCallbackRoute, 
+    shouldBypassAuth 
+  })
 
   // Check PIN unlock state from sessionStorage
   const [isAppUnlocked, setIsAppUnlocked] = React.useState(() => {
@@ -52,7 +61,8 @@ function RootComponent() {
   const { isAuthenticated, isLoading } = useConvexAuth()
 
   // Public routes that don't require authentication
-  const publicRoutes = ['/sign-in', '/sign-up']
+  // Include gmail-callback as public since it handles OAuth flow
+  const publicRoutes = ['/sign-in', '/sign-up', '/gmail-callback']
   const isPublicRoute = publicRoutes.includes(location.pathname)
 
   // Handle redirects based on auth state
@@ -72,8 +82,9 @@ function RootComponent() {
       navigate({ to: '/sign-in' })
     }
 
-    if (isAuthenticated && isPublicRoute) {
-      console.log('Authenticated on public route, redirecting to dashboard')
+    // Only redirect to dashboard from sign-in/sign-up pages, not from callback routes
+    if (isAuthenticated && (location.pathname === '/sign-in' || location.pathname === '/sign-up')) {
+      console.log('Authenticated on auth page, redirecting to dashboard')
       navigate({ to: '/' })
     }
   }, [isAuthenticated, isPublicRoute, shouldBypassAuth, navigate, isLoading, isAppUnlocked, location.pathname])

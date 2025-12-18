@@ -76,6 +76,12 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // Skip OAuth callback routes - never cache, always go to network
+  // Query params are critical for these routes
+  if (url.pathname.includes('callback') || url.pathname.includes('gmail-callback')) {
+    return;
+  }
+
   event.respondWith(
     // Network-first strategy
     fetch(request)

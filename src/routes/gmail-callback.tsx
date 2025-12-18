@@ -14,9 +14,23 @@ import { api } from '../../convex/_generated/api'
  * 2. We exchange the code for tokens via Convex action
  * 3. On success, redirect to /settings/gmail
  * 
- * Note: We parse URL params directly with URLSearchParams because TanStack Router's
- * search parsing can have issues with special characters in OAuth codes.
+ * IMPORTANT: We capture URL params immediately at module load time because
+ * TanStack Router or other middleware may strip them during initialization.
  */
+
+// Capture params immediately when module loads - before any routing happens
+const initialParams = new URLSearchParams(window.location.search)
+const capturedCode = initialParams.get('code')
+const capturedError = initialParams.get('error')
+
+console.log('[Gmail Callback] Module loaded, captured params:', {
+  hasCode: !!capturedCode,
+  codeLength: capturedCode?.length,
+  error: capturedError,
+  fullSearch: window.location.search,
+  href: window.location.href,
+})
+
 export const Route = createFileRoute('/gmail-callback')({
   component: GmailCallbackPage,
 })
@@ -28,22 +42,21 @@ function GmailCallbackPage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const hasProcessed = useRef(false)
 
+  // Use the captured params from module load time
+  const code = capturedCode
+  const error = capturedError
+
   useEffect(() => {
     // Prevent double-processing in React strict mode
     if (hasProcessed.current) return
     hasProcessed.current = true
 
     const handleCallback = async () => {
-      // Parse URL params directly - more reliable for OAuth codes with special chars
-      const params = new URLSearchParams(window.location.search)
-      const code = params.get('code')
-      const error = params.get('error')
-      
-      console.log('[Gmail Callback] Processing', { 
+      console.log('[Gmail Callback] Processing with captured params', { 
         hasCode: !!code, 
         codeLength: code?.length,
         error,
-        fullSearch: window.location.search 
+        currentSearch: window.location.search 
       })
 
       if (error) {
