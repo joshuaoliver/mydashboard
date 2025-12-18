@@ -127,6 +127,7 @@ export const upsertChat = internalMutation({
 /**
  * Helper mutation to upsert participants for a chat
  * Stores all participant data from the API (both single and group chats)
+ * Also matches participants to existing contacts by username/phone
  */
 export const upsertParticipants = internalMutation({
   args: {
@@ -146,8 +147,64 @@ export const upsertParticipants = internalMutation({
   handler: async (ctx, args) => {
     let insertedCount = 0;
     let updatedCount = 0;
+    let matchedCount = 0;
+
+    // Helper to normalize phone numbers for matching
+    const normalizePhone = (phone: string) => phone.replace(/[\s\-\(\)]/g, '');
 
     for (const participant of args.participants) {
+      // Skip self - no need to match yourself to contacts
+      if (participant.isSelf) {
+        continue;
+      }
+
+      // Try to match participant to an existing contact
+      let contactId: string | undefined = undefined;
+
+      // 1. Try matching by Instagram username
+      if (participant.username) {
+        const contactByInstagram = await ctx.db
+          .query("contacts")
+          .withIndex("by_instagram", (q) => q.eq("instagram", participant.username!))
+          .first();
+        
+        if (contactByInstagram) {
+          contactId = contactByInstagram._id;
+        }
+      }
+
+      // 2. Try matching by WhatsApp phone number
+      if (!contactId && participant.phoneNumber) {
+        const contactByWhatsapp = await ctx.db
+          .query("contacts")
+          .withIndex("by_whatsapp", (q) => q.eq("whatsapp", participant.phoneNumber!))
+          .first();
+        
+        if (contactByWhatsapp) {
+          contactId = contactByWhatsapp._id;
+        } else {
+          // Fall back to searching phones array
+          const searchPhone = normalizePhone(participant.phoneNumber);
+          const allContactsWithPhones = await ctx.db
+            .query("contacts")
+            .filter((q) => q.neq(q.field("phones"), undefined))
+            .collect();
+
+          const matchedContact = allContactsWithPhones.find((c) => {
+            if (!c.phones) return false;
+            return c.phones.some((p) => normalizePhone(p.phone) === searchPhone);
+          });
+
+          if (matchedContact) {
+            contactId = matchedContact._id;
+          }
+        }
+      }
+
+      if (contactId) {
+        matchedCount++;
+      }
+
       // Check if participant already exists for this chat
       const existingParticipant = await ctx.db
         .query("beeperParticipants")
@@ -167,6 +224,7 @@ export const upsertParticipants = internalMutation({
           isSelf: participant.isSelf,
           cannotMessage: participant.cannotMessage,
           lastSyncedAt: args.lastSyncedAt,
+          contactId: contactId as any, // Link to matched contact
         });
         updatedCount++;
       } else {
@@ -182,16 +240,17 @@ export const upsertParticipants = internalMutation({
           isSelf: participant.isSelf,
           cannotMessage: participant.cannotMessage,
           lastSyncedAt: args.lastSyncedAt,
+          contactId: contactId as any, // Link to matched contact
         });
         insertedCount++;
       }
     }
 
     console.log(
-      `[upsertParticipants] Chat ${args.chatId}: inserted ${insertedCount}, updated ${updatedCount} participants`
+      `[upsertParticipants] Chat ${args.chatId}: inserted ${insertedCount}, updated ${updatedCount}, matched ${matchedCount} to contacts`
     );
 
-    return { insertedCount, updatedCount };
+    return { insertedCount, updatedCount, matchedCount };
   },
 });
 

@@ -143,10 +143,13 @@ export default defineSchema({
     isSelf: v.boolean(),             // Is this the authenticated user?
     cannotMessage: v.optional(v.boolean()),
     lastSyncedAt: v.number(),        // When this participant was last updated
+    // Link to contacts table (matched by username/phone during sync)
+    contactId: v.optional(v.id("contacts")), // Reference to matched contact, if any
   })
     .index("by_chat", ["chatId"])              // Get all participants for a chat
     .index("by_participant", ["participantId"]) // Find chats by participant
-    .index("by_chat_participant", ["chatId", "participantId"]), // Unique lookup for upsert
+    .index("by_chat_participant", ["chatId", "participantId"]) // Unique lookup for upsert
+    .index("by_contact", ["contactId"]),       // Find all chats/participants for a contact
 
   // Dex CRM integration - sync contacts from Dex
   contacts: defineTable({
