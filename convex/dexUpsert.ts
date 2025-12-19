@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import { internalMutation } from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { DexContact } from "./dexActions";
+import { normalizePhone } from "./messageHelpers";
 
 /**
  * Internal mutation to upsert contacts into the database
@@ -116,6 +117,31 @@ export const upsertContacts = internalMutation({
           ? dexContact.emails.filter((e: { email?: string }) => e.email)
           : undefined;
 
+        // Compute normalizedPhones for O(1) matching
+        // Collects all phone numbers (from phones array + whatsapp field if present)
+        // and normalizes them to digits-only format
+        const allNormalizedPhones = new Set<string>();
+        
+        // Add phones from phones array
+        if (mappedPhones) {
+          for (const p of mappedPhones) {
+            if (p.phone) {
+              const normalized = normalizePhone(p.phone);
+              if (normalized) {
+                allNormalizedPhones.add(normalized);
+              }
+            }
+          }
+        }
+        
+        // Note: whatsapp field is not in Dex data, but if the contact already exists
+        // and has a whatsapp field, we should preserve it in normalizedPhones
+        // This is handled in the patch below where we merge with existing data
+
+        const normalizedPhones = allNormalizedPhones.size > 0 
+          ? Array.from(allNormalizedPhones) 
+          : undefined;
+
         const contactData = {
           dexId: dexContact.id,
           firstName: dexContact.first_name || undefined,
@@ -125,6 +151,7 @@ export const upsertContacts = internalMutation({
           imageUrl: dexContact.image_url || undefined,
           emails: mappedEmails,
           phones: mappedPhones,
+          normalizedPhones, // Pre-computed for O(1) phone matching
           birthday: dexContact.birthday || undefined,
           lastSeenAt: dexContact.last_seen_at || undefined,
           lastSyncedAt: now,
@@ -153,8 +180,23 @@ export const upsertContacts = internalMutation({
           const phonesChanged = JSON.stringify(existing.phones) !== JSON.stringify(contactData.phones);
           const instagramChanged = existing.instagram !== contactData.instagram;
 
+          // Merge normalizedPhones with existing whatsapp if present
+          // The whatsapp field is set locally, not from Dex, so we need to preserve it
+          let finalNormalizedPhones = contactData.normalizedPhones ? [...contactData.normalizedPhones] : [];
+          if (existing.whatsapp) {
+            const normalizedWhatsapp = normalizePhone(existing.whatsapp);
+            if (normalizedWhatsapp && !finalNormalizedPhones.includes(normalizedWhatsapp)) {
+              finalNormalizedPhones.push(normalizedWhatsapp);
+            }
+          }
+          
+          const patchData = {
+            ...contactData,
+            normalizedPhones: finalNormalizedPhones.length > 0 ? finalNormalizedPhones : undefined,
+          };
+
           // Contact changed in Dex - update it
-          await ctx.db.patch(existing._id, contactData);
+          await ctx.db.patch(existing._id, patchData);
           updatedCount++;
 
           // If phones or instagram changed, trigger rematch for this contact

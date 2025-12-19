@@ -84,41 +84,23 @@ export const upsertChat = internalMutation({
         }
       }
       
-      // 3. If no exact match, try normalized phone matching against:
-      //    - whatsapp field (normalized)
-      //    - phones array (normalized)
-      // This handles format differences like +61411785274 vs 0411785274
+      // 3. If no exact match, try normalized phone matching using pre-computed array
+      // This avoids runtime normalization - just check if the array contains our search phone
+      // Handles format differences like +61411785274 vs 0411785274
       if (!contactId && args.chatData.phoneNumber) {
         const searchPhone = normalizePhone(args.chatData.phoneNumber);
         
-        // Get all contacts with whatsapp or phones fields
-        const contactsWithPhones = await ctx.db
+        const contactsWithNormalizedPhones = await ctx.db
           .query("contacts")
-          .filter((q) => 
-            q.or(
-              q.neq(q.field("whatsapp"), undefined),
-              q.neq(q.field("phones"), undefined)
-            )
-          )
+          .filter((q) => q.neq(q.field("normalizedPhones"), undefined))
           .collect();
         
-        // Search with normalized comparison
-        for (const contact of contactsWithPhones) {
-          // Check whatsapp field with normalization
-          if (contact.whatsapp && normalizePhone(contact.whatsapp) === searchPhone) {
-            contactId = contact._id;
-            break;
-          }
-          // Check phones array with normalization
-          if (contact.phones) {
-            const hasMatch = contact.phones.some(
-              (p) => normalizePhone(p.phone) === searchPhone
-            );
-            if (hasMatch) {
-              contactId = contact._id;
-              break;
-            }
-          }
+        const matchedContact = contactsWithNormalizedPhones.find((c) => 
+          c.normalizedPhones?.includes(searchPhone)
+        );
+        
+        if (matchedContact) {
+          contactId = matchedContact._id;
         }
       }
     }
@@ -126,10 +108,17 @@ export const upsertChat = internalMutation({
     if (existingChat) {
       chatDocId = existingChat._id;
       
-      // Check if messages need syncing (based on activity timestamp)
-      shouldSyncMessages =
-        !existingChat.lastMessagesSyncedAt ||
-        args.chatData.lastActivity > existingChat.lastMessagesSyncedAt;
+      // Check if messages need syncing
+      // STRATEGY: Use cursor (sortKey) for precise change detection, fallback to timestamps
+      const neverSynced = !existingChat.lastMessagesSyncedAt;
+      
+      if (args.chatData.newestMessageSortKey && existingChat.newestMessageSortKey) {
+        // If we have cursors, use them! If the head moved, we need to sync.
+        shouldSyncMessages = neverSynced || args.chatData.newestMessageSortKey !== existingChat.newestMessageSortKey;
+      } else {
+        // Fallback to timestamp check (vulnerable to clock skew if Beeper clock > Convex clock)
+        shouldSyncMessages = neverSynced || args.chatData.lastActivity > (existingChat.lastMessagesSyncedAt ?? 0);
+      }
 
       // OPTIMIZATION: Skip write if nothing meaningful has changed
       // Compare key fields that would affect the UI or require syncing
@@ -332,29 +321,16 @@ export const upsertParticipants = internalMutation({
           if (contactByWhatsapp) {
             contactId = contactByWhatsapp._id;
           } else {
-            // Fall back to normalized matching against whatsapp and phones array
+            // Fall back to normalized matching using pre-computed normalizedPhones array
             const searchPhone = normalizePhone(participant.phoneNumber);
-            const allContactsWithPhones = await ctx.db
+            const contactsWithNormalizedPhones = await ctx.db
               .query("contacts")
-              .filter((q) => 
-                q.or(
-                  q.neq(q.field("whatsapp"), undefined),
-                  q.neq(q.field("phones"), undefined)
-                )
-              )
+              .filter((q) => q.neq(q.field("normalizedPhones"), undefined))
               .collect();
 
-            const matchedContact = allContactsWithPhones.find((c) => {
-              // Check whatsapp field with normalization
-              if (c.whatsapp && normalizePhone(c.whatsapp) === searchPhone) {
-                return true;
-              }
-              // Check phones array with normalization
-              if (c.phones) {
-                return c.phones.some((p) => normalizePhone(p.phone) === searchPhone);
-              }
-              return false;
-            });
+            const matchedContact = contactsWithNormalizedPhones.find((c) => 
+              c.normalizedPhones?.includes(searchPhone)
+            );
 
             if (matchedContact) {
               contactId = matchedContact._id;
@@ -563,6 +539,10 @@ export const syncChatMessages = internalMutation({
       `[syncChatMessages] Chat ${args.chatId}: inserted ${insertedCount}, skipped ${skippedCount} (already cached)`
     );
 
+    // Get current chat state to ensure we don't overwrite newer data with older data
+    // (e.g. during historical sync where we fetch old messages)
+    const chat = await ctx.db.get(args.chatDocId);
+    
     // Calculate reply tracking from NEW messages (if any)
     // OR query database to find the actual last message
     let lastMessageFrom: "user" | "them" | undefined;
@@ -572,15 +552,27 @@ export const syncChatMessages = internalMutation({
     if (args.messages.length > 0) {
       // We have new messages - use the most recent one from the API
       // Messages MUST be sorted by timestamp (oldest to newest) before calling this function
-      const lastMessage = args.messages[args.messages.length - 1];
-      lastMessageFrom = lastMessage.isFromUser ? "user" : "them";
-      needsReply = !lastMessage.isFromUser; // Need to reply if they sent last message
-      lastMessageText = lastMessage.text;
+      const potentialLastMsg = args.messages[args.messages.length - 1];
       
-      console.log(
-        `[syncChatMessages] Updated reply tracking from NEW messages: ` +
-        `lastFrom=${lastMessageFrom}, needsReply=${needsReply}`
-      );
+      // CRITICAL: Only update chat preview if this message is actually newer than what we have
+      // This protects against overwriting the preview with old messages during historical sync
+      const isNewer = !chat?.newestMessageSortKey || 
+                      compareSortKeys(potentialLastMsg.sortKey, chat.newestMessageSortKey) >= 0;
+      
+      if (isNewer) {
+        lastMessageFrom = potentialLastMsg.isFromUser ? "user" : "them";
+        needsReply = !potentialLastMsg.isFromUser; // Need to reply if they sent last message
+        lastMessageText = potentialLastMsg.text;
+        
+        console.log(
+          `[syncChatMessages] Updated reply tracking from NEW messages: ` +
+          `lastFrom=${lastMessageFrom}, needsReply=${needsReply}`
+        );
+      } else {
+        console.log(
+          `[syncChatMessages] Preserving existing chat preview (fetched messages are older than current head)`
+        );
+      }
     } else {
       // No new messages - query database to find the actual last message
       // This ensures we don't overwrite existing tracking data with undefined
@@ -936,6 +928,22 @@ export const syncBeeperChatsInternal = internalAction({
                   messageCount: messagesToSync.length, 
                 }
               );
+              
+              // SYNC-TRIGGERED AI GENERATION:
+              // If new messages were inserted AND needsReply=true (other person sent last message),
+              // schedule AI reply suggestions generation in the background
+              if (messageCount > 0 && needsReply) {
+                console.log(
+                  `[Beeper Sync] Scheduling AI reply suggestions for chat ${chat.id} (${chat.title}) - needsReply=true, ${messageCount} new messages`
+                );
+                
+                // Schedule immediately but non-blocking
+                await ctx.scheduler.runAfter(0, api.beeperActions.generateReplySuggestions, {
+                  chatId: chat.id,
+                  chatName: chat.title || "Unknown",
+                  instagramUsername: username,
+                });
+              }
             }
           } catch (msgError) {
             // SDK handles retries, but log if it still fails

@@ -427,6 +427,26 @@ export const runHistoricalSyncBatch = action({
 });
 
 /**
+ * Get oldest message timestamp for a chat (internal)
+ * Used to check if we've reached a date limit during historical sync
+ */
+export const getOldestMessageTimestamp = internalQuery({
+  args: {
+    chatId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    // Get the oldest message by timestamp for this chat
+    const oldestMessage = await ctx.db
+      .query("beeperMessages")
+      .withIndex("by_chat", (q) => q.eq("chatId", args.chatId))
+      .order("asc")
+      .first();
+    
+    return oldestMessage?.timestamp ?? null;
+  },
+});
+
+/**
  * Get chats that need more message history (internal)
  * Returns chats sorted by: hasCompleteHistory=false first, then by messageCount ascending
  */

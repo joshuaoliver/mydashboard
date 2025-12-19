@@ -192,3 +192,44 @@ export const fixMetaAIChats = mutation({
   },
 });
 
+/**
+ * Update the AI-assessed reply importance for a chat
+ * Called by generateReplySuggestions after AI generates importance rating
+ * 
+ * @param chatId - The chat to update
+ * @param importance - Importance rating 1-5 (1=Low, 2=Normal, 3=Moderate, 4=High, 5=Urgent)
+ */
+export const updateReplyImportance = internalMutation({
+  args: {
+    chatId: v.string(),
+    importance: v.number(), // 1-5 scale
+  },
+  handler: async (ctx, args) => {
+    // Validate importance is in valid range
+    if (args.importance < 1 || args.importance > 5) {
+      console.warn(`[updateReplyImportance] Invalid importance ${args.importance} for chat ${args.chatId}, clamping to 1-5`);
+    }
+    const clampedImportance = Math.max(1, Math.min(5, Math.round(args.importance)));
+
+    const chat = await ctx.db
+      .query("beeperChats")
+      .withIndex("by_chat_id", (q) => q.eq("chatId", args.chatId))
+      .first();
+    
+    if (!chat) {
+      console.warn(`[updateReplyImportance] Chat ${args.chatId} not found`);
+      return { success: false, error: "Chat not found" };
+    }
+
+    const now = Date.now();
+    await ctx.db.patch(chat._id, {
+      replyImportance: clampedImportance,
+      replyImportanceUpdatedAt: now,
+    });
+
+    console.log(`[updateReplyImportance] Set importance=${clampedImportance} for chat ${args.chatId} (${chat.title})`);
+
+    return { success: true, chatId: args.chatId, importance: clampedImportance };
+  },
+});
+

@@ -2,7 +2,6 @@ import { Button } from '@/components/ui/button'
 import { Copy, Check, Sparkles } from 'lucide-react'
 import { useState } from 'react'
 import { Loader } from '@/components/ai-elements/loader'
-import { Response } from '@/components/ai-elements/response'
 
 interface ReplySuggestion {
   reply: string
@@ -100,9 +99,9 @@ export function ReplySuggestions({
                   : 'bg-white border-2 border-gray-300 hover:border-blue-400 hover:shadow-sm'
               }`}
             >
-              {/* Reply text with markdown support */}
-              <div className="text-sm text-gray-900 leading-relaxed break-words overflow-hidden">
-                <Response>{suggestion.reply}</Response>
+              {/* Reply text */}
+              <div className="text-sm text-gray-900 leading-relaxed break-words overflow-hidden whitespace-pre-wrap">
+                {suggestion.reply}
               </div>
 
               {/* Copy button - only show for selected */}

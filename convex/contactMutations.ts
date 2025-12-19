@@ -50,7 +50,7 @@ export const findContactByInstagram = query({
 /**
  * Query to find a contact by phone number
  * Used for matching Beeper WhatsApp/iMessage chats to Dex contacts
- * Uses normalized phone matching to handle format differences
+ * Uses normalized phone matching via index for O(1) lookup
  */
 export const findContactByPhone = query({
   args: {
@@ -69,29 +69,17 @@ export const findContactByPhone = query({
       .withIndex("by_whatsapp", (q) => q.eq("whatsapp", args.phoneNumber))
       .first();
 
-    // If not found, search with normalization against whatsapp and phones
+    // If not found, search using pre-computed normalizedPhones array
+    // This avoids runtime normalization - just check if the array contains our search phone
     if (!contact) {
-      const allContacts = await ctx.db
+      const contactsWithNormalizedPhones = await ctx.db
         .query("contacts")
-        .filter((q) => 
-          q.or(
-            q.neq(q.field("whatsapp"), undefined),
-            q.neq(q.field("phones"), undefined)
-          )
-        )
+        .filter((q) => q.neq(q.field("normalizedPhones"), undefined))
         .collect();
-
-      contact = allContacts.find((c) => {
-        // Check whatsapp field with normalization
-        if (c.whatsapp && normalizePhone(c.whatsapp) === searchPhone) {
-          return true;
-        }
-        // Check phones array with normalization
-        if (c.phones) {
-          return c.phones.some((p) => normalizePhone(p.phone) === searchPhone);
-        }
-        return false;
-      }) || null;
+      
+      contact = contactsWithNormalizedPhones.find((c) => 
+        c.normalizedPhones?.includes(searchPhone)
+      ) || null;
     }
 
     // If still not found, check socialHandles for whatsapp platform
@@ -402,28 +390,16 @@ export const createContact = mutation({
         return { contactId: existingWhatsapp._id, existed: true };
       }
 
-      // Check whatsapp and phones with normalized comparison
-      const allContactsWithPhones = await ctx.db
+      // Check using pre-computed normalizedPhones array
+      // This avoids runtime normalization - just check if the array contains our search phone
+      const contactsWithNormalizedPhones = await ctx.db
         .query("contacts")
-        .filter((q) => 
-          q.or(
-            q.neq(q.field("whatsapp"), undefined),
-            q.neq(q.field("phones"), undefined)
-          )
-        )
+        .filter((q) => q.neq(q.field("normalizedPhones"), undefined))
         .collect();
-
-      const existingPhone = allContactsWithPhones.find((c) => {
-        // Check whatsapp field with normalization
-        if (c.whatsapp && normalizePhone(c.whatsapp) === searchPhone) {
-          return true;
-        }
-        // Check phones array with normalization
-        if (c.phones) {
-          return c.phones.some((p) => normalizePhone(p.phone) === searchPhone);
-        }
-        return false;
-      });
+      
+      const existingPhone = contactsWithNormalizedPhones.find((c) => 
+        c.normalizedPhones?.includes(searchPhone)
+      );
 
       if (existingPhone) {
         return { contactId: existingPhone._id, existed: true };
@@ -434,11 +410,26 @@ export const createContact = mutation({
     // If only a phone number is provided (iMessage), don't sync to Dex
     const doNotSyncToDex = !args.instagram && !args.whatsapp && !!args.phoneNumber;
 
+    // Compute normalizedPhones for O(1) matching
+    const allNormalizedPhones = new Set<string>();
+    if (args.whatsapp) {
+      const normalized = normalizePhone(args.whatsapp);
+      if (normalized) allNormalizedPhones.add(normalized);
+    }
+    if (args.phoneNumber) {
+      const normalized = normalizePhone(args.phoneNumber);
+      if (normalized) allNormalizedPhones.add(normalized);
+    }
+    const normalizedPhones = allNormalizedPhones.size > 0 
+      ? Array.from(allNormalizedPhones) 
+      : undefined;
+
     // Create new contact (no dexId - will be added when Dex sync finds a match)
     const contactId = await ctx.db.insert("contacts", {
       instagram: args.instagram,
       whatsapp: args.whatsapp,
       phones: args.phoneNumber ? [{ phone: args.phoneNumber }] : undefined,
+      normalizedPhones, // Pre-computed for O(1) phone matching
       firstName: args.firstName,
       lastName: args.lastName,
       description: args.description,
@@ -568,35 +559,28 @@ export const rematchChatsToContacts = internalMutation({
     let participantMatchedCount = 0;
     let participantUnchangedCount = 0;
 
-    // Helper to normalize phone numbers
     // PRE-FETCH: Load all contacts ONCE and build lookup maps
     // This avoids repeatedly querying contacts inside the loop
     const allContacts = await ctx.db.query("contacts").collect();
     
     // Build lookup maps for O(1) matching
-    // All phone numbers are normalized for consistent matching
+    // Use pre-computed normalizedPhones for phone matching (no runtime normalization needed)
     const instagramMap = new Map<string, string>(); // username -> contactId
-    const phoneMap = new Map<string, string>();     // normalized phone -> contactId (from whatsapp field AND phones array)
+    const phoneMap = new Map<string, string>();     // normalized phone -> contactId
     
     for (const contact of allContacts) {
       if (contact.instagram) {
         instagramMap.set(contact.instagram, contact._id);
       }
-      // Add whatsapp field to phone map (normalized)
-      if (contact.whatsapp) {
-        phoneMap.set(normalizePhone(contact.whatsapp), contact._id);
-      }
-      // Add phones array to phone map (normalized)
-      if (contact.phones) {
-        for (const p of contact.phones) {
-          if (p.phone) {
-            phoneMap.set(normalizePhone(p.phone), contact._id);
-          }
+      // Use pre-computed normalizedPhones array (already normalized, no runtime cost)
+      if (contact.normalizedPhones) {
+        for (const normalizedPhone of contact.normalizedPhones) {
+          phoneMap.set(normalizedPhone, contact._id);
         }
       }
     }
     
-    console.log(`[rematchChatsToContacts] Built lookup maps: ${instagramMap.size} instagram, ${phoneMap.size} phones (includes whatsapp)`);
+    console.log(`[rematchChatsToContacts] Built lookup maps: ${instagramMap.size} instagram, ${phoneMap.size} phones`);
 
     // ============================================
     // PART 1: Match beeperChats
@@ -740,16 +724,20 @@ export const rematchChatsForContact = internalMutation({
       }
     }
 
-    // 2. By phone number (using normalization for all networks)
-    // Build a set of all normalized phone numbers for this contact
-    const contactPhones = new Set<string>();
-    if (contact.whatsapp) {
-      contactPhones.add(normalizePhone(contact.whatsapp));
-    }
-    if (contact.phones) {
-      for (const p of contact.phones) {
-        if (p.phone) {
-          contactPhones.add(normalizePhone(p.phone));
+    // 2. By phone number (using pre-computed normalizedPhones)
+    // Use the contact's normalizedPhones array if available, otherwise compute
+    const contactPhones = new Set<string>(contact.normalizedPhones || []);
+    
+    // Fallback: if normalizedPhones not populated, compute from whatsapp/phones
+    if (contactPhones.size === 0) {
+      if (contact.whatsapp) {
+        contactPhones.add(normalizePhone(contact.whatsapp));
+      }
+      if (contact.phones) {
+        for (const p of contact.phones) {
+          if (p.phone) {
+            contactPhones.add(normalizePhone(p.phone));
+          }
         }
       }
     }
@@ -813,27 +801,16 @@ export const rematchChatsForContact = internalMutation({
         }
         
         if (!newContactId && chat.phoneNumber) {
-          // Try normalized phone matching
+          // Try normalized phone matching using pre-computed normalizedPhones
           const chatPhoneNormalized = normalizePhone(chat.phoneNumber);
-          const allContactsWithPhones = await ctx.db
+          const contactsWithNormalizedPhones = await ctx.db
             .query("contacts")
-            .filter((q) => 
-              q.or(
-                q.neq(q.field("whatsapp"), undefined),
-                q.neq(q.field("phones"), undefined)
-              )
-            )
+            .filter((q) => q.neq(q.field("normalizedPhones"), undefined))
             .collect();
           
-          const newMatch = allContactsWithPhones.find((c) => {
-            if (c.whatsapp && normalizePhone(c.whatsapp) === chatPhoneNormalized) {
-              return true;
-            }
-            if (c.phones) {
-              return c.phones.some((p) => normalizePhone(p.phone) === chatPhoneNormalized);
-            }
-            return false;
-          });
+          const newMatch = contactsWithNormalizedPhones.find((c) => 
+            c.normalizedPhones?.includes(chatPhoneNormalized)
+          );
           if (newMatch) newContactId = newMatch._id;
         }
         
@@ -974,6 +951,93 @@ export const backfillChatPhoneNumbers = mutation({
       updated,
       alreadyHasPhone,
       noParticipantPhone,
+    };
+  },
+});
+
+/**
+ * Backfill normalizedPhones field for all existing contacts
+ * 
+ * This is a one-time migration to populate the normalizedPhones field
+ * for O(1) phone matching. Run after deploying the schema change.
+ * 
+ * Run via: npx convex run contactMutations:backfillNormalizedPhones --prod
+ */
+export const backfillNormalizedPhones = mutation({
+  args: {},
+  handler: async (ctx): Promise<{
+    scanned: number;
+    updated: number;
+    alreadyHas: number;
+    noPhones: number;
+  }> => {
+    console.log("[backfillNormalizedPhones] Starting backfill of normalizedPhones for all contacts...");
+    
+    // Get all contacts
+    const allContacts = await ctx.db.query("contacts").collect();
+    
+    console.log(`[backfillNormalizedPhones] Found ${allContacts.length} contacts to process`);
+    
+    let updated = 0;
+    let alreadyHas = 0;
+    let noPhones = 0;
+    
+    for (const contact of allContacts) {
+      // Compute normalizedPhones from whatsapp and phones array
+      const allNormalizedPhones = new Set<string>();
+      
+      // Add whatsapp field
+      if (contact.whatsapp) {
+        const normalized = normalizePhone(contact.whatsapp);
+        if (normalized) allNormalizedPhones.add(normalized);
+      }
+      
+      // Add phones array
+      if (contact.phones) {
+        for (const p of contact.phones) {
+          if (p.phone) {
+            const normalized = normalizePhone(p.phone);
+            if (normalized) allNormalizedPhones.add(normalized);
+          }
+        }
+      }
+      
+      if (allNormalizedPhones.size === 0) {
+        noPhones++;
+        continue;
+      }
+      
+      const newNormalizedPhones = Array.from(allNormalizedPhones);
+      
+      // Check if already has correct normalizedPhones
+      const existingNormalized = contact.normalizedPhones || [];
+      const isSame = 
+        existingNormalized.length === newNormalizedPhones.length &&
+        existingNormalized.every(p => newNormalizedPhones.includes(p));
+      
+      if (isSame) {
+        alreadyHas++;
+        continue;
+      }
+      
+      // Update the contact
+      await ctx.db.patch(contact._id, {
+        normalizedPhones: newNormalizedPhones,
+      });
+      updated++;
+    }
+    
+    console.log(
+      `[backfillNormalizedPhones] Complete: ` +
+      `scanned=${allContacts.length}, updated=${updated}, ` +
+      `alreadyHas=${alreadyHas}, noPhones=${noPhones}`
+    );
+    
+    return {
+      scanned: allContacts.length,
+      updated,
+      alreadyHas,
+      noPhones,
     };
   },
 });

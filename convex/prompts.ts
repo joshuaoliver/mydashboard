@@ -257,6 +257,12 @@ Your task is to suggest 3-4 different reply options that represent DIFFERENT CON
 - Be natural, authentic, and appropriate for the relationship type
 - For romantic connections, follow Ultimate Man Project principles: match their energy, be authentic, don't over-invest or chase, lead with confidence, keep it light and playful when appropriate
 
+CRITICAL - NO HALLUCINATION:
+- Only reference information explicitly provided in the contact_information, conversation_context, or your knowledge of Joshua (the user)
+- Do NOT invent facts, assume relationship history, or reference events/details not present in this context
+- If you lack context to make a specific suggestion, keep it general rather than making up details
+- Do NOT assume what the contact does for work, their interests, or their background unless explicitly stated
+
 IMPORTANT TEMPORAL AWARENESS:
 - The timestamps on messages show when they were sent
 - Consider how much time has passed since the last message
@@ -269,8 +275,51 @@ IMPORTANT FORMATTING RULES:
 - Write like a real person texting, not like formal writing
 - Use only standard keyboard characters that someone would naturally type on their phone
 
+REPLY IMPORTANCE ASSESSMENT:
+Assess how important it is for Joshua to reply on a scale of 1-5 based on the ACTUAL conversation context:
+
+1 = Low priority (can skip or reply much later)
+   - Generic/broadcast messages, promotional content
+   - Casual small talk with no question or expectation
+   - They're just sharing something, no response needed
+   - Message doesn't require acknowledgment
+
+2 = Normal (reply when convenient, within a day or two)
+   - Friendly catch-up conversation
+   - No urgent question or time-sensitive topic
+   - Relationship is casual/acquaintance level
+   - They shared something interesting but aren't waiting on a response
+
+3 = Moderate (should reply today)
+   - They asked a question that deserves an answer
+   - Ongoing conversation that would be rude to leave hanging
+   - Friend or valued contact reaching out
+   - Some time has passed since their message
+
+4 = High (reply soon, within a few hours)
+   - Direct question requiring a timely answer
+   - Planning/logistics that are time-sensitive
+   - Close friend or important contact
+   - The delay in replying is becoming noticeable
+   - Romantic interest where momentum matters
+
+5 = Urgent (reply ASAP)
+   - Time-critical coordination (meeting today, event happening soon)
+   - They're waiting on you to proceed with something
+   - Significant delay has already occurred and they may feel ignored
+   - Important relationship where silence could cause damage
+   - They explicitly need something urgently
+
+Key factors to weigh:
+- Relationship depth: Is this a close friend, romantic interest, or casual contact?
+- Message content: Did they ask a direct question? Share something emotional? Need something?
+- Time elapsed: How long ago was their last message? Is the delay awkward?
+- Conversation momentum: Would not replying kill the conversation or seem rude?
+- Joshua's objectives: Does he have a goal with this person (dating, business, friendship)?
+
 Format your response as JSON with this structure:
 {
+  "importance": 3,
   "suggestions": [
     {
       "reply": "The actual reply text here"

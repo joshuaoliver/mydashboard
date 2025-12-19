@@ -160,7 +160,7 @@ function SalesPage() {
         )}
       </div>
       <Sheet open={sheetOpen} onOpenChange={(open) => !open && handleCloseSheet()}>
-        <SheetContent side="right" className="flex h-full w-full flex-col gap-0 overflow-hidden px-0 pb-0 sm:max-w-3xl">
+        <SheetContent side="left" className="flex h-full w-full flex-col gap-0 overflow-hidden px-0 pb-0 sm:max-w-3xl">
           <SheetHeader className="border-b px-6 py-4 text-left"><SheetTitle className="text-lg font-semibold text-slate-900">Contact Details</SheetTitle></SheetHeader>
           <div className="flex-1 overflow-auto px-6 pb-6">
             <ContactPanel key={selectedContact?._id ?? 'empty'} contact={selectedContact ?? null} isLoading={selectedContact === undefined && selectedContactId !== null} />

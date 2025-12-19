@@ -84,6 +84,10 @@ export default defineSchema({
     lastMessageFrom: v.optional(v.string()),   // "user" or "them" - who sent last message
     needsReply: v.optional(v.boolean()),       // Does user need to reply?
     
+    // AI-assessed reply importance (1-5 scale)
+    replyImportance: v.optional(v.number()),          // 1=Low, 2=Normal, 3=Moderate, 4=High, 5=Urgent
+    replyImportanceUpdatedAt: v.optional(v.number()), // When importance was last assessed by AI
+    
     // Message cursor tracking (boundaries of our message window)
     newestMessageSortKey: v.optional(v.string()),  // Newest message sortKey we have
     oldestMessageSortKey: v.optional(v.string()),  // Oldest message sortKey we have
@@ -208,14 +212,22 @@ export default defineSchema({
     setName: v.optional(v.string()), // User-set custom name override (displayed with original name in parentheses)
     // Priority slider (1-100)
     priority: v.optional(v.number()), // Priority level 1-100 for contact importance
+    // Pre-computed normalized phones for O(1) matching
+    // Contains digits-only normalized versions of all phone numbers (whatsapp + phones array)
+    // e.g., ["61417248743", "61411785274"] - Australian numbers normalized to international format
+    normalizedPhones: v.optional(v.array(v.string())),
   })
     .index("by_dex_id", ["dexId"])
     .index("by_instagram", ["instagram"]) // For matching with Beeper Instagram chats
     .index("by_whatsapp", ["whatsapp"]), // For matching with Beeper WhatsApp chats
+    // Note: normalizedPhones is an array field used for fast in-memory matching
+    // Convex doesn't support array-contains queries via index, so we filter + includes()
 
   // Locations - user-defined locations for contacts
   locations: defineTable({
-    name: v.string(), // Location name
+    name: v.string(), // Location name (city, country, or region)
+    latitude: v.optional(v.number()), // Latitude coordinate
+    longitude: v.optional(v.number()), // Longitude coordinate
     createdAt: v.number(), // Creation timestamp
   })
     .index("by_name", ["name"]),

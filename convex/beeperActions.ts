@@ -200,6 +200,7 @@ export const generateReplySuggestions = action({
       lastMessage: v.string(),
       messageCount: v.number(),
     }),
+    importance: v.optional(v.number()), // AI-assessed importance 1-5
     isCached: v.boolean(),
     generatedAt: v.number(),
   }),
@@ -211,6 +212,7 @@ export const generateReplySuggestions = action({
       lastMessage: string;
       messageCount: number;
     };
+    importance?: number;
     isCached: boolean;
     generatedAt: number;
   }> => {
@@ -238,6 +240,7 @@ export const generateReplySuggestions = action({
             lastMessage: "",
             messageCount: 0,
           },
+          importance: undefined,
           isCached: false,
           generatedAt: Date.now(),
         };
@@ -269,7 +272,12 @@ export const generateReplySuggestions = action({
           // If we have valid cached suggestions, return them immediately
           if (cached) {
             console.log(`[generateReplySuggestions] ✅ Using cached suggestions for chat ${args.chatId}`);
-            return cached;
+            // Fetch current importance from the chat (importance is stored on chat, not in cache)
+            const chat = await ctx.runQuery(api.beeperQueries.getChatById, { chatId: args.chatId });
+            return {
+              ...cached,
+              importance: chat?.replyImportance,
+            };
           } else {
             console.log(`[generateReplySuggestions] No cache found for message ID: ${lastMessage.id}`);
           }
@@ -521,6 +529,7 @@ Format as JSON:
 
       // Parse the AI response
       let suggestions;
+      let importance: number | undefined;
       try {
         // Strip markdown code blocks if present (OpenAI sometimes wraps JSON in ```json ... ```)
         let cleanedText = result.text.trim();
@@ -535,6 +544,14 @@ Format as JSON:
         suggestions = (aiResponse.suggestions || []).map((s: any) => ({
           reply: s.reply.replace(/—/g, '-').replace(/–/g, '-'),
         }));
+        
+        // Extract importance rating (1-5)
+        if (typeof aiResponse.importance === 'number') {
+          importance = Math.max(1, Math.min(5, Math.round(aiResponse.importance)));
+          console.log(`[generateReplySuggestions] AI assessed importance: ${importance}`);
+        } else {
+          console.log(`[generateReplySuggestions] No importance rating in AI response`);
+        }
       } catch (parseError) {
         // If JSON parsing fails, use a fallback
         console.error("Error parsing AI response:", parseError);
@@ -544,6 +561,14 @@ Format as JSON:
             reply: "Thanks for your message! I'll get back to you soon.",
           },
         ];
+      }
+      
+      // Save importance to the chat if we got one
+      if (importance !== undefined) {
+        await ctx.runMutation(internal.beeperMutations.updateReplyImportance, {
+          chatId: args.chatId,
+          importance,
+        });
       }
 
       const conversationContext = {
@@ -572,6 +597,7 @@ Format as JSON:
       return {
         suggestions,
         conversationContext,
+        importance,
         isCached: false,
         generatedAt: Date.now(),
       };
