@@ -32,6 +32,9 @@ import {
   BarChart3,
   FolderKanban,
   Zap,
+  Bot,
+  FileText,
+  MapPin,
 } from "lucide-react"
 import { ModeToggle } from "@/components/ui/mode-toggle"
 import { Link, useNavigate } from '@tanstack/react-router'
@@ -162,6 +165,38 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                   >
                     <FolderKanban className="h-5 w-5" />
                     Projects
+                  </Link>
+                  <Link 
+                    to="/settings/ai"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex items-center gap-3 px-4 py-3 rounded-md text-base text-slate-300 hover:text-white hover:bg-slate-800/80 transition-all"
+                  >
+                    <Bot className="h-5 w-5" />
+                    AI Models
+                  </Link>
+                  <Link 
+                    to="/settings/prompts"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex items-center gap-3 px-4 py-3 rounded-md text-base text-slate-300 hover:text-white hover:bg-slate-800/80 transition-all"
+                  >
+                    <MessageSquare className="h-5 w-5" />
+                    AI Prompts
+                  </Link>
+                  <Link 
+                    to="/settings/locations"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex items-center gap-3 px-4 py-3 rounded-md text-base text-slate-300 hover:text-white hover:bg-slate-800/80 transition-all"
+                  >
+                    <MapPin className="h-5 w-5" />
+                    Locations
+                  </Link>
+                  <Link 
+                    to="/settings/sample-outputs"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex items-center gap-3 px-4 py-3 rounded-md text-base text-slate-300 hover:text-white hover:bg-slate-800/80 transition-all"
+                  >
+                    <FileText className="h-5 w-5" />
+                    Sample Outputs
                   </Link>
                   <Link 
                     to="/settings"
@@ -309,6 +344,50 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                           >
                             <FolderKanban className="h-4 w-4 flex-shrink-0" />
                             <span>Projects</span>
+                          </Link>
+                        </NavigationMenuLink>
+                      </li>
+                      <li>
+                        <NavigationMenuLink asChild>
+                          <Link 
+                            to="/settings/ai"
+                            className="flex flex-row items-center gap-2 px-3 py-2 rounded-md text-sm text-slate-300 hover:text-white hover:bg-slate-700 transition-colors w-full"
+                          >
+                            <Bot className="h-4 w-4 flex-shrink-0" />
+                            <span>AI Models</span>
+                          </Link>
+                        </NavigationMenuLink>
+                      </li>
+                      <li>
+                        <NavigationMenuLink asChild>
+                          <Link 
+                            to="/settings/prompts"
+                            className="flex flex-row items-center gap-2 px-3 py-2 rounded-md text-sm text-slate-300 hover:text-white hover:bg-slate-700 transition-colors w-full"
+                          >
+                            <MessageSquare className="h-4 w-4 flex-shrink-0" />
+                            <span>AI Prompts</span>
+                          </Link>
+                        </NavigationMenuLink>
+                      </li>
+                      <li>
+                        <NavigationMenuLink asChild>
+                          <Link 
+                            to="/settings/locations"
+                            className="flex flex-row items-center gap-2 px-3 py-2 rounded-md text-sm text-slate-300 hover:text-white hover:bg-slate-700 transition-colors w-full"
+                          >
+                            <MapPin className="h-4 w-4 flex-shrink-0" />
+                            <span>Locations</span>
+                          </Link>
+                        </NavigationMenuLink>
+                      </li>
+                      <li>
+                        <NavigationMenuLink asChild>
+                          <Link 
+                            to="/settings/sample-outputs"
+                            className="flex flex-row items-center gap-2 px-3 py-2 rounded-md text-sm text-slate-300 hover:text-white hover:bg-slate-700 transition-colors w-full"
+                          >
+                            <FileText className="h-4 w-4 flex-shrink-0" />
+                            <span>Sample Outputs</span>
                           </Link>
                         </NavigationMenuLink>
                       </li>

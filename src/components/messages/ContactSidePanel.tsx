@@ -67,6 +67,7 @@ export function ContactSidePanel() {
       searchedUsername={selectedChat?.username}
       searchedPhoneNumber={selectedChat?.phoneNumber}
       participantName={selectedChat?.name}
+      participantImageUrl={selectedChat?.contactImageUrl}
     />
   )
 }

@@ -348,6 +348,34 @@ export default defineSchema({
   })
     .index("by_timestamp", ["timestamp"]),
 
+  // Message Snapshots - historical Beeper chat stats
+  // Tracks chat counts across all networks (iMessage, WhatsApp, Instagram, etc.)
+  messageSnapshots: defineTable({
+    timestamp: v.number(),
+    // Total counts across all networks
+    totalChats: v.number(),             // Total number of chats
+    archivedChats: v.number(),          // Chats that are archived
+    activeChats: v.number(),            // Chats that are not archived
+    needsReplyChats: v.number(),        // Chats where last message is from them (awaiting our reply)
+    mutedChats: v.number(),             // Chats that are muted
+    pinnedChats: v.number(),            // Chats that are pinned
+    // Breakdown by network
+    imessageChats: v.optional(v.number()),
+    whatsappChats: v.optional(v.number()),
+    instagramChats: v.optional(v.number()),
+    facebookChats: v.optional(v.number()),
+    telegramChats: v.optional(v.number()),
+    otherNetworkChats: v.optional(v.number()),
+    // Reply tracking
+    needsReplyImessage: v.optional(v.number()),
+    needsReplyWhatsapp: v.optional(v.number()),
+    needsReplyInstagram: v.optional(v.number()),
+    needsReplyFacebook: v.optional(v.number()),
+    needsReplyTelegram: v.optional(v.number()),
+    needsReplyOther: v.optional(v.number()),
+  })
+    .index("by_timestamp", ["timestamp"]),
+
   // Hubstaff Time Entries - individual time tracking records
   hubstaffTimeEntries: defineTable({
     date: v.string(),                    // YYYY-MM-DD

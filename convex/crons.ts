@@ -31,27 +31,39 @@ crons.interval(
 );
 
 // ===========================================
-// Stats Dashboard Sync Jobs
+// Stats Dashboard Sync Jobs (every 30 min)
 // ===========================================
 
 /**
- * Gmail inbox sync - every 15 minutes
+ * Gmail inbox sync - every 30 minutes
  * Stores historical inbox count snapshots
  */
 crons.interval(
   "sync-gmail-inbox",
-  { minutes: 15 },
+  { minutes: 30 },
   internal.gmailSync.syncInbox,
   {}
 );
 
 /**
- * Hubstaff time entries sync - every 15 minutes
+ * Message stats capture - every 30 minutes
+ * Captures chat counts across all networks (iMessage, WhatsApp, etc.)
+ * Tracks reply rates and archived counts for historical analysis
+ */
+crons.interval(
+  "capture-message-stats",
+  { minutes: 30 },
+  internal.messageStats.captureStats,
+  {}
+);
+
+/**
+ * Hubstaff time entries sync - every 30 minutes
  * Fetches time entries for the selected user
  */
 crons.interval(
   "sync-hubstaff-entries",
-  { minutes: 15 },
+  { minutes: 30 },
   internal.hubstaffSync.syncTimeEntries,
   {}
 );
@@ -68,13 +80,13 @@ crons.interval(
 );
 
 /**
- * Linear issues sync - every 15 minutes
+ * Linear issues sync - every 30 minutes
  * Syncs uncompleted issues from all active workspaces
  * Serves as backup to webhook-based real-time updates
  */
 crons.interval(
   "sync-linear-issues",
-  { minutes: 15 },
+  { minutes: 30 },
   internal.linearSync.syncAllWorkspaces,
   {}
 );

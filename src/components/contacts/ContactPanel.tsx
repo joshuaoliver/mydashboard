@@ -54,6 +54,7 @@ interface ContactPanelProps {
   searchedUsername?: string
   searchedPhoneNumber?: string // WhatsApp phone number
   participantName?: string // Name from chat participant (for creating contacts)
+  participantImageUrl?: string // Profile image from chat (for creating contacts)
 }
 
 const connectionOptions = [
@@ -80,7 +81,7 @@ const leadStatusOptions = [
   { value: "Former", label: "Former" },
 ] as const
 
-export function ContactPanel({ contact, isLoading, searchedUsername, searchedPhoneNumber, participantName }: ContactPanelProps) {
+export function ContactPanel({ contact, isLoading, searchedUsername, searchedPhoneNumber, participantName, participantImageUrl }: ContactPanelProps) {
   const [notes, setNotes] = useState(contact?.notes || "")
   const [objective, setObjective] = useState(contact?.objective || "")
   const [isSaving, setIsSaving] = useState(false)
@@ -463,6 +464,7 @@ export function ContactPanel({ contact, isLoading, searchedUsername, searchedPho
         whatsapp: searchedPhoneNumber,
         phoneNumber: searchedPhoneNumber, // For iMessage contacts
         firstName: participantName, // Use the participant's display name
+        imageUrl: participantImageUrl, // Profile image from chat
       })
       // Contact will be refetched automatically via Convex reactivity
     } catch (error) {

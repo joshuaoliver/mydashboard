@@ -22,9 +22,11 @@ import { Route as AuthenticatedContactsRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedStatsIndexRouteImport } from './routes/_authenticated/stats/index'
 import { Route as AuthenticatedSettingsIndexRouteImport } from './routes/_authenticated/settings/index'
 import { Route as AuthenticatedContactsIndexRouteImport } from './routes/_authenticated/contacts/index'
+import { Route as AuthenticatedStatsMessagesRouteImport } from './routes/_authenticated/stats/messages'
 import { Route as AuthenticatedStatsLinearRouteImport } from './routes/_authenticated/stats/linear'
 import { Route as AuthenticatedStatsHubstaffRouteImport } from './routes/_authenticated/stats/hubstaff'
 import { Route as AuthenticatedStatsGmailRouteImport } from './routes/_authenticated/stats/gmail'
+import { Route as AuthenticatedSettingsSampleOutputsRouteImport } from './routes/_authenticated/settings/sample-outputs'
 import { Route as AuthenticatedSettingsPromptsRouteImport } from './routes/_authenticated/settings/prompts'
 import { Route as AuthenticatedSettingsProjectsRouteImport } from './routes/_authenticated/settings/projects'
 import { Route as AuthenticatedSettingsLocationsRouteImport } from './routes/_authenticated/settings/locations'
@@ -102,6 +104,12 @@ const AuthenticatedContactsIndexRoute =
     path: '/',
     getParentRoute: () => AuthenticatedContactsRoute,
   } as any)
+const AuthenticatedStatsMessagesRoute =
+  AuthenticatedStatsMessagesRouteImport.update({
+    id: '/messages',
+    path: '/messages',
+    getParentRoute: () => AuthenticatedStatsRoute,
+  } as any)
 const AuthenticatedStatsLinearRoute =
   AuthenticatedStatsLinearRouteImport.update({
     id: '/linear',
@@ -119,6 +127,12 @@ const AuthenticatedStatsGmailRoute = AuthenticatedStatsGmailRouteImport.update({
   path: '/gmail',
   getParentRoute: () => AuthenticatedStatsRoute,
 } as any)
+const AuthenticatedSettingsSampleOutputsRoute =
+  AuthenticatedSettingsSampleOutputsRouteImport.update({
+    id: '/sample-outputs',
+    path: '/sample-outputs',
+    getParentRoute: () => AuthenticatedSettingsRoute,
+  } as any)
 const AuthenticatedSettingsPromptsRoute =
   AuthenticatedSettingsPromptsRouteImport.update({
     id: '/prompts',
@@ -198,9 +212,11 @@ export interface FileRoutesByFullPath {
   '/settings/locations': typeof AuthenticatedSettingsLocationsRoute
   '/settings/projects': typeof AuthenticatedSettingsProjectsRouteWithChildren
   '/settings/prompts': typeof AuthenticatedSettingsPromptsRoute
+  '/settings/sample-outputs': typeof AuthenticatedSettingsSampleOutputsRoute
   '/stats/gmail': typeof AuthenticatedStatsGmailRoute
   '/stats/hubstaff': typeof AuthenticatedStatsHubstaffRoute
   '/stats/linear': typeof AuthenticatedStatsLinearRoute
+  '/stats/messages': typeof AuthenticatedStatsMessagesRoute
   '/contacts/': typeof AuthenticatedContactsIndexRoute
   '/settings/': typeof AuthenticatedSettingsIndexRoute
   '/stats/': typeof AuthenticatedStatsIndexRoute
@@ -222,9 +238,11 @@ export interface FileRoutesByTo {
   '/settings/locations': typeof AuthenticatedSettingsLocationsRoute
   '/settings/projects': typeof AuthenticatedSettingsProjectsRouteWithChildren
   '/settings/prompts': typeof AuthenticatedSettingsPromptsRoute
+  '/settings/sample-outputs': typeof AuthenticatedSettingsSampleOutputsRoute
   '/stats/gmail': typeof AuthenticatedStatsGmailRoute
   '/stats/hubstaff': typeof AuthenticatedStatsHubstaffRoute
   '/stats/linear': typeof AuthenticatedStatsLinearRoute
+  '/stats/messages': typeof AuthenticatedStatsMessagesRoute
   '/contacts': typeof AuthenticatedContactsIndexRoute
   '/settings': typeof AuthenticatedSettingsIndexRoute
   '/stats': typeof AuthenticatedStatsIndexRoute
@@ -251,9 +269,11 @@ export interface FileRoutesById {
   '/_authenticated/settings/locations': typeof AuthenticatedSettingsLocationsRoute
   '/_authenticated/settings/projects': typeof AuthenticatedSettingsProjectsRouteWithChildren
   '/_authenticated/settings/prompts': typeof AuthenticatedSettingsPromptsRoute
+  '/_authenticated/settings/sample-outputs': typeof AuthenticatedSettingsSampleOutputsRoute
   '/_authenticated/stats/gmail': typeof AuthenticatedStatsGmailRoute
   '/_authenticated/stats/hubstaff': typeof AuthenticatedStatsHubstaffRoute
   '/_authenticated/stats/linear': typeof AuthenticatedStatsLinearRoute
+  '/_authenticated/stats/messages': typeof AuthenticatedStatsMessagesRoute
   '/_authenticated/contacts/': typeof AuthenticatedContactsIndexRoute
   '/_authenticated/settings/': typeof AuthenticatedSettingsIndexRoute
   '/_authenticated/stats/': typeof AuthenticatedStatsIndexRoute
@@ -280,9 +300,11 @@ export interface FileRouteTypes {
     | '/settings/locations'
     | '/settings/projects'
     | '/settings/prompts'
+    | '/settings/sample-outputs'
     | '/stats/gmail'
     | '/stats/hubstaff'
     | '/stats/linear'
+    | '/stats/messages'
     | '/contacts/'
     | '/settings/'
     | '/stats/'
@@ -304,9 +326,11 @@ export interface FileRouteTypes {
     | '/settings/locations'
     | '/settings/projects'
     | '/settings/prompts'
+    | '/settings/sample-outputs'
     | '/stats/gmail'
     | '/stats/hubstaff'
     | '/stats/linear'
+    | '/stats/messages'
     | '/contacts'
     | '/settings'
     | '/stats'
@@ -332,9 +356,11 @@ export interface FileRouteTypes {
     | '/_authenticated/settings/locations'
     | '/_authenticated/settings/projects'
     | '/_authenticated/settings/prompts'
+    | '/_authenticated/settings/sample-outputs'
     | '/_authenticated/stats/gmail'
     | '/_authenticated/stats/hubstaff'
     | '/_authenticated/stats/linear'
+    | '/_authenticated/stats/messages'
     | '/_authenticated/contacts/'
     | '/_authenticated/settings/'
     | '/_authenticated/stats/'
@@ -441,6 +467,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedContactsIndexRouteImport
       parentRoute: typeof AuthenticatedContactsRoute
     }
+    '/_authenticated/stats/messages': {
+      id: '/_authenticated/stats/messages'
+      path: '/messages'
+      fullPath: '/stats/messages'
+      preLoaderRoute: typeof AuthenticatedStatsMessagesRouteImport
+      parentRoute: typeof AuthenticatedStatsRoute
+    }
     '/_authenticated/stats/linear': {
       id: '/_authenticated/stats/linear'
       path: '/linear'
@@ -461,6 +494,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/stats/gmail'
       preLoaderRoute: typeof AuthenticatedStatsGmailRouteImport
       parentRoute: typeof AuthenticatedStatsRoute
+    }
+    '/_authenticated/settings/sample-outputs': {
+      id: '/_authenticated/settings/sample-outputs'
+      path: '/sample-outputs'
+      fullPath: '/settings/sample-outputs'
+      preLoaderRoute: typeof AuthenticatedSettingsSampleOutputsRouteImport
+      parentRoute: typeof AuthenticatedSettingsRoute
     }
     '/_authenticated/settings/prompts': {
       id: '/_authenticated/settings/prompts'
@@ -574,6 +614,7 @@ interface AuthenticatedSettingsRouteChildren {
   AuthenticatedSettingsLocationsRoute: typeof AuthenticatedSettingsLocationsRoute
   AuthenticatedSettingsProjectsRoute: typeof AuthenticatedSettingsProjectsRouteWithChildren
   AuthenticatedSettingsPromptsRoute: typeof AuthenticatedSettingsPromptsRoute
+  AuthenticatedSettingsSampleOutputsRoute: typeof AuthenticatedSettingsSampleOutputsRoute
   AuthenticatedSettingsIndexRoute: typeof AuthenticatedSettingsIndexRoute
 }
 
@@ -588,6 +629,8 @@ const AuthenticatedSettingsRouteChildren: AuthenticatedSettingsRouteChildren = {
   AuthenticatedSettingsProjectsRoute:
     AuthenticatedSettingsProjectsRouteWithChildren,
   AuthenticatedSettingsPromptsRoute: AuthenticatedSettingsPromptsRoute,
+  AuthenticatedSettingsSampleOutputsRoute:
+    AuthenticatedSettingsSampleOutputsRoute,
   AuthenticatedSettingsIndexRoute: AuthenticatedSettingsIndexRoute,
 }
 
@@ -600,6 +643,7 @@ interface AuthenticatedStatsRouteChildren {
   AuthenticatedStatsGmailRoute: typeof AuthenticatedStatsGmailRoute
   AuthenticatedStatsHubstaffRoute: typeof AuthenticatedStatsHubstaffRoute
   AuthenticatedStatsLinearRoute: typeof AuthenticatedStatsLinearRoute
+  AuthenticatedStatsMessagesRoute: typeof AuthenticatedStatsMessagesRoute
   AuthenticatedStatsIndexRoute: typeof AuthenticatedStatsIndexRoute
 }
 
@@ -607,6 +651,7 @@ const AuthenticatedStatsRouteChildren: AuthenticatedStatsRouteChildren = {
   AuthenticatedStatsGmailRoute: AuthenticatedStatsGmailRoute,
   AuthenticatedStatsHubstaffRoute: AuthenticatedStatsHubstaffRoute,
   AuthenticatedStatsLinearRoute: AuthenticatedStatsLinearRoute,
+  AuthenticatedStatsMessagesRoute: AuthenticatedStatsMessagesRoute,
   AuthenticatedStatsIndexRoute: AuthenticatedStatsIndexRoute,
 }
 

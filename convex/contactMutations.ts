@@ -345,6 +345,7 @@ export const createContact = mutation({
     firstName: v.optional(v.string()),
     lastName: v.optional(v.string()),
     description: v.optional(v.string()),
+    imageUrl: v.optional(v.string()), // Profile image URL (from chat)
   },
   handler: async (ctx, args) => {
     const now = Date.now();
@@ -433,6 +434,7 @@ export const createContact = mutation({
       firstName: args.firstName,
       lastName: args.lastName,
       description: args.description,
+      imageUrl: args.imageUrl, // Profile image from chat
       doNotSyncToDex: doNotSyncToDex || undefined,
       lastSyncedAt: now,
       lastModifiedAt: now,
@@ -483,6 +485,14 @@ export const updateLeadStatus = mutation({
     // If setting a lead status (not clearing it) and sex is empty, set to Female
     if (args.leadStatus && (!contact.sex || contact.sex.length === 0)) {
       update.sex = ["Female"];
+    }
+
+    // Auto-add "Romantic" to connections if setting a lead status and not already present
+    if (args.leadStatus) {
+      const currentConnections = contact.connections || [];
+      if (!currentConnections.includes("Romantic")) {
+        update.connections = [...currentConnections, "Romantic"];
+      }
     }
 
     // Auto-set intimateConnection to true for Connected, Current, or Former statuses

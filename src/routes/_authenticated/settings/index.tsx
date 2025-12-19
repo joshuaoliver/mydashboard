@@ -8,7 +8,7 @@ import { useQuery } from '@tanstack/react-query'
 import { convexQuery } from '@convex-dev/react-query'
 import { api } from '../../../../convex/_generated/api'
 import { useState, useEffect, useRef } from 'react'
-import { Trash2, Database, AlertCircle, CheckCircle, Settings as SettingsIcon, Users, RefreshCw, Bot, MessageSquare, MapPin, RotateCcw, Compass, Clock, History, Square, Play } from 'lucide-react'
+import { Trash2, Database, AlertCircle, CheckCircle, Settings as SettingsIcon, Users, RefreshCw, Bot, MessageSquare, MapPin, RotateCcw, Compass, Clock, History, Square, Play, FileText } from 'lucide-react'
 
 export const Route = createFileRoute('/_authenticated/settings/')({
   component: SettingsPage,
@@ -28,7 +28,6 @@ function SettingsPage() {
   const [rematchResult, setRematchResult] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
   
   // Historical sync state
-  const [chatsPerBatch, setChatsPerBatch] = useState(5)
   const [messagesPerChat, setMessagesPerChat] = useState(100)
   const [loadOlderChatsFirst, setLoadOlderChatsFirst] = useState(true)
   const [isHistoricalSyncing, setIsHistoricalSyncing] = useState(false)
@@ -124,9 +123,8 @@ function SettingsPage() {
   const runOneBatch = async () => {
     try {
       const result = await runHistoricalBatch({
-        chatsPerBatch,
-        messagesPerChat,
-        loadOlderChatsFirst,
+        loadOlderChats: loadOlderChatsFirst,
+        messagesPerRequest: messagesPerChat,
       })
       
       if (result.success) {
@@ -447,21 +445,9 @@ function SettingsPage() {
             )}
             
             {/* Settings */}
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label className="text-xs text-muted-foreground">Chats per batch</Label>
-                <Input
-                  type="number"
-                  min={1}
-                  max={20}
-                  value={chatsPerBatch}
-                  onChange={(e) => setChatsPerBatch(Number(e.target.value))}
-                  className="w-full"
-                  disabled={isHistoricalSyncing}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label className="text-xs text-muted-foreground">Messages per chat</Label>
+                <Label className="text-xs text-muted-foreground">Messages per request</Label>
                 <Input
                   type="number"
                   min={50}
@@ -658,6 +644,16 @@ function SettingsPage() {
               <div>
                 <p className="font-medium group-hover:text-accent-foreground">Locations</p>
                 <p className="text-xs text-muted-foreground">Manage location tags</p>
+              </div>
+            </Link>
+            <Link 
+              to="/settings/sample-outputs"
+              className="flex items-center gap-3 p-4 rounded-lg bg-muted/50 border hover:border-orange-500/50 hover:bg-accent transition-all group"
+            >
+              <FileText className="h-5 w-5 text-orange-500 group-hover:text-orange-400" />
+              <div>
+                <p className="font-medium group-hover:text-accent-foreground">Sample Outputs</p>
+                <p className="text-xs text-muted-foreground">Copy messages for AI tone training</p>
               </div>
             </Link>
           </CardContent>
