@@ -1,5 +1,6 @@
 import { query } from "./_generated/server";
 import { v } from "convex/values";
+import { normalizePhone } from "./messageHelpers";
 
 /**
  * Find potential duplicate contacts
@@ -25,7 +26,6 @@ export const findDuplicates = query({
       confidence: "high" | "medium" | "low";
     }> = [];
 
-    const normalizePhone = (phone: string) => phone.replace(/[\s\-\(\)]/g, '');
     const normalizeName = (name: string) => name.toLowerCase().trim();
 
     // Get all other contacts (excluding this one and any already merged)
@@ -152,7 +152,6 @@ export const findAllDuplicates = query({
       matchReason: string;
     }> = [];
 
-    const normalizePhone = (phone: string) => phone.replace(/[\s\-\(\)]/g, '');
     const processed = new Set<string>();
 
     // Group by Instagram username

@@ -6,6 +6,7 @@ import { v } from "convex/values";
 import { generateText } from "ai";
 import { createGateway } from "@ai-sdk/gateway";
 import { createBeeperClient } from "./beeperClient";
+import { formatSydneyDateTime } from "./timezone";
 
 // Beeper API configuration (from environment variables)
 // Using bywave proxy instead of localhost so Convex (cloud-hosted) can access it
@@ -283,17 +284,23 @@ export const generateReplySuggestions = action({
       // No cache or last message changed - generate new suggestions
       console.log(`[generateReplySuggestions] Generating new suggestions for chat ${args.chatId}`);
 
-      // Format conversation for AI prompt
+      // Get current time in Sydney for context
+      const currentTimeSydney = formatSydneyDateTime(Date.now());
+
+      // Format conversation for AI prompt WITH timestamps
+      // This helps the AI understand the temporal context of messages
       const conversationHistory = messages
         .slice(-25) // Use last 25 messages for context
-        .map((msg: { isFromUser: boolean; text: string }) => {
+        .map((msg: { isFromUser: boolean; text: string; timestamp: number }) => {
           const role = msg.isFromUser ? "You" : args.chatName;
-          return `${role}: ${msg.text}`;
+          const msgTime = formatSydneyDateTime(msg.timestamp);
+          return `[${msgTime}] ${role}: ${msg.text}`;
         })
         .join("\n");
 
-      // Get last message for context
+      // Get last message for context with timestamp
       const lastMessageText = lastMessage.text;
+      const lastMessageTime = formatSydneyDateTime(lastMessage.timestamp);
 
       // Build contact context with XML structure if available
       // Only include fields that are visible/editable in the contact panel
@@ -389,7 +396,40 @@ export const generateReplySuggestions = action({
         if (contact.intimateConnection) {
           contactContext += `\n<intimate_connection>Yes</intimate_connection>`;
         }
+        
+        // Timezone information if available
+        if (contact.timezone) {
+          contactContext += `\n<timezone>${contact.timezone}</timezone>`;
+        }
       }
+
+      // Build temporal context section - critical for time-aware replies
+      // This helps the AI understand when messages were sent relative to now
+      // Default to Sydney timezone for recipient if not explicitly set (most contacts are local)
+      const recipientTimezone = contact?.timezone || "Australia/Sydney";
+      let recipientTime: string;
+      try {
+        recipientTime = new Date().toLocaleString("en-AU", {
+          timeZone: recipientTimezone,
+          day: "numeric",
+          month: "short",
+          year: "numeric",
+          hour: "numeric",
+          minute: "2-digit",
+          hour12: true,
+        });
+      } catch (e) {
+        // Fallback to Sydney if timezone is invalid
+        recipientTime = currentTimeSydney;
+      }
+      
+      let temporalContext = `<temporal_context>
+<current_time>${currentTimeSydney}</current_time>
+<your_timezone>Australia/Sydney (AEDT/AEST)</your_timezone>
+<recipient_timezone>${recipientTimezone}${!contact?.timezone ? " (assumed same as yours)" : ""}</recipient_timezone>
+<recipient_current_time>${recipientTime}</recipient_current_time>
+<last_message_time>${lastMessageTime}</last_message_time>
+</temporal_context>`;
 
       // Add custom context if provided
       let customContextSection = "";
@@ -419,7 +459,10 @@ ${args.customContext}
           .replace(/\{\{contactContext\}\}/g, contactContext)
           .replace(/\{\{customContext\}\}/g, customContextSection)
           .replace(/\{\{platform\}\}/g, platform)
-          .replace(/\{\{messageCount\}\}/g, messages.length.toString());
+          .replace(/\{\{messageCount\}\}/g, messages.length.toString())
+          .replace(/\{\{temporalContext\}\}/g, temporalContext)
+          .replace(/\{\{currentTime\}\}/g, currentTimeSydney)
+          .replace(/\{\{lastMessageTime\}\}/g, lastMessageTime);
         
         console.log(`[generateReplySuggestions] Using configured prompt template from database`);
       } else {
@@ -427,15 +470,19 @@ ${args.customContext}
         console.warn(`[generateReplySuggestions] Prompt template 'reply-suggestions' not found, using fallback`);
         prompt = `You are an AI assistant helping Joshua Oliver (26, male, Sydney) craft contextually appropriate replies.
 
+${temporalContext}
+
 Contact: ${args.chatName}
 Platform: ${platform}
 ${contactContext}
 ${customContextSection}
 
-Conversation history:
+Conversation history (with timestamps):
 ${conversationHistory}
 
-Latest message from ${args.chatName}: "${lastMessageText}"
+Latest message from ${args.chatName} at ${lastMessageTime}: "${lastMessageText}"
+
+IMPORTANT TEMPORAL CONTEXT: Consider the time difference between when the last message was sent and the current time. If the conversation happened yesterday or earlier, do NOT suggest replies that would have been appropriate at that time (like "have a good sleep" for a tired message from last night). Instead, suggest replies that are appropriate for NOW.
 
 Suggest 3-4 different reply options representing DIFFERENT conversation pathways. Match the relationship context and be natural.
 

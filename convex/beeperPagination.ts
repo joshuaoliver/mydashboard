@@ -1,8 +1,343 @@
-import { action } from "./_generated/server";
-import { internal } from "./_generated/api";
+import { action, internalMutation, internalQuery, query } from "./_generated/server";
+import { internal, api } from "./_generated/api";
 import { v } from "convex/values";
 import { createBeeperClient } from "./beeperClient";
 import { extractMessageText, compareSortKeys } from "./messageHelpers";
+
+/**
+ * Historical sync state - tracks progress of historical sync job
+ */
+export const getHistoricalSyncStatus = query({
+  args: {},
+  handler: async (ctx) => {
+    const setting = await ctx.db
+      .query("settings")
+      .withIndex("by_key", (q) => q.eq("key", "historical_sync_status"))
+      .first();
+    
+    if (!setting) {
+      return {
+        isRunning: false,
+        chatsProcessed: 0,
+        totalChats: 0,
+        messagesLoaded: 0,
+        currentChat: null,
+        startedAt: null,
+        lastUpdated: null,
+        error: null,
+      };
+    }
+    
+    return setting.value as {
+      isRunning: boolean;
+      chatsProcessed: number;
+      totalChats: number;
+      messagesLoaded: number;
+      currentChat: string | null;
+      startedAt: number | null;
+      lastUpdated: number | null;
+      error: string | null;
+    };
+  },
+});
+
+export const updateHistoricalSyncStatus = internalMutation({
+  args: {
+    isRunning: v.boolean(),
+    chatsProcessed: v.optional(v.number()),
+    totalChats: v.optional(v.number()),
+    messagesLoaded: v.optional(v.number()),
+    currentChat: v.optional(v.union(v.string(), v.null())),
+    startedAt: v.optional(v.union(v.number(), v.null())),
+    error: v.optional(v.union(v.string(), v.null())),
+  },
+  handler: async (ctx, args) => {
+    const existing = await ctx.db
+      .query("settings")
+      .withIndex("by_key", (q) => q.eq("key", "historical_sync_status"))
+      .first();
+    
+    const newValue = {
+      isRunning: args.isRunning,
+      chatsProcessed: args.chatsProcessed ?? existing?.value?.chatsProcessed ?? 0,
+      totalChats: args.totalChats ?? existing?.value?.totalChats ?? 0,
+      messagesLoaded: args.messagesLoaded ?? existing?.value?.messagesLoaded ?? 0,
+      currentChat: args.currentChat !== undefined ? args.currentChat : existing?.value?.currentChat ?? null,
+      startedAt: args.startedAt !== undefined ? args.startedAt : existing?.value?.startedAt ?? null,
+      lastUpdated: Date.now(),
+      error: args.error !== undefined ? args.error : existing?.value?.error ?? null,
+    };
+    
+    if (existing) {
+      await ctx.db.patch(existing._id, {
+        value: newValue,
+        updatedAt: Date.now(),
+      });
+    } else {
+      await ctx.db.insert("settings", {
+        key: "historical_sync_status",
+        type: "config",
+        value: newValue,
+        updatedAt: Date.now(),
+      });
+    }
+  },
+});
+
+/**
+ * Stop the historical sync
+ */
+export const stopHistoricalSync = action({
+  args: {},
+  handler: async (ctx) => {
+    await ctx.runMutation(internal.beeperPagination.updateHistoricalSyncStatus, {
+      isRunning: false,
+      error: "Stopped by user",
+    });
+    return { success: true };
+  },
+});
+
+/**
+ * Historical batch sync - loads X chats going back in time, with Y messages each
+ * Runs one batch at a time, can be called repeatedly until stopped
+ */
+export const runHistoricalSyncBatch = action({
+  args: {
+    chatsPerBatch: v.number(),      // How many chats to process per batch
+    messagesPerChat: v.number(),    // How many messages to load per chat
+    loadOlderChatsFirst: v.optional(v.boolean()), // Whether to load older chats first
+  },
+  handler: async (ctx, args) => {
+    const { chatsPerBatch, messagesPerChat, loadOlderChatsFirst } = args;
+    
+    try {
+      // Check if already running
+      const status = await ctx.runQuery(api.beeperPagination.getHistoricalSyncStatus, {});
+      
+      // Mark as running
+      await ctx.runMutation(internal.beeperPagination.updateHistoricalSyncStatus, {
+        isRunning: true,
+        startedAt: status.startedAt || Date.now(),
+        error: null,
+      });
+      
+      const client = createBeeperClient();
+      let chatsProcessed = status.chatsProcessed || 0;
+      let totalMessagesLoaded = status.messagesLoaded || 0;
+      
+      // Step 1: Optionally load older chats first to expand the chat list
+      if (loadOlderChatsFirst) {
+        console.log(`[Historical Sync] Loading older chats first...`);
+        
+        const loadChatsResult = await ctx.runAction(api.beeperPagination.loadOlderChats, {
+          limit: chatsPerBatch,
+        });
+        
+        if (!loadChatsResult.success) {
+          console.log(`[Historical Sync] No more older chats to load: ${loadChatsResult.error}`);
+        } else {
+          console.log(`[Historical Sync] Loaded ${loadChatsResult.chatsLoaded} older chats`);
+        }
+      }
+      
+      // Step 2: Get chats that need more message history
+      // Priority: chats without complete history, sorted by message count (fewest first)
+      const chatsNeedingHistory = await ctx.runQuery(
+        internal.beeperPagination.getChatsNeedingHistory,
+        { limit: chatsPerBatch }
+      );
+      
+      if (chatsNeedingHistory.length === 0) {
+        await ctx.runMutation(internal.beeperPagination.updateHistoricalSyncStatus, {
+          isRunning: false,
+          error: "All chats have complete history or no chats found",
+        });
+        
+        return {
+          success: true,
+          chatsProcessed: 0,
+          messagesLoaded: 0,
+          hasMoreChats: false,
+          hasMoreMessages: false,
+        };
+      }
+      
+      await ctx.runMutation(internal.beeperPagination.updateHistoricalSyncStatus, {
+        isRunning: true,
+        totalChats: chatsNeedingHistory.length,
+      });
+      
+      console.log(`[Historical Sync] Processing ${chatsNeedingHistory.length} chats...`);
+      
+      // Step 3: For each chat, load older messages
+      let hasMoreMessages = false;
+      
+      for (const chat of chatsNeedingHistory) {
+        // Check if we should stop
+        const currentStatus = await ctx.runQuery(api.beeperPagination.getHistoricalSyncStatus, {});
+        if (!currentStatus.isRunning) {
+          console.log(`[Historical Sync] Stopped by user`);
+          return {
+            success: true,
+            chatsProcessed,
+            messagesLoaded: totalMessagesLoaded,
+            hasMoreChats: true,
+            hasMoreMessages: true,
+            stoppedByUser: true,
+          };
+        }
+        
+        await ctx.runMutation(internal.beeperPagination.updateHistoricalSyncStatus, {
+          isRunning: true,
+          currentChat: chat.title,
+          chatsProcessed,
+        });
+        
+        console.log(`[Historical Sync] Processing chat: ${chat.title} (${chat.messageCount || 0} messages)`);
+        
+        // Load messages for this chat
+        let messagesLoadedForChat = 0;
+        let chatHasMore = true;
+        let iterations = 0;
+        const maxIterations = Math.ceil(messagesPerChat / 50); // 50 messages per API call
+        
+        while (chatHasMore && messagesLoadedForChat < messagesPerChat && iterations < maxIterations) {
+          iterations++;
+          
+          // If chat has no messages yet, do initial load
+          const chatDetails = await ctx.runQuery(
+            internal.beeperQueries.getChatByIdInternal,
+            { chatId: chat.chatId }
+          ) as any;
+          
+          if (!chatDetails?.oldestMessageSortKey) {
+            // Need to do initial message load first
+            const initialResult = await ctx.runAction(api.beeperPagination.loadNewerMessages, {
+              chatId: chat.chatId,
+            });
+            
+            if (initialResult.success) {
+              messagesLoadedForChat += initialResult.messagesLoaded;
+              totalMessagesLoaded += initialResult.messagesLoaded;
+              chatHasMore = initialResult.hasMore;
+            } else {
+              console.log(`[Historical Sync] Initial load failed for ${chat.title}: ${initialResult.error}`);
+              break;
+            }
+          } else if (chatDetails?.hasCompleteHistory) {
+            console.log(`[Historical Sync] Chat ${chat.title} already has complete history`);
+            chatHasMore = false;
+            break;
+          } else {
+            // Load older messages
+            const result = await ctx.runAction(api.beeperPagination.loadOlderMessages, {
+              chatId: chat.chatId,
+              limit: Math.min(50, messagesPerChat - messagesLoadedForChat),
+            });
+            
+            if (result.success) {
+              messagesLoadedForChat += result.messagesLoaded;
+              totalMessagesLoaded += result.messagesLoaded;
+              chatHasMore = result.hasMore;
+              
+              if (result.messagesLoaded === 0) {
+                break; // No more messages available
+              }
+            } else {
+              console.log(`[Historical Sync] Error loading messages for ${chat.title}: ${result.error}`);
+              break;
+            }
+          }
+          
+          // Update status
+          await ctx.runMutation(internal.beeperPagination.updateHistoricalSyncStatus, {
+            isRunning: true,
+            messagesLoaded: totalMessagesLoaded,
+          });
+        }
+        
+        if (chatHasMore && messagesLoadedForChat >= messagesPerChat) {
+          hasMoreMessages = true;
+        }
+        
+        chatsProcessed++;
+        console.log(`[Historical Sync] Loaded ${messagesLoadedForChat} messages for ${chat.title}`);
+      }
+      
+      // Update final status
+      await ctx.runMutation(internal.beeperPagination.updateHistoricalSyncStatus, {
+        isRunning: false,
+        chatsProcessed,
+        messagesLoaded: totalMessagesLoaded,
+        currentChat: null,
+      });
+      
+      // Check if there are more chats to process
+      const remainingChats = await ctx.runQuery(
+        internal.beeperPagination.getChatsNeedingHistory,
+        { limit: 1 }
+      );
+      
+      return {
+        success: true,
+        chatsProcessed,
+        messagesLoaded: totalMessagesLoaded,
+        hasMoreChats: remainingChats.length > 0,
+        hasMoreMessages,
+      };
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : "Unknown error";
+      console.error(`[Historical Sync] Error: ${errorMsg}`);
+      
+      await ctx.runMutation(internal.beeperPagination.updateHistoricalSyncStatus, {
+        isRunning: false,
+        error: errorMsg,
+      });
+      
+      return {
+        success: false,
+        error: errorMsg,
+        chatsProcessed: 0,
+        messagesLoaded: 0,
+        hasMoreChats: false,
+        hasMoreMessages: false,
+      };
+    }
+  },
+});
+
+/**
+ * Get chats that need more message history (internal)
+ * Returns chats sorted by: hasCompleteHistory=false first, then by messageCount ascending
+ */
+export const getChatsNeedingHistory = internalQuery({
+  args: {
+    limit: v.number(),
+  },
+  handler: async (ctx, args) => {
+    // Get all chats that don't have complete history
+    const chats = await ctx.db
+      .query("beeperChats")
+      .filter((q) => 
+        q.or(
+          q.eq(q.field("hasCompleteHistory"), false),
+          q.eq(q.field("hasCompleteHistory"), undefined)
+        )
+      )
+      .collect();
+    
+    // Sort by message count ascending (prioritize chats with fewest messages)
+    const sorted = chats.sort((a, b) => (a.messageCount || 0) - (b.messageCount || 0));
+    
+    return sorted.slice(0, args.limit).map(chat => ({
+      chatId: chat.chatId,
+      title: chat.title,
+      messageCount: chat.messageCount || 0,
+      hasCompleteHistory: chat.hasCompleteHistory || false,
+    }));
+  },
+});
 
 /**
  * Load older chats (backward pagination)

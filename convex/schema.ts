@@ -97,6 +97,7 @@ export default defineSchema({
     .index("by_username", ["username"])        // Find by Instagram username
     .index("by_phone", ["phoneNumber"])        // Find by WhatsApp/phone number
     .index("by_type_archived", ["type", "isArchived"]) // Fast filter for chat list queries
+    .index("by_type_archived_activity", ["type", "isArchived", "lastActivity"]) // Filter + sort by activity
     .index("by_contact", ["contactId"]),       // Find chats by linked contact
 
   // Beeper messages - cached messages per chat (last 20-30 only)
@@ -193,6 +194,7 @@ export default defineSchema({
     intimateConnectionDate: v.optional(v.string()), // ISO date string for when intimate connection started
     // Deduplication and cross-platform tracking
     whatsapp: v.optional(v.string()), // Primary WhatsApp phone number for matching
+    timezone: v.optional(v.string()), // IANA timezone identifier (e.g., "America/New_York", "Europe/London")
     socialHandles: v.optional(v.array(v.object({
       platform: v.string(),    // "instagram", "whatsapp", "facebook", "phone"
       handle: v.string(),       // Username or phone number
@@ -201,6 +203,10 @@ export default defineSchema({
     }))), // Historical and alternate social media handles
     mergedFrom: v.optional(v.array(v.id("contacts"))), // IDs of contacts merged into this one
     doNotSyncToDex: v.optional(v.boolean()), // Flag for contacts that should not sync to Dex (e.g., iMessage-only contacts)
+    // Custom name override
+    setName: v.optional(v.string()), // User-set custom name override (displayed with original name in parentheses)
+    // Priority slider (1-100)
+    priority: v.optional(v.number()), // Priority level 1-100 for contact importance
   })
     .index("by_dex_id", ["dexId"])
     .index("by_instagram", ["instagram"]) // For matching with Beeper Instagram chats

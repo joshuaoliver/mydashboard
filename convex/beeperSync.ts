@@ -2,12 +2,7 @@ import { internalMutation, internalAction, action } from "./_generated/server";
 import { internal, api } from "./_generated/api";
 import { v } from "convex/values";
 import { createBeeperClient } from "./beeperClient";
-import { extractMessageText, compareSortKeys } from "./messageHelpers";
-
-/**
- * Helper to normalize phone numbers for matching
- */
-const normalizePhone = (phone: string) => phone.replace(/[\s\-\(\)]/g, '');
+import { extractMessageText, compareSortKeys, normalizePhone } from "./messageHelpers";
 
 /**
  * Helper mutation to upsert a single chat into database
@@ -77,7 +72,7 @@ export const upsertChat = internalMutation({
         }
       }
 
-      // 2. Try matching by WhatsApp phone number (fast indexed lookup)
+      // 2. Try matching by WhatsApp phone number (fast indexed lookup - exact match)
       if (!contactId && args.chatData.phoneNumber) {
         const contactByWhatsapp = await ctx.db
           .query("contacts")
@@ -89,20 +84,32 @@ export const upsertChat = internalMutation({
         }
       }
       
-      // 3. For iMessage/SMS chats, also search the phones array (slightly more expensive)
-      // This enables matching when phone numbers are in Dex but not in the whatsapp field
-      if (!contactId && args.chatData.phoneNumber && 
-          (args.chatData.network === "iMessage" || args.chatData.network === "SMS")) {
+      // 3. If no exact match, try normalized phone matching against:
+      //    - whatsapp field (normalized)
+      //    - phones array (normalized)
+      // This handles format differences like +61411785274 vs 0411785274
+      if (!contactId && args.chatData.phoneNumber) {
         const searchPhone = normalizePhone(args.chatData.phoneNumber);
         
-        // Get contacts that have phones array
+        // Get all contacts with whatsapp or phones fields
         const contactsWithPhones = await ctx.db
           .query("contacts")
-          .filter((q) => q.neq(q.field("phones"), undefined))
+          .filter((q) => 
+            q.or(
+              q.neq(q.field("whatsapp"), undefined),
+              q.neq(q.field("phones"), undefined)
+            )
+          )
           .collect();
         
-        // Search through phones arrays for a match
+        // Search with normalized comparison
         for (const contact of contactsWithPhones) {
+          // Check whatsapp field with normalization
+          if (contact.whatsapp && normalizePhone(contact.whatsapp) === searchPhone) {
+            contactId = contact._id;
+            break;
+          }
+          // Check phones array with normalization
           if (contact.phones) {
             const hasMatch = contact.phones.some(
               (p) => normalizePhone(p.phone) === searchPhone
@@ -117,6 +124,38 @@ export const upsertChat = internalMutation({
     }
 
     if (existingChat) {
+      chatDocId = existingChat._id;
+      
+      // Check if messages need syncing (based on activity timestamp)
+      shouldSyncMessages =
+        !existingChat.lastMessagesSyncedAt ||
+        args.chatData.lastActivity > existingChat.lastMessagesSyncedAt;
+
+      // OPTIMIZATION: Skip write if nothing meaningful has changed
+      // Compare key fields that would affect the UI or require syncing
+      const hasNewActivity = args.chatData.lastActivity > (existingChat.lastActivity || 0);
+      const contactChanged = contactId !== undefined && contactId !== existingChat.contactId;
+      const usernameChanged = args.chatData.username !== existingChat.username;
+      const phoneChanged = args.chatData.phoneNumber !== existingChat.phoneNumber;
+      const unreadChanged = args.chatData.unreadCount !== existingChat.unreadCount;
+      const archivedChanged = args.chatData.isArchived !== existingChat.isArchived;
+      const mutedChanged = args.chatData.isMuted !== existingChat.isMuted;
+      const pinnedChanged = args.chatData.isPinned !== existingChat.isPinned;
+      const titleChanged = args.chatData.title !== existingChat.title;
+      
+      const hasChanges = hasNewActivity || contactChanged || usernameChanged || 
+                         phoneChanged || unreadChanged || archivedChanged || 
+                         mutedChanged || pinnedChanged || titleChanged;
+      
+      if (!hasChanges) {
+        // Nothing meaningful changed - skip the write entirely
+        console.log(
+          `[upsertChat] Chat ${args.chatData.chatId}: SKIPPED (no changes), ` +
+          `shouldSyncMessages=${shouldSyncMessages}`
+        );
+        return { chatDocId, shouldSyncMessages };
+      }
+
       // Build selective update - only include fields that are provided
       const updates: any = {
         localChatID: args.chatData.localChatID,
@@ -176,18 +215,10 @@ export const upsertChat = internalMutation({
       }
       
       await ctx.db.patch(existingChat._id, updates);
-      chatDocId = existingChat._id;
-      
-      // Check if messages need syncing
-      shouldSyncMessages =
-        !existingChat.lastMessagesSyncedAt ||
-        args.chatData.lastActivity > existingChat.lastMessagesSyncedAt;
       
       console.log(
-        `[upsertChat] Chat ${args.chatData.chatId}: ` +
-        `lastMessagesSyncedAt=${existingChat.lastMessagesSyncedAt}, ` +
-        `lastActivity=${args.chatData.lastActivity}, ` +
-        `shouldSync=${shouldSyncMessages}, ` +
+        `[upsertChat] Chat ${args.chatData.chatId}: UPDATED, ` +
+        `shouldSyncMessages=${shouldSyncMessages}, ` +
         `contactId=${contactId || 'none'}`
       );
     } else {
@@ -234,9 +265,6 @@ export const upsertParticipants = internalMutation({
     let insertedCount = 0;
     let updatedCount = 0;
     let matchedCount = 0;
-
-    // Helper to normalize phone numbers for matching
-    const normalizePhone = (phone: string) => phone.replace(/[\s\-\(\)]/g, '');
 
     // Track the "other person" participant for single chats
     // Used to backfill chat phoneNumber if missing
@@ -290,8 +318,9 @@ export const upsertParticipants = internalMutation({
           }
         }
 
-        // 2. Try matching by WhatsApp phone number
+        // 2. Try matching by phone number (with normalization for format differences)
         if (!contactId && participant.phoneNumber) {
+          // First try exact match on whatsapp (fast index)
           const contactByWhatsapp = await ctx.db
             .query("contacts")
             .withIndex("by_whatsapp", (q) => q.eq("whatsapp", participant.phoneNumber!))
@@ -300,16 +329,28 @@ export const upsertParticipants = internalMutation({
           if (contactByWhatsapp) {
             contactId = contactByWhatsapp._id;
           } else {
-            // Fall back to searching phones array
+            // Fall back to normalized matching against whatsapp and phones array
             const searchPhone = normalizePhone(participant.phoneNumber);
             const allContactsWithPhones = await ctx.db
               .query("contacts")
-              .filter((q) => q.neq(q.field("phones"), undefined))
+              .filter((q) => 
+                q.or(
+                  q.neq(q.field("whatsapp"), undefined),
+                  q.neq(q.field("phones"), undefined)
+                )
+              )
               .collect();
 
             const matchedContact = allContactsWithPhones.find((c) => {
-              if (!c.phones) return false;
-              return c.phones.some((p) => normalizePhone(p.phone) === searchPhone);
+              // Check whatsapp field with normalization
+              if (c.whatsapp && normalizePhone(c.whatsapp) === searchPhone) {
+                return true;
+              }
+              // Check phones array with normalization
+              if (c.phones) {
+                return c.phones.some((p) => normalizePhone(p.phone) === searchPhone);
+              }
+              return false;
             });
 
             if (matchedContact) {
@@ -336,19 +377,32 @@ export const upsertParticipants = internalMutation({
         .first();
 
       if (existingParticipant) {
-        // Update existing participant
-        await ctx.db.patch(existingParticipant._id, {
-          fullName: participant.fullName,
-          username: participant.username,
-          phoneNumber: participant.phoneNumber,
-          email: participant.email,
-          imgURL: participant.imgURL,
-          isSelf: participant.isSelf,
-          cannotMessage: participant.cannotMessage,
-          lastSyncedAt: args.lastSyncedAt,
-          contactId: contactId as any, // Link to matched contact
-        });
-        updatedCount++;
+        // OPTIMIZATION: Skip update if nothing has changed
+        const hasChanges = 
+          existingParticipant.fullName !== participant.fullName ||
+          existingParticipant.username !== participant.username ||
+          existingParticipant.phoneNumber !== participant.phoneNumber ||
+          existingParticipant.email !== participant.email ||
+          existingParticipant.imgURL !== participant.imgURL ||
+          existingParticipant.cannotMessage !== participant.cannotMessage ||
+          existingParticipant.contactId !== contactId;
+        
+        if (hasChanges) {
+          // Update existing participant
+          await ctx.db.patch(existingParticipant._id, {
+            fullName: participant.fullName,
+            username: participant.username,
+            phoneNumber: participant.phoneNumber,
+            email: participant.email,
+            imgURL: participant.imgURL,
+            isSelf: participant.isSelf,
+            cannotMessage: participant.cannotMessage,
+            lastSyncedAt: args.lastSyncedAt,
+            contactId: contactId as any, // Link to matched contact
+          });
+          updatedCount++;
+        }
+        // If no changes, skip the write entirely
       } else {
         // Insert new participant
         await ctx.db.insert("beeperParticipants", {

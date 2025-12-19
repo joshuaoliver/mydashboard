@@ -44,6 +44,7 @@ export const syncContactsFromDex = internalAction({
 /**
  * Force sync - bypasses "unchanged" check to re-process all contacts
  * Useful when phone normalization logic changes
+ * Processes in batches to avoid timeout
  */
 export const syncContactsFromDexForced = internalAction({
   args: {},
@@ -63,13 +64,46 @@ export const syncContactsFromDexForced = internalAction({
       const result = await ctx.runAction(api.dexActions.fetchDexContacts, {});
       const dexContacts: DexContact[] = result.contacts;
 
-      // Call mutation with forceUpdate=true to bypass "unchanged" check
-      const syncResult = await ctx.runMutation(internal.dexUpsert.upsertContacts, {
-        contacts: dexContacts,
-        forceUpdate: true,
-      });
+      console.log(`Fetched ${dexContacts.length} contacts, processing in batches...`);
 
-      return syncResult;
+      // Process in batches of 100 to avoid mutation timeout
+      const BATCH_SIZE = 100;
+      let totalAdded = 0;
+      let totalUpdated = 0;
+      let totalSkipped = 0;
+      let totalErrors = 0;
+      const allErrorMessages: string[] = [];
+
+      for (let i = 0; i < dexContacts.length; i += BATCH_SIZE) {
+        const batch = dexContacts.slice(i, i + BATCH_SIZE);
+        const batchNum = Math.floor(i / BATCH_SIZE) + 1;
+        const totalBatches = Math.ceil(dexContacts.length / BATCH_SIZE);
+        
+        console.log(`Processing batch ${batchNum}/${totalBatches} (${batch.length} contacts)...`);
+        
+        const syncResult = await ctx.runMutation(internal.dexUpsert.upsertContacts, {
+          contacts: batch,
+          forceUpdate: true,
+        });
+
+        totalAdded += syncResult.added;
+        totalUpdated += syncResult.updated;
+        totalSkipped += syncResult.skipped;
+        totalErrors += syncResult.errors;
+        allErrorMessages.push(...syncResult.errorMessages);
+      }
+
+      console.log(`Force sync complete: ${totalAdded} added, ${totalUpdated} updated, ${totalSkipped} skipped`);
+
+      return {
+        totalProcessed: dexContacts.length,
+        added: totalAdded,
+        updated: totalUpdated,
+        skipped: totalSkipped,
+        errors: totalErrors,
+        errorMessages: allErrorMessages,
+        timestamp: Date.now(),
+      };
     } catch (error) {
       console.error("Error in syncContactsFromDexForced:", error);
       throw new Error(

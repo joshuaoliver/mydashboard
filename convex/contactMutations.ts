@@ -1,6 +1,7 @@
 import { mutation, query, internalMutation, action } from "./_generated/server";
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
+import { normalizePhone } from "./messageHelpers";
 
 /**
  * Query to find a contact by Instagram username
@@ -47,8 +48,9 @@ export const findContactByInstagram = query({
 });
 
 /**
- * Query to find a contact by WhatsApp phone number
- * Used for matching Beeper WhatsApp chats to Dex contacts
+ * Query to find a contact by phone number
+ * Used for matching Beeper WhatsApp/iMessage chats to Dex contacts
+ * Uses normalized phone matching to handle format differences
  */
 export const findContactByPhone = query({
   args: {
@@ -59,29 +61,36 @@ export const findContactByPhone = query({
       return null;
     }
 
-    // Normalize phone number (remove spaces, dashes, etc.)
-    const normalizePhone = (phone: string) => {
-      return phone.replace(/[\s\-\(\)]/g, '');
-    };
-
     const searchPhone = normalizePhone(args.phoneNumber);
 
-    // Try exact match on whatsapp field first
+    // Try exact match on whatsapp field first (fast index)
     let contact = await ctx.db
       .query("contacts")
       .withIndex("by_whatsapp", (q) => q.eq("whatsapp", args.phoneNumber))
       .first();
 
-    // If not found, search in phones array
+    // If not found, search with normalization against whatsapp and phones
     if (!contact) {
       const allContacts = await ctx.db
         .query("contacts")
-        .filter((q) => q.neq(q.field("phones"), undefined))
+        .filter((q) => 
+          q.or(
+            q.neq(q.field("whatsapp"), undefined),
+            q.neq(q.field("phones"), undefined)
+          )
+        )
         .collect();
 
       contact = allContacts.find((c) => {
-        if (!c.phones) return false;
-        return c.phones.some((p) => normalizePhone(p.phone) === searchPhone);
+        // Check whatsapp field with normalization
+        if (c.whatsapp && normalizePhone(c.whatsapp) === searchPhone) {
+          return true;
+        }
+        // Check phones array with normalization
+        if (c.phones) {
+          return c.phones.some((p) => normalizePhone(p.phone) === searchPhone);
+        }
+        return false;
       }) || null;
     }
 
@@ -269,6 +278,25 @@ export const updateContactLocations = mutation({
 });
 
 /**
+ * Update timezone for a contact
+ * Used for time-aware AI reply suggestions
+ */
+export const updateContactTimezone = mutation({
+  args: {
+    contactId: v.id("contacts"),
+    timezone: v.optional(v.string()), // IANA timezone identifier (e.g., "America/New_York")
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.contactId, {
+      timezone: args.timezone,
+      lastModifiedAt: Date.now(),
+    });
+
+    return { success: true };
+  },
+});
+
+/**
  * Toggle a location (add if not present, remove if present)
  */
 export const toggleLocation = mutation({
@@ -362,10 +390,9 @@ export const createContact = mutation({
     // Check if contact with this phone number already exists (for iMessage)
     if (args.phoneNumber) {
       // Normalize phone number for comparison
-      const normalizePhone = (phone: string) => phone.replace(/[\s\-\(\)]/g, '');
       const searchPhone = normalizePhone(args.phoneNumber);
 
-      // Check whatsapp field
+      // Check whatsapp field (exact match first - fast)
       const existingWhatsapp = await ctx.db
         .query("contacts")
         .withIndex("by_whatsapp", (q) => q.eq("whatsapp", args.phoneNumber))
@@ -375,15 +402,27 @@ export const createContact = mutation({
         return { contactId: existingWhatsapp._id, existed: true };
       }
 
-      // Check phones array
+      // Check whatsapp and phones with normalized comparison
       const allContactsWithPhones = await ctx.db
         .query("contacts")
-        .filter((q) => q.neq(q.field("phones"), undefined))
+        .filter((q) => 
+          q.or(
+            q.neq(q.field("whatsapp"), undefined),
+            q.neq(q.field("phones"), undefined)
+          )
+        )
         .collect();
 
       const existingPhone = allContactsWithPhones.find((c) => {
-        if (!c.phones) return false;
-        return c.phones.some((p) => normalizePhone(p.phone) === searchPhone);
+        // Check whatsapp field with normalization
+        if (c.whatsapp && normalizePhone(c.whatsapp) === searchPhone) {
+          return true;
+        }
+        // Check phones array with normalization
+        if (c.phones) {
+          return c.phones.some((p) => normalizePhone(p.phone) === searchPhone);
+        }
+        return false;
       });
 
       if (existingPhone) {
@@ -459,52 +498,97 @@ export const updateLeadStatus = mutation({
 });
 
 /**
- * Re-match all chats to contacts
+ * Update contact's custom set name (local-only)
+ * This allows users to set a custom display name for the contact
+ */
+export const updateSetName = mutation({
+  args: {
+    contactId: v.id("contacts"),
+    setName: v.union(v.string(), v.null()),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.contactId, {
+      setName: args.setName ?? undefined,
+      lastModifiedAt: Date.now(),
+    });
+    return { success: true };
+  },
+});
+
+/**
+ * Update contact's priority (local-only)
+ * Priority is a number from 1-100 for importance ranking
+ */
+export const updatePriority = mutation({
+  args: {
+    contactId: v.id("contacts"),
+    priority: v.union(v.number(), v.null()),
+  },
+  handler: async (ctx, args) => {
+    // Clamp priority to 1-100 range if provided
+    let priority = args.priority;
+    if (priority !== null) {
+      priority = Math.max(1, Math.min(100, priority));
+    }
+    
+    await ctx.db.patch(args.contactId, {
+      priority: priority ?? undefined,
+      lastModifiedAt: Date.now(),
+    });
+    return { success: true };
+  },
+});
+
+/**
+ * Re-match all chats AND participants to contacts
  * Call this when contacts are created, updated (instagram/whatsapp/phone fields), or merged
  * 
- * This is an internal mutation that scans all beeperChats and updates their contactId
- * based on current contact data. Runs at sync time, not query time.
+ * This is an internal mutation that scans all beeperChats AND beeperParticipants
+ * and updates their contactId based on current contact data.
  */
 export const rematchChatsToContacts = internalMutation({
   args: {},
   handler: async (ctx) => {
     const now = Date.now();
-    let matchedCount = 0;
-    let unmatchedCount = 0;
-    let unchangedCount = 0;
+    let chatMatchedCount = 0;
+    let chatUnmatchedCount = 0;
+    let chatUnchangedCount = 0;
+    let participantMatchedCount = 0;
+    let participantUnchangedCount = 0;
 
     // Helper to normalize phone numbers
-    const normalizePhone = (phone: string) => phone.replace(/[\s\-\(\)]/g, '');
-
     // PRE-FETCH: Load all contacts ONCE and build lookup maps
     // This avoids repeatedly querying contacts inside the loop
     const allContacts = await ctx.db.query("contacts").collect();
     
     // Build lookup maps for O(1) matching
+    // All phone numbers are normalized for consistent matching
     const instagramMap = new Map<string, string>(); // username -> contactId
-    const whatsappMap = new Map<string, string>();  // phone -> contactId
-    const phonesMap = new Map<string, string>();    // normalized phone -> contactId
+    const phoneMap = new Map<string, string>();     // normalized phone -> contactId (from whatsapp field AND phones array)
     
     for (const contact of allContacts) {
       if (contact.instagram) {
         instagramMap.set(contact.instagram, contact._id);
       }
+      // Add whatsapp field to phone map (normalized)
       if (contact.whatsapp) {
-        whatsappMap.set(contact.whatsapp, contact._id);
+        phoneMap.set(normalizePhone(contact.whatsapp), contact._id);
       }
-      // Build phone lookup from phones array
+      // Add phones array to phone map (normalized)
       if (contact.phones) {
         for (const p of contact.phones) {
           if (p.phone) {
-            phonesMap.set(normalizePhone(p.phone), contact._id);
+            phoneMap.set(normalizePhone(p.phone), contact._id);
           }
         }
       }
     }
     
-    console.log(`[rematchChatsToContacts] Built lookup maps: ${instagramMap.size} instagram, ${whatsappMap.size} whatsapp, ${phonesMap.size} phones`);
+    console.log(`[rematchChatsToContacts] Built lookup maps: ${instagramMap.size} instagram, ${phoneMap.size} phones (includes whatsapp)`);
 
-    // Get all single chats (groups don't have contactId)
+    // ============================================
+    // PART 1: Match beeperChats
+    // ============================================
     const chats = await ctx.db
       .query("beeperChats")
       .withIndex("by_type_archived", (q) => q.eq("type", "single"))
@@ -520,16 +604,11 @@ export const rematchChatsToContacts = internalMutation({
         newContactId = instagramMap.get(chat.username);
       }
 
-      // 2. Try matching by WhatsApp phone number (O(1) lookup)
+      // 2. Try matching by phone number (O(1) lookup with normalization)
+      // Works for all networks: WhatsApp, iMessage, SMS
       if (!newContactId && chat.phoneNumber) {
-        newContactId = whatsappMap.get(chat.phoneNumber);
-      }
-
-      // 3. For iMessage/SMS chats, also search the phones array (O(1) lookup)
-      if (!newContactId && chat.phoneNumber && 
-          (chat.network === "iMessage" || chat.network === "SMS")) {
         const searchPhone = normalizePhone(chat.phoneNumber);
-        newContactId = phonesMap.get(searchPhone);
+        newContactId = phoneMap.get(searchPhone);
       }
 
       // Update only if contactId changed
@@ -541,20 +620,73 @@ export const rematchChatsToContacts = internalMutation({
         });
         
         if (newContactId) {
-          matchedCount++;
+          chatMatchedCount++;
         } else {
-          unmatchedCount++;
+          chatUnmatchedCount++;
         }
       } else {
-        unchangedCount++;
+        chatUnchangedCount++;
+      }
+    }
+
+    // ============================================
+    // PART 2: Match beeperParticipants
+    // ============================================
+    const participants = await ctx.db
+      .query("beeperParticipants")
+      .filter((q) => q.eq(q.field("isSelf"), false)) // Only match non-self participants
+      .collect();
+
+    console.log(`[rematchChatsToContacts] Processing ${participants.length} non-self participants`);
+
+    for (const participant of participants) {
+      let newContactId: string | undefined = undefined;
+
+      // 1. Try matching by Instagram username
+      if (participant.username) {
+        newContactId = instagramMap.get(participant.username);
+      }
+
+      // 2. Try matching by phone number (normalized, covers WhatsApp + phones array)
+      if (!newContactId && participant.phoneNumber) {
+        const searchPhone = normalizePhone(participant.phoneNumber);
+        newContactId = phoneMap.get(searchPhone);
+      }
+
+      // Update only if contactId changed
+      const currentContactId = participant.contactId;
+      if (newContactId !== currentContactId) {
+        await ctx.db.patch(participant._id, {
+          contactId: newContactId as any,
+        });
+        
+        if (newContactId) {
+          participantMatchedCount++;
+        }
+        // Don't count unmatched for participants (too noisy)
+      } else {
+        participantUnchangedCount++;
       }
     }
 
     console.log(
-      `[rematchChatsToContacts] Complete: ${matchedCount} matched, ${unmatchedCount} unmatched, ${unchangedCount} unchanged`
+      `[rematchChatsToContacts] Complete: ` +
+      `Chats: ${chatMatchedCount} matched, ${chatUnmatchedCount} unmatched, ${chatUnchangedCount} unchanged | ` +
+      `Participants: ${participantMatchedCount} matched, ${participantUnchangedCount} unchanged`
     );
 
-    return { matchedCount, unmatchedCount, unchangedCount };
+    // Return combined counts (for backward compatibility, use chat counts as primary)
+    return { 
+      matchedCount: chatMatchedCount + participantMatchedCount, 
+      unmatchedCount: chatUnmatchedCount, 
+      unchangedCount: chatUnchangedCount + participantUnchangedCount,
+      // Also return detailed breakdown
+      chatMatchedCount,
+      chatUnmatchedCount,
+      chatUnchangedCount,
+      participantMatchedCount,
+      participantUnchangedCount,
+    };
   },
 });
 
@@ -596,51 +728,38 @@ export const rematchChatsForContact = internalMutation({
       }
     }
 
-    // 2. By WhatsApp phone (search chats with matching phone number)
+    // 2. By phone number (using normalization for all networks)
+    // Build a set of all normalized phone numbers for this contact
+    const contactPhones = new Set<string>();
     if (contact.whatsapp) {
-      const allSingleChats = await ctx.db
-        .query("beeperChats")
-        .withIndex("by_phone", (q) => q.eq("phoneNumber", contact.whatsapp!))
-        .collect();
-      
-      for (const chat of allSingleChats) {
-        if (chat.contactId !== args.contactId) {
-          await ctx.db.patch(chat._id, {
-            contactId: args.contactId,
-            contactMatchedAt: now,
-          });
-          updated++;
+      contactPhones.add(normalizePhone(contact.whatsapp));
+    }
+    if (contact.phones) {
+      for (const p of contact.phones) {
+        if (p.phone) {
+          contactPhones.add(normalizePhone(p.phone));
         }
       }
     }
-
-    // 3. By phones array (for iMessage/SMS matching)
-    if (contact.phones && contact.phones.length > 0) {
-      const normalizePhone = (phone: string) => phone.replace(/[\s\-\(\)]/g, '');
-      
-      // Get all iMessage/SMS chats that have a phone number
-      const iMessageChats = await ctx.db
+    
+    if (contactPhones.size > 0) {
+      // Get all single chats with a phone number
+      const chatsWithPhone = await ctx.db
         .query("beeperChats")
         .filter((q) => 
           q.and(
-            q.neq(q.field("phoneNumber"), undefined),
-            q.or(
-              q.eq(q.field("network"), "iMessage"),
-              q.eq(q.field("network"), "SMS")
-            )
+            q.eq(q.field("type"), "single"),
+            q.neq(q.field("phoneNumber"), undefined)
           )
         )
         .collect();
       
-      // Check each chat's phone against contact's phones array
-      for (const chat of iMessageChats) {
+      // Check each chat's phone against contact's phones (normalized)
+      for (const chat of chatsWithPhone) {
         if (chat.contactId !== args.contactId && chat.phoneNumber) {
           const chatPhoneNormalized = normalizePhone(chat.phoneNumber);
-          const hasMatch = contact.phones.some(
-            (p) => normalizePhone(p.phone) === chatPhoneNormalized
-          );
           
-          if (hasMatch) {
+          if (contactPhones.has(chatPhoneNormalized)) {
             await ctx.db.patch(chat._id, {
               contactId: args.contactId,
               contactMatchedAt: now,
@@ -659,17 +778,17 @@ export const rematchChatsForContact = internalMutation({
       .collect();
     
     for (const chat of linkedChats) {
-      // Check if this chat still matches this contact
+      // Check if this chat still matches this contact (using normalized phone comparison)
       const matchesInstagram = contact.instagram && chat.username === contact.instagram;
-      const matchesWhatsapp = contact.whatsapp && chat.phoneNumber === contact.whatsapp;
       
-      // Also check phones array for iMessage/SMS
-      const normalizePhone = (phone: string) => phone.replace(/[\s\-\(\)]/g, '');
-      const matchesPhones = chat.phoneNumber && contact.phones?.some(
-        (p) => normalizePhone(p.phone) === normalizePhone(chat.phoneNumber!)
-      );
+      // Use normalized phone matching for whatsapp and phones
+      let matchesPhone = false;
+      if (chat.phoneNumber) {
+        const chatPhoneNormalized = normalizePhone(chat.phoneNumber);
+        matchesPhone = contactPhones.has(chatPhoneNormalized);
+      }
       
-      if (!matchesInstagram && !matchesWhatsapp && !matchesPhones) {
+      if (!matchesInstagram && !matchesPhone) {
         // This chat no longer matches - try to find a new match or clear
         let newContactId: string | undefined = undefined;
         
@@ -682,10 +801,27 @@ export const rematchChatsForContact = internalMutation({
         }
         
         if (!newContactId && chat.phoneNumber) {
-          const newMatch = await ctx.db
+          // Try normalized phone matching
+          const chatPhoneNormalized = normalizePhone(chat.phoneNumber);
+          const allContactsWithPhones = await ctx.db
             .query("contacts")
-            .withIndex("by_whatsapp", (q) => q.eq("whatsapp", chat.phoneNumber!))
-            .first();
+            .filter((q) => 
+              q.or(
+                q.neq(q.field("whatsapp"), undefined),
+                q.neq(q.field("phones"), undefined)
+              )
+            )
+            .collect();
+          
+          const newMatch = allContactsWithPhones.find((c) => {
+            if (c.whatsapp && normalizePhone(c.whatsapp) === chatPhoneNormalized) {
+              return true;
+            }
+            if (c.phones) {
+              return c.phones.some((p) => normalizePhone(p.phone) === chatPhoneNormalized);
+            }
+            return false;
+          });
           if (newMatch) newContactId = newMatch._id;
         }
         

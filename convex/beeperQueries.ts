@@ -9,8 +9,8 @@ import { extractMessageText } from "./messageHelpers";
  * Replaces direct API calls from frontend
  * 
  * PERFORMANCE OPTIMIZED:
+ * - Uses compound index for type+isArchived+lastActivity (filter AND sort in DB)
  * - Uses pre-computed contactId from sync time (no N+1 queries)
- * - Uses compound index for type+isArchived filtering
  * - Batches contact lookups for matched chats
  * - Batches cached image lookups
  */
@@ -27,27 +27,30 @@ export const listCachedChats = query({
   handler: async (ctx, args) => {
     const filter = args.filter || "all";
     
-    // Use compound index for type+isArchived filtering (much faster than post-filter)
-    // Then apply additional filters if needed
+    // Use compound index for type+isArchived+lastActivity (filter AND sort in database)
+    // The index "by_type_archived_activity" has fields: ["type", "isArchived", "lastActivity"]
+    // This allows us to filter by type/isArchived and sort by lastActivity in a single index scan
     let queryBuilder;
     
     if (filter === "archived") {
-      // Use compound index for type=single, isArchived=true
+      // Use compound index for type=single, isArchived=true, sorted by lastActivity DESC
       queryBuilder = ctx.db
         .query("beeperChats")
-        .withIndex("by_type_archived", (q) => 
+        .withIndex("by_type_archived_activity", (q) => 
           q.eq("type", "single").eq("isArchived", true)
-        );
+        )
+        .order("desc"); // Sort by lastActivity (last field in index) descending
     } else {
-      // All other filters: type=single, isArchived=false
+      // All other filters: type=single, isArchived=false, sorted by lastActivity DESC
       queryBuilder = ctx.db
         .query("beeperChats")
-        .withIndex("by_type_archived", (q) => 
+        .withIndex("by_type_archived_activity", (q) => 
           q.eq("type", "single").eq("isArchived", false)
-        );
+        )
+        .order("desc"); // Sort by lastActivity (last field in index) descending
     }
     
-    // Apply additional filters for unreplied/unread
+    // Apply additional filters for unreplied/unread (post-filter on indexed results)
     if (filter === "unreplied") {
       queryBuilder = queryBuilder.filter((q) =>
         q.eq(q.field("needsReply"), true)
@@ -58,13 +61,11 @@ export const listCachedChats = query({
       );
     }
     
-    // Note: We can't sort by lastActivity after using a different index
-    // But the compound index naturally returns results, and we paginate them
-    // For proper ordering, we'll sort the page in memory (small dataset per page)
+    // Paginate - results are already sorted by lastActivity DESC from the database
     const result = await queryBuilder.paginate(args.paginationOpts);
     
-    // Sort the page by lastActivity descending (pagination is typically 10-50 items)
-    const sortedPage = [...result.page].sort((a, b) => b.lastActivity - a.lastActivity);
+    // No in-memory sort needed - database returns results in correct order
+    const sortedPage = result.page;
 
     // Batch fetch all contacts for chats that have a pre-computed contactId
     // This is O(1) per contact lookup (using direct get by ID)
@@ -154,6 +155,7 @@ export const listCachedChats = query({
         needsReply: chat.needsReply,
         lastMessageFrom: chat.lastMessageFrom,
         contactImageUrl: profileImageUrl,
+        contactId: chat.contactId, // Direct link to contact for ContactSidePanel
       };
     });
 
@@ -274,6 +276,7 @@ export const getChatByIdWithContact = query({
       needsReply: chat.needsReply,
       lastMessageFrom: chat.lastMessageFrom,
       contactImageUrl: profileImageUrl,
+      contactId: chat.contactId, // Direct link to contact for ContactSidePanel
     };
   },
 });

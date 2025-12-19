@@ -4,6 +4,7 @@ import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
+import { Slider } from '@/components/ui/slider'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
 import {
@@ -12,7 +13,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { User, Save, Lock, Unlock, X, Check, AlertCircle, MoreVertical, Merge } from 'lucide-react'
+import { User, Save, Lock, Unlock, X, Check, AlertCircle, MoreVertical, Merge, Pencil } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { useMutation, useQuery } from 'convex/react'
 import { api } from '../../../convex/_generated/api'
@@ -43,6 +44,8 @@ interface Contact {
   intimateConnection?: boolean
   intimateConnectionDate?: string
   leadStatus?: "Talking" | "Planning" | "Dated" | "Connected" | "Former"
+  setName?: string
+  priority?: number
 }
 
 interface ContactPanelProps {
@@ -95,6 +98,13 @@ export function ContactPanel({ contact, isLoading, searchedUsername, searchedPho
   const [intimateConnectionDate, setIntimateConnectionDate] = useState(contact?.intimateConnectionDate || "")
   const [leadStatus, setLeadStatus] = useState<string | undefined>(contact?.leadStatus)
   
+  // Name editing state
+  const [isEditingName, setIsEditingName] = useState(false)
+  const [editedSetName, setEditedSetName] = useState(contact?.setName || "")
+  
+  // Priority state
+  const [priority, setPriority] = useState<number>(contact?.priority || 50)
+  
   // Duplicate detection state
   const [showMergeDialog, setShowMergeDialog] = useState(false)
   
@@ -112,6 +122,8 @@ export function ContactPanel({ contact, isLoading, searchedUsername, searchedPho
   const createTagMutation = useMutation(api.tagMutations.createTag)
   const toggleTagMutation = useMutation(api.tagMutations.toggleTag)
   const mergeContactsMutation = useMutation(api.contactMerge.mergeContacts)
+  const updateSetNameMutation = useMutation(api.contactMutations.updateSetName)
+  const updatePriorityMutation = useMutation(api.contactMutations.updatePriority)
   
   // Query locations, tags, and duplicates
   const locations = useQuery(api.locationQueries.listLocations)
@@ -164,6 +176,9 @@ export function ContactPanel({ contact, isLoading, searchedUsername, searchedPho
     setIntimateConnection(contact?.intimateConnection || false)
     setIntimateConnectionDate(contact?.intimateConnectionDate || "")
     setLeadStatus(contact?.leadStatus)
+    setEditedSetName(contact?.setName || "")
+    setPriority(contact?.priority || 50)
+    setIsEditingName(false)
   }, [contact])
 
   const handleConnectionToggle = async (connectionType: string) => {
@@ -377,6 +392,51 @@ export function ContactPanel({ contact, isLoading, searchedUsername, searchedPho
     handleToggleLocation(locationId)
   }
 
+  const handleSaveSetName = async () => {
+    if (!contact) return
+    
+    setIsSaving(true)
+    try {
+      await updateSetNameMutation({
+        contactId: contact._id,
+        setName: editedSetName.trim() || null,
+      })
+      setIsEditingName(false)
+    } catch (error) {
+      console.error('Failed to update set name:', error)
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const handleCancelEditName = () => {
+    setEditedSetName(contact?.setName || "")
+    setIsEditingName(false)
+  }
+
+  const handlePriorityChange = async (value: number[]) => {
+    if (!contact) return
+    
+    const newPriority = value[0]
+    setPriority(newPriority)
+    
+    // Debounce the save - we'll save on mouse up / interaction end
+  }
+
+  const handlePriorityCommit = async (value: number[]) => {
+    if (!contact) return
+    
+    const newPriority = value[0]
+    try {
+      await updatePriorityMutation({
+        contactId: contact._id,
+        priority: newPriority,
+      })
+    } catch (error) {
+      console.error('Failed to update priority:', error)
+    }
+  }
+
   const handlePinComplete = (value: string) => {
     if (value === CORRECT_PIN) {
       setPinError(false)
@@ -464,8 +524,10 @@ export function ContactPanel({ contact, isLoading, searchedUsername, searchedPho
     )
   }
 
-  const contactName = [contact.firstName, contact.lastName].filter(Boolean).join(" ") || "Unknown"
-  const initials = contactName
+  const originalName = [contact.firstName, contact.lastName].filter(Boolean).join(" ") || "Unknown"
+  const displayName = contact.setName || originalName
+  const showOriginalInParens = contact.setName && contact.setName !== originalName
+  const initials = displayName
     .split(" ")
     .map((n) => n[0])
     .join("")
@@ -484,29 +546,90 @@ export function ContactPanel({ contact, isLoading, searchedUsername, searchedPho
     >
       <div className="flex-shrink-0 px-6 py-4 border-b border-gray-200 space-y-4">
         {/* Contact Header */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-start gap-3">
           {contact.imageUrl ? (
             <img
               src={contact.imageUrl}
-              alt={contactName}
-              className="w-12 h-12 rounded-full object-cover"
+              alt={displayName}
+              className="w-12 h-12 rounded-full object-cover flex-shrink-0"
             />
           ) : (
-            <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center text-white font-semibold">
+            <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center text-white font-semibold flex-shrink-0">
               {initials}
             </div>
           )}
           <div className="flex-1 min-w-0">
-            <h3 className="font-semibold text-gray-900 truncate">{contactName}</h3>
+            {isEditingName ? (
+              <div className="flex items-center gap-2">
+                <Input
+                  value={editedSetName}
+                  onChange={(e) => setEditedSetName(e.target.value)}
+                  placeholder={originalName}
+                  className="h-8 text-sm font-semibold"
+                  autoFocus
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleSaveSetName()
+                    if (e.key === 'Escape') handleCancelEditName()
+                  }}
+                />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 w-8 p-0"
+                  onClick={handleSaveSetName}
+                  disabled={isSaving}
+                >
+                  <Check className="h-4 w-4 text-green-600" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 w-8 p-0"
+                  onClick={handleCancelEditName}
+                >
+                  <X className="h-4 w-4 text-gray-500" />
+                </Button>
+              </div>
+            ) : (
+              <div 
+                className="group cursor-pointer"
+                onClick={() => {
+                  setEditedSetName(contact.setName || "")
+                  setIsEditingName(true)
+                }}
+              >
+                <div className="flex items-center gap-1">
+                  <h3 className="font-semibold text-gray-900 truncate">{displayName}</h3>
+                  <Pencil className="h-3 w-3 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+                </div>
+                {showOriginalInParens && (
+                  <p className="text-xs text-gray-400">({originalName})</p>
+                )}
+              </div>
+            )}
             {contact.instagram && (
               <p className="text-sm text-gray-500">@{contact.instagram}</p>
             )}
           </div>
           
+          {/* Priority Slider */}
+          <div className="flex flex-col items-center flex-shrink-0 w-8">
+            <Slider
+              value={[priority]}
+              onValueChange={handlePriorityChange}
+              onValueCommit={handlePriorityCommit}
+              min={1}
+              max={100}
+              step={1}
+              orientation="vertical"
+              className="h-10 min-h-10"
+            />
+          </div>
+          
           {/* Kebab Menu */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+              <Button variant="ghost" size="sm" className="h-8 w-8 p-0 flex-shrink-0">
                 <MoreVertical className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>

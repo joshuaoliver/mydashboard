@@ -7,8 +7,8 @@ import { useMutation, useAction } from 'convex/react'
 import { useQuery } from '@tanstack/react-query'
 import { convexQuery } from '@convex-dev/react-query'
 import { api } from '../../../../convex/_generated/api'
-import { useState } from 'react'
-import { Trash2, Database, AlertCircle, CheckCircle, Settings as SettingsIcon, Users, RefreshCw, Bot, MessageSquare, MapPin, RotateCcw, Compass, Clock } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { Trash2, Database, AlertCircle, CheckCircle, Settings as SettingsIcon, Users, RefreshCw, Bot, MessageSquare, MapPin, RotateCcw, Compass, Clock, History, Square, Play } from 'lucide-react'
 
 export const Route = createFileRoute('/_authenticated/settings/')({
   component: SettingsPage,
@@ -26,6 +26,14 @@ function SettingsPage() {
   const [cursorResetResult, setCursorResetResult] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
   const [isRematching, setIsRematching] = useState(false)
   const [rematchResult, setRematchResult] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
+  
+  // Historical sync state
+  const [chatsPerBatch, setChatsPerBatch] = useState(5)
+  const [messagesPerChat, setMessagesPerChat] = useState(100)
+  const [loadOlderChatsFirst, setLoadOlderChatsFirst] = useState(true)
+  const [isHistoricalSyncing, setIsHistoricalSyncing] = useState(false)
+  const [historicalSyncResult, setHistoricalSyncResult] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
+  const syncIntervalRef = useRef<NodeJS.Timeout | null>(null)
 
   const clearMessages = useMutation(api.cleanupMessages.clearAllMessages)
   const clearChats = useMutation(api.cleanupMessages.clearAllChats)
@@ -33,8 +41,11 @@ function SettingsPage() {
   const fullResync = useAction(api.beeperSync.fullResync)
   const resetCursors = useMutation(api.cursorHelpers.resetAllCursors)
   const triggerRematch = useAction(api.contactMutations.triggerFullRematch)
+  const runHistoricalBatch = useAction(api.beeperPagination.runHistoricalSyncBatch)
+  const stopHistoricalSync = useAction(api.beeperPagination.stopHistoricalSync)
   const { data: dexStats } = useQuery(convexQuery(api.dexQueries.getSyncStats, {}))
   const { data: syncDiagnostics } = useQuery(convexQuery(api.cursorHelpers.getSyncDiagnostics, {}))
+  const { data: historicalSyncStatus } = useQuery(convexQuery(api.beeperPagination.getHistoricalSyncStatus, {}))
 
   const handleClearMessages = async () => {
     if (!confirm('Delete all cached messages?')) return
@@ -109,6 +120,73 @@ function SettingsPage() {
     }
     finally { setIsRematching(false) }
   }
+
+  const runOneBatch = async () => {
+    try {
+      const result = await runHistoricalBatch({
+        chatsPerBatch,
+        messagesPerChat,
+        loadOlderChatsFirst,
+      })
+      
+      if (result.success) {
+        setHistoricalSyncResult({ 
+          type: 'success', 
+          message: `Loaded ${result.messagesLoaded} messages from ${result.chatsProcessed} chats` 
+        })
+        return { hasMore: result.hasMoreChats || result.hasMoreMessages, stoppedByUser: result.stoppedByUser }
+      } else {
+        setHistoricalSyncResult({ type: 'error', message: result.error || 'Sync failed' })
+        return { hasMore: false, stoppedByUser: false }
+      }
+    } catch (e) {
+      setHistoricalSyncResult({ type: 'error', message: `Failed: ${e instanceof Error ? e.message : 'Unknown'}` })
+      return { hasMore: false, stoppedByUser: false }
+    }
+  }
+
+  const handleStartHistoricalSync = async () => {
+    setIsHistoricalSyncing(true)
+    setHistoricalSyncResult(null)
+    
+    // Run first batch immediately
+    const firstResult = await runOneBatch()
+    
+    if (firstResult.hasMore && !firstResult.stoppedByUser) {
+      // Set up interval to run more batches
+      syncIntervalRef.current = setInterval(async () => {
+        const result = await runOneBatch()
+        if (!result.hasMore || result.stoppedByUser) {
+          if (syncIntervalRef.current) {
+            clearInterval(syncIntervalRef.current)
+            syncIntervalRef.current = null
+          }
+          setIsHistoricalSyncing(false)
+        }
+      }, 5000) // 5 second delay between batches
+    } else {
+      setIsHistoricalSyncing(false)
+    }
+  }
+
+  const handleStopHistoricalSync = async () => {
+    if (syncIntervalRef.current) {
+      clearInterval(syncIntervalRef.current)
+      syncIntervalRef.current = null
+    }
+    await stopHistoricalSync()
+    setIsHistoricalSyncing(false)
+    setHistoricalSyncResult({ type: 'success', message: 'Sync stopped by user' })
+  }
+
+  // Cleanup interval on unmount
+  useEffect(() => {
+    return () => {
+      if (syncIntervalRef.current) {
+        clearInterval(syncIntervalRef.current)
+      }
+    }
+  }, [])
 
   const formatTimestamp = (ts: number | null) => {
     if (!ts) return 'Never'

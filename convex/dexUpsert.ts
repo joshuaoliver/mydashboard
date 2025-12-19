@@ -58,12 +58,15 @@ export const upsertContacts = internalMutation({
         // Dex API returns phones as [{phone_number: "...", label: "..."}]
         // Our schema expects [{phone: "..."}]
         // 
-        // Phone normalization rules:
+        // Format phone for STORAGE (E.164 format with + prefix)
+        // This is different from normalizePhone() in messageHelpers.ts which is for MATCHING
+        // 
+        // Phone formatting rules:
         // - Australian mobiles: 9-digit starting with 4 → add +61 prefix
         // - Already has + prefix → keep as-is (already in E.164 format)
         // - 10-digit starting with 04 → Australian mobile, convert to +614...
         // - Other formats → keep as-is for now
-        const normalizePhone = (rawPhone: string): string => {
+        const formatPhoneForStorage = (rawPhone: string): string => {
           // Strip all non-digit characters except leading +
           const hasPlus = rawPhone.startsWith('+');
           const digits = rawPhone.replace(/\D/g, '');
@@ -104,7 +107,7 @@ export const upsertContacts = internalMutation({
 
         const mappedPhones = dexContact.phones?.length
           ? dexContact.phones.map((p: { phone_number?: string; phone?: string }) => ({
-              phone: normalizePhone(p.phone_number || p.phone || ""),
+              phone: formatPhoneForStorage(p.phone_number || p.phone || ""),
             })).filter((p: { phone: string }) => p.phone) // Filter out empty phones
           : undefined;
 

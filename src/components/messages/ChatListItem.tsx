@@ -1,7 +1,33 @@
 import { cn } from '@/lib/utils'
-import { Archive, ArchiveRestore } from 'lucide-react'
+import { Archive, ArchiveRestore, Instagram, MessageCircle, Phone, Mail } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { memo } from 'react'
+
+// Network icon component
+function NetworkIcon({ network }: { network: string }) {
+  const normalizedNetwork = network.toLowerCase()
+  
+  const iconClass = "w-3 h-3 text-gray-400"
+  
+  if (normalizedNetwork.includes('instagram')) {
+    return <Instagram className={cn(iconClass, "text-pink-500")} />
+  }
+  if (normalizedNetwork.includes('whatsapp')) {
+    return <MessageCircle className={cn(iconClass, "text-green-500")} />
+  }
+  if (normalizedNetwork.includes('sms') || normalizedNetwork.includes('imessage')) {
+    return <Phone className={cn(iconClass, "text-blue-500")} />
+  }
+  if (normalizedNetwork.includes('email') || normalizedNetwork.includes('gmail')) {
+    return <Mail className={cn(iconClass, "text-red-400")} />
+  }
+  // Fallback: show first letter
+  return (
+    <span className="w-3 h-3 text-[9px] font-medium text-gray-400 flex items-center justify-center">
+      {network.charAt(0).toUpperCase()}
+    </span>
+  )
+}
 
 interface ChatListItemProps {
   id: string
@@ -36,27 +62,29 @@ export const ChatListItem = memo(function ChatListItem({
   isArchived = false,
   contactImageUrl,
 }: ChatListItemProps) {
-  // Format timestamp
+  // Smart timestamp formatting
   const formatTime = (timestamp: number) => {
     const date = new Date(timestamp)
     const now = new Date()
     const diffMs = now.getTime() - date.getTime()
-    const diffMins = Math.floor(diffMs / 60000)
     const diffHours = Math.floor(diffMs / 3600000)
     const diffDays = Math.floor(diffMs / 86400000)
 
-    if (diffMins < 1) return 'Just now'
-    if (diffMins < 60) return `${diffMins}m ago`
-    if (diffHours < 24) return `${diffHours}h ago`
-    if (diffDays === 1) return 'Yesterday'
-    if (diffDays < 7) return `${diffDays}d ago`
-    return date.toLocaleDateString()
+    // Today: show time like "2:34 PM"
+    if (diffHours < 24 && date.getDate() === now.getDate()) {
+      return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+    }
+    // Yesterday
+    if (diffDays === 1 || (diffDays === 0 && date.getDate() !== now.getDate())) {
+      return 'Yesterday'
+    }
+    // Within this week: show day name
+    if (diffDays < 7) {
+      return date.toLocaleDateString([], { weekday: 'short' })
+    }
+    // Older: show date
+    return date.toLocaleDateString([], { month: 'short', day: 'numeric' })
   }
-
-  // Truncate message preview
-  const truncatedMessage = lastMessage.length > 80 
-    ? `${lastMessage.substring(0, 80)}...` 
-    : lastMessage
 
   const hasUnread = unreadCount > 0
 
@@ -70,107 +98,105 @@ export const ChatListItem = memo(function ChatListItem({
   }
 
   return (
-    <div className="relative group" onMouseEnter={handleMouseEnter}>
+    <div className="relative group w-full overflow-hidden" onMouseEnter={handleMouseEnter}>
       <button
         onClick={onClick}
         className={cn(
-          'w-full text-left px-4 py-3 transition-colors',
+          'w-full text-left px-3 py-2.5 transition-colors block',
           'hover:bg-gray-50',
-          isSelected && 'border-l-4 border-l-blue-500',
+          isSelected && 'border-l-4 border-l-blue-500 bg-blue-50/50',
           hasUnread && !isSelected && 'bg-blue-50/30'
         )}
       >
-      <div className="flex items-start gap-3">
-        {/* Avatar with unread indicator - Use contact image if available */}
-        <div className="flex-shrink-0 relative">
-          {contactImageUrl ? (
-            <img
-              src={contactImageUrl}
-              alt={name}
-              className="w-10 h-10 rounded-full object-cover"
-              loading="lazy"
-              decoding="async"
-              onError={(e) => {
-                // Fallback to initial if image fails to load
-                const target = e.currentTarget;
-                target.style.display = 'none';
-                const fallback = document.createElement('div');
-                fallback.className = 'w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center text-white font-semibold';
-                fallback.textContent = name.charAt(0).toUpperCase();
-                target.parentElement?.appendChild(fallback);
-              }}
-            />
-          ) : (
-            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-slate-300 to-slate-400 flex items-center justify-center text-white font-semibold">
-              {name.charAt(0).toUpperCase()}
-            </div>
-          )}
-          {hasUnread && (
-            <div className="absolute -top-0.5 -right-0.5 w-3 h-3 bg-blue-500 rounded-full border-2 border-white"></div>
-          )}
-        </div>
+        <div className="flex items-start gap-2.5 w-full">
+          {/* Avatar with unread indicator - Use contact image if available */}
+          <div className="flex-shrink-0 relative">
+            {contactImageUrl ? (
+              <img
+                src={contactImageUrl}
+                alt={name}
+                className="w-9 h-9 rounded-full object-cover"
+                loading="lazy"
+                decoding="async"
+                onError={(e) => {
+                  // Fallback to initial if image fails to load
+                  const target = e.currentTarget;
+                  target.style.display = 'none';
+                  const fallback = document.createElement('div');
+                  fallback.className = 'w-9 h-9 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center text-white font-semibold text-sm';
+                  fallback.textContent = name.charAt(0).toUpperCase();
+                  target.parentElement?.appendChild(fallback);
+                }}
+              />
+            ) : (
+              <div className="w-9 h-9 rounded-full bg-gradient-to-br from-slate-300 to-slate-400 flex items-center justify-center text-white font-semibold text-sm">
+                {name.charAt(0).toUpperCase()}
+              </div>
+            )}
+            {hasUnread && (
+              <div className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-blue-500 rounded-full border-2 border-white"></div>
+            )}
+          </div>
 
-        {/* Chat info */}
-        <div className="flex-1 min-w-0 overflow-hidden">
-          {/* Header row: Name, network badge, time */}
-          <div className="flex items-center justify-between gap-2 mb-1">
-            <div className="flex items-center gap-2 min-w-0 flex-1 overflow-hidden">
-              {/* Name with username tooltip on hover */}
+          {/* Chat info - use explicit width calculation */}
+          <div className="flex-1 min-w-0 w-0">
+            {/* Header row: Name + Timestamp + Network icon on right */}
+            <div className="flex items-start justify-between gap-1 w-full">
+              {/* Name */}
               <h3 
                 className={cn(
-                  "truncate text-sm min-w-0 flex-shrink",
-                  hasUnread ? "font-bold text-gray-900" : "font-normal text-gray-700"
+                  "truncate text-sm leading-tight flex-1 min-w-0",
+                  hasUnread ? "font-semibold text-gray-900" : "font-normal text-gray-700"
                 )}
                 title={username ? `@${username}` : phoneNumber || undefined}
               >
                 {name}
               </h3>
-              {network && (
-                <span className="px-1.5 py-0.5 text-xs font-medium bg-gray-100 text-gray-600 rounded flex-shrink-0 whitespace-nowrap">
-                  {network}
+              {/* Timestamp + Network icon on right */}
+              <div className="flex items-center gap-1 flex-shrink-0">
+                <span className={cn(
+                  "text-[10px] leading-tight whitespace-nowrap",
+                  hasUnread ? "font-medium text-blue-600" : "text-gray-400"
+                )}>
+                  {formatTime(lastMessageTime)}
+                </span>
+                {network && (
+                  <span title={network}>
+                    <NetworkIcon network={network} />
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Last message preview - smaller text, never bold */}
+            <div className="flex items-center gap-1.5 mt-0.5 w-full">
+              <p className="text-xs truncate flex-1 min-w-0 leading-snug text-gray-500">
+                {lastMessage}
+              </p>
+              {hasUnread && (
+                <span className="px-1 py-0.5 text-[10px] font-bold bg-blue-600 text-white rounded-full flex-shrink-0 min-w-[16px] text-center leading-none">
+                  {unreadCount}
                 </span>
               )}
             </div>
-            <span className={cn(
-              "text-xs flex-shrink-0 whitespace-nowrap",
-              hasUnread ? "font-semibold text-blue-600" : "text-gray-500"
-            )}>
-              {formatTime(lastMessageTime)}
-            </span>
-          </div>
-
-          {/* Last message preview */}
-          <div className="flex items-start gap-2 overflow-hidden">
-            <p className={cn(
-              "text-sm truncate flex-1 min-w-0",
-              hasUnread ? "font-medium text-gray-900" : "text-gray-600"
-            )}>
-              {truncatedMessage}
-            </p>
-            {hasUnread && (
-              <span className="px-1.5 py-0.5 text-xs font-bold bg-blue-600/90 text-white rounded-full flex-shrink-0 min-w-[20px] text-center whitespace-nowrap">
-                {unreadCount}
-              </span>
-            )}
           </div>
         </div>
-      </div>
       </button>
       
       {/* Archive button - shown on hover */}
       {onArchive && (
-        <div className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity">
+        <div className="absolute right-1 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity">
           <Button
             variant="ghost"
             size="sm"
             onClick={handleArchiveClick}
-            className="h-8 w-8 p-0"
+            className="h-7 w-7 p-0"
             title={isArchived ? "Unarchive chat" : "Archive chat"}
           >
             {isArchived ? (
-              <ArchiveRestore className="h-4 w-4" />
+              <ArchiveRestore className="h-3.5 w-3.5" />
             ) : (
-              <Archive className="h-4 w-4" />
+              <Archive className="h-3.5 w-3.5" />
             )}
           </Button>
         </div>

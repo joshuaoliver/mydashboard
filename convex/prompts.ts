@@ -227,6 +227,8 @@ export const initializeDefaultPrompts = mutation({
 <location>Sydney, Australia</location>
 </user_profile>
 
+{{temporalContext}}
+
 <contact_information>
 {{contactContext}}
 </contact_information>
@@ -242,6 +244,7 @@ export const initializeDefaultPrompts = mutation({
 
 <last_message_from>{{chatName}}</last_message_from>
 <last_message_text>{{lastMessageText}}</last_message_text>
+<last_message_time>{{lastMessageTime}}</last_message_time>
 </conversation_context>
 
 {{customContext}}
@@ -253,6 +256,12 @@ Your task is to suggest 3-4 different reply options that represent DIFFERENT CON
 - Match the conversation's context, relationship dynamics, and Joshua's objectives
 - Be natural, authentic, and appropriate for the relationship type
 - For romantic connections, follow Ultimate Man Project principles: match their energy, be authentic, don't over-invest or chase, lead with confidence, keep it light and playful when appropriate
+
+IMPORTANT TEMPORAL AWARENESS:
+- The timestamps on messages show when they were sent
+- Consider how much time has passed since the last message
+- If the conversation happened yesterday or earlier, do NOT suggest replies that would have been appropriate at that time (like "have a good sleep" for a message about being tired that was sent last night)
+- Always craft replies that are appropriate for the CURRENT time
 
 IMPORTANT FORMATTING RULES:
 - DO NOT use em dashes (—) or en dashes (–) anywhere in the replies

@@ -17,6 +17,7 @@ export function ChatListPanel() {
   const selectedChatId = useChatStore((state) => state.selectedChatId)
   const tabFilter = useChatStore((state) => state.tabFilter)
   const setTabFilter = useChatStore((state) => state.setTabFilter)
+  const setChatList = useChatStore((state) => state.setChatList)
 
   // Local state
   const [isSyncing, setIsSyncing] = useState(false)
@@ -37,7 +38,15 @@ export function ChatListPanel() {
   // Actions
   const pageLoadSync = useAction(api.beeperSync.pageLoadSync)
   const manualSync = useAction(api.beeperSync.manualSync)
-  const archiveChat = useAction(api.chatActions.archiveChat)
+  const archiveChatAction = useAction(api.chatActions.archiveChat)
+  const unarchiveChatAction = useAction(api.chatActions.unarchiveChat)
+
+  // Sync chat list to store for keyboard navigation
+  useEffect(() => {
+    if (allLoadedChats) {
+      setChatList(allLoadedChats.map(c => ({ id: c.id, name: c.name })))
+    }
+  }, [allLoadedChats, setChatList])
 
   // Trigger sync on mount
   useEffect(() => {
@@ -78,18 +87,24 @@ export function ChatListPanel() {
     navigate({ to: '/messages', search: { chatId } })
   }, [navigate])
 
-  // Handle archive
+  // Handle archive/unarchive toggle
   const handleArchiveChat = useCallback(async (chatId: string) => {
     try {
-      await archiveChat({ chatId })
-      if (selectedChatId === chatId) {
-        navigate({ to: '/messages', search: { chatId: undefined } })
+      // If viewing archived tab, unarchive; otherwise archive
+      if (tabFilter === 'archived') {
+        await unarchiveChatAction({ chatId })
+      } else {
+        await archiveChatAction({ chatId })
+        // Clear selection when archiving from non-archived view
+        if (selectedChatId === chatId) {
+          navigate({ to: '/messages', search: { chatId: undefined } })
+        }
       }
     } catch (err) {
-      console.error('Failed to archive chat:', err)
-      setError(err instanceof Error ? err.message : 'Failed to archive chat')
+      console.error('Failed to archive/unarchive chat:', err)
+      setError(err instanceof Error ? err.message : 'Failed to archive/unarchive chat')
     }
-  }, [archiveChat, selectedChatId, navigate])
+  }, [archiveChatAction, unarchiveChatAction, tabFilter, selectedChatId, navigate])
 
   // Handle manual refresh
   const handleRefresh = useCallback(async () => {
@@ -149,51 +164,55 @@ export function ChatListPanel() {
   ].filter(Boolean).join(' • '), [allLoadedChats.length, syncInfo?.lastSyncedAt])
 
   return (
-    <div className="h-full flex flex-col bg-white border-r border-gray-200">
+    <div className="h-full w-full flex flex-col bg-white border-r border-gray-200 overflow-hidden">
       {/* Header */}
-      <div className="flex-shrink-0 px-4 py-3 border-b border-gray-200">
-        <div className="flex items-center gap-2">
-          {/* Tab Filter */}
-          <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
+      <div className="flex-shrink-0 px-2 py-2 border-b border-gray-200">
+        <div className="flex items-center gap-1">
+          {/* Tab Filter - compact buttons */}
+          <div className="flex items-center gap-0.5 bg-gray-100 rounded-md p-0.5 flex-1 min-w-0">
             <button
               onClick={() => setTabFilter('unreplied')}
-              className={`px-3 py-1 text-xs font-medium rounded transition-colors ${
+              className={`flex-1 px-1.5 py-1 text-[10px] font-medium rounded transition-colors truncate ${
                 tabFilter === 'unreplied'
                   ? 'bg-white text-gray-900 shadow-sm'
                   : 'text-gray-600 hover:text-gray-900'
               }`}
+              title="Unreplied"
             >
               Unreplied
             </button>
             <button
               onClick={() => setTabFilter('unread')}
-              className={`px-3 py-1 text-xs font-medium rounded transition-colors ${
+              className={`flex-1 px-1.5 py-1 text-[10px] font-medium rounded transition-colors truncate ${
                 tabFilter === 'unread'
                   ? 'bg-white text-gray-900 shadow-sm'
                   : 'text-gray-600 hover:text-gray-900'
               }`}
+              title="Unread"
             >
               Unread
             </button>
             <button
               onClick={() => setTabFilter('all')}
-              className={`px-3 py-1 text-xs font-medium rounded transition-colors ${
+              className={`flex-1 px-1.5 py-1 text-[10px] font-medium rounded transition-colors ${
                 tabFilter === 'all'
                   ? 'bg-white text-gray-900 shadow-sm'
                   : 'text-gray-600 hover:text-gray-900'
               }`}
+              title="All"
             >
               All
             </button>
             <button
               onClick={() => setTabFilter('archived')}
-              className={`px-3 py-1 text-xs font-medium rounded transition-colors ${
+              className={`flex-1 px-1.5 py-1 text-[10px] font-medium rounded transition-colors ${
                 tabFilter === 'archived'
                   ? 'bg-white text-gray-900 shadow-sm'
                   : 'text-gray-600 hover:text-gray-900'
               }`}
+              title="Archived"
             >
-              Archived
+              📦
             </button>
           </div>
           
@@ -206,9 +225,9 @@ export function ChatListPanel() {
                   variant="ghost" 
                   size="sm"
                   disabled={isSyncing}
-                  className="h-8"
+                  className="h-7 w-7 p-0 flex-shrink-0"
                 >
-                  <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
+                  <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
                 </Button>
               </TooltipTrigger>
               <TooltipContent>
@@ -245,10 +264,10 @@ export function ChatListPanel() {
       ) : (
         <ScrollArea 
           ref={chatListRef}
-          className="flex-1"
+          className="flex-1 w-full overflow-hidden"
           onScrollChange={handleScroll}
         >
-          <div className="divide-y divide-gray-100">
+          <div className="divide-y divide-gray-100 w-full">
             {allLoadedChats.map((chat) => (
               <ChatListItem
                 key={chat.id}
@@ -264,6 +283,7 @@ export function ChatListPanel() {
                 onClick={() => handleChatSelect(chat.id)}
                 onHover={handleChatHover}
                 onArchive={handleArchiveChat}
+                isArchived={tabFilter === 'archived'}
                 contactImageUrl={chat.contactImageUrl}
               />
             ))}

@@ -11,6 +11,7 @@ import {
   ResizablePanelGroup,
 } from '@/components/ui/resizable'
 import { useIsMobile } from '@/lib/hooks/use-mobile'
+import { useChatKeyboardShortcuts } from '@/lib/hooks/use-chat-keyboard-shortcuts'
 import {
   Sheet,
   SheetContent,
@@ -44,6 +45,9 @@ function Messages() {
   const contactPanelOpen = useChatStore((state) => state.contactPanelOpen)
   const setContactPanelOpen = useChatStore((state) => state.setContactPanelOpen)
 
+  // Enable keyboard shortcuts (E to archive, J/K or arrows to navigate)
+  useChatKeyboardShortcuts()
+
   // Sync URL param with Zustand store
   useEffect(() => {
     const targetId = chatId || null
@@ -73,7 +77,7 @@ function Messages() {
         /* Desktop Layout */
         <ResizablePanelGroup direction="horizontal" className="flex-1">
           {/* Left Sidebar - Chat List */}
-          <ResizablePanel defaultSize={25} minSize={20} maxSize={40}>
+          <ResizablePanel defaultSize={22} minSize={15} maxSize={35}>
             <ChatListPanel />
           </ResizablePanel>
 

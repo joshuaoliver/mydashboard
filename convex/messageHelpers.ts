@@ -1,6 +1,46 @@
 /**
- * Helper functions for processing Beeper messages
+ * Helper functions for processing Beeper messages and phone number normalization
  */
+
+/**
+ * Normalize phone number for consistent matching
+ * 
+ * Handles various formats and converts to a consistent digits-only format:
+ * - +61 411 785 274 -> 61411785274
+ * - 0411 785 274 -> 61411785274 (Australian local to international)
+ * - (04) 1178-5274 -> 61411785274
+ * - 417248743 -> 61417248743 (9-digit Australian mobile)
+ * - 61411785274 -> 61411785274
+ * 
+ * @param phone - The phone number in any format
+ * @returns Normalized phone number (digits only, Australian numbers converted to international)
+ */
+export function normalizePhone(phone: string): string {
+  // Remove all non-digit characters (including + prefix)
+  let digits = phone.replace(/\D/g, '');
+  
+  // Handle Australian mobile: 10 digits starting with 0 (e.g., 0411785274)
+  // Convert to international: 61411785274
+  if (digits.startsWith('0') && digits.length === 10) {
+    digits = '61' + digits.slice(1);
+  }
+  // Handle Australian mobile: 9 digits starting with 4 (e.g., 411785274 or 417248743)
+  // This can happen when the + is stripped from +61417248743 stored as 417248743
+  // Convert to international: 61411785274
+  else if (digits.length === 9 && digits.startsWith('4')) {
+    digits = '61' + digits;
+  }
+  // Handle Australian landline: 9 digits starting with area code (2, 3, 7, 8)
+  else if (digits.length === 9 && ['2', '3', '7', '8'].includes(digits[0])) {
+    digits = '61' + digits;
+  }
+  // Handle Australian landline: 10 digits starting with 0 + area code
+  else if (digits.length === 10 && digits.startsWith('0') && ['2', '3', '7', '8'].includes(digits[1])) {
+    digits = '61' + digits.slice(1);
+  }
+  
+  return digits;
+}
 
 /**
  * Extracts the plain text from a message text field.
