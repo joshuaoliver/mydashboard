@@ -41,6 +41,44 @@ export const syncContactsFromDex = internalAction({
   },
 });
 
+/**
+ * Force sync - bypasses "unchanged" check to re-process all contacts
+ * Useful when phone normalization logic changes
+ */
+export const syncContactsFromDexForced = internalAction({
+  args: {},
+  handler: async (ctx): Promise<{
+    totalProcessed: number;
+    added: number;
+    updated: number;
+    skipped: number;
+    errors: number;
+    errorMessages: string[];
+    timestamp: number;
+  }> => {
+    try {
+      console.log("Starting FORCED Dex contacts sync (will update all contacts)...");
+      
+      // Fetch contacts from Dex
+      const result = await ctx.runAction(api.dexActions.fetchDexContacts, {});
+      const dexContacts: DexContact[] = result.contacts;
+
+      // Call mutation with forceUpdate=true to bypass "unchanged" check
+      const syncResult = await ctx.runMutation(internal.dexUpsert.upsertContacts, {
+        contacts: dexContacts,
+        forceUpdate: true,
+      });
+
+      return syncResult;
+    } catch (error) {
+      console.error("Error in syncContactsFromDexForced:", error);
+      throw new Error(
+        `Failed to force sync contacts from Dex: ${error instanceof Error ? error.message : "Unknown error"}`
+      );
+    }
+  },
+});
+
 // Upsert moved to convex/dexUpsert.ts
 
 /**
@@ -71,18 +109,11 @@ export const updateContactDescription = mutation({
 
       // Trigger write-back to Dex (non-blocking) - only if contact has dexId
       // We use scheduler to make this async and not block the mutation
-      // Call internal action in separate module; using cast until codegen catches up is not needed if types are generated
       const dexId = contact.dexId;
       if (dexId) {
         await ctx.scheduler.runAfter(0, internal.dexWriteback.writeToDex, {
           dexId: dexId,
           description: args.description,
-          firstName: undefined,
-          lastName: undefined,
-          instagram: undefined,
-          emails: undefined,
-          phones: undefined,
-          birthday: undefined,
         });
       }
 
@@ -108,8 +139,8 @@ export const writeToDex = internalAction({
     firstName: v.optional(v.string()),
     lastName: v.optional(v.string()),
     instagram: v.optional(v.string()),
-    emails: v.optional(v.array(v.object({ email: v.string() }))),
-    phones: v.optional(v.array(v.object({ phone: v.string() }))),
+    // Note: We intentionally do NOT write back phones or emails
+    // These come from the user's address book and should only be read, not modified
     birthday: v.optional(v.string()),
   },
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -123,9 +154,8 @@ export const writeToDex = internalAction({
       if (args.firstName !== undefined) updates.first_name = args.firstName;
       if (args.lastName !== undefined) updates.last_name = args.lastName;
       if (args.instagram !== undefined) updates.instagram = args.instagram;
-      if (args.emails !== undefined) updates.emails = args.emails;
-      if (args.phones !== undefined) updates.phones = args.phones;
       if (args.birthday !== undefined) updates.birthday = args.birthday;
+      // Note: phones and emails are read-only from address book - never write back
       
       // Call the Dex update action
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -187,6 +217,7 @@ export const updateContact = mutation({
       });
 
       // Trigger write-back to Dex (non-blocking) - only if contact has dexId
+      // Note: We only write back editable fields, not phones/emails (from address book)
       const dexId = contact.dexId;
       if (dexId) {
         await ctx.scheduler.runAfter(0, internal.dexWriteback.writeToDex, {
@@ -195,8 +226,6 @@ export const updateContact = mutation({
           firstName: args.updates.firstName,
           lastName: args.updates.lastName,
           instagram: args.updates.instagram,
-          emails: args.updates.emails,
-          phones: args.updates.phones,
           birthday: args.updates.birthday,
         });
       }

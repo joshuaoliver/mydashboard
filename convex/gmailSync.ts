@@ -3,7 +3,10 @@ import { action, internalAction, internalMutation, mutation, query } from "./_ge
 import { internal } from "./_generated/api";
 
 /**
- * Gmail Sync - Periodic sync of inbox stats
+ * Gmail Sync - Periodic sync of inbox thread stats
+ * 
+ * Tracks thread (conversation) counts rather than individual messages.
+ * A thread is considered unread until all messages within it have been read.
  */
 
 // ==========================================
@@ -53,7 +56,7 @@ export const syncInbox = internalAction({
         forums: stats.forums,
       });
 
-      console.log(`Gmail sync complete: ${stats.totalInbox} total, ${stats.unread} unread`);
+      console.log(`Gmail sync complete: ${stats.totalInbox} total threads, ${stats.unread} unread threads`);
       return { success: true, stats };
     } catch (error) {
       console.error("Gmail sync failed:", error);
@@ -114,6 +117,23 @@ export const deleteSnapshot = mutation({
     
     await ctx.db.delete(args.id);
     return { success: true };
+  },
+});
+
+/**
+ * Clear all Gmail snapshots (internal use only)
+ * Used for resetting data when switching from message to thread tracking
+ */
+export const clearAllSnapshots = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const snapshots = await ctx.db.query("gmailSnapshots").collect();
+    let deleted = 0;
+    for (const snapshot of snapshots) {
+      await ctx.db.delete(snapshot._id);
+      deleted++;
+    }
+    return { deleted };
   },
 });
 
@@ -280,7 +300,7 @@ export const triggerManualSync = action({
       if ("success" in result && result.success) {
         return { 
           success: true, 
-          message: `Synced successfully: ${result.stats.totalInbox} total emails, ${result.stats.unread} unread`,
+          message: `Synced successfully: ${result.stats.totalInbox} total threads, ${result.stats.unread} unread`,
           stats: result.stats 
         };
       }

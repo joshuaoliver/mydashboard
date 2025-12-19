@@ -10,9 +10,11 @@ import type { DexContact } from "./dexActions";
 export const upsertContacts = internalMutation({
   args: {
     contacts: v.array(v.any()), // DexContact array
+    forceUpdate: v.optional(v.boolean()), // If true, bypass "unchanged" check and update all contacts
   },
   handler: async (ctx, args) => {
     const dexContacts = args.contacts as DexContact[];
+    const forceUpdate = args.forceUpdate ?? false;
 
     let addedCount = 0;
     let updatedCount = 0;
@@ -53,6 +55,64 @@ export const upsertContacts = internalMutation({
         }
 
         // Map Dex fields to our schema
+        // Dex API returns phones as [{phone_number: "...", label: "..."}]
+        // Our schema expects [{phone: "..."}]
+        // 
+        // Phone normalization rules:
+        // - Australian mobiles: 9-digit starting with 4 → add +61 prefix
+        // - Already has + prefix → keep as-is (already in E.164 format)
+        // - 10-digit starting with 04 → Australian mobile, convert to +614...
+        // - Other formats → keep as-is for now
+        const normalizePhone = (rawPhone: string): string => {
+          // Strip all non-digit characters except leading +
+          const hasPlus = rawPhone.startsWith('+');
+          const digits = rawPhone.replace(/\D/g, '');
+          
+          // Already in international format
+          if (hasPlus && digits.length >= 10) {
+            return '+' + digits;
+          }
+          
+          // Australian mobile: 9 digits starting with 4 (e.g., 417248743)
+          if (digits.length === 9 && digits.startsWith('4')) {
+            return '+61' + digits;
+          }
+          
+          // Australian mobile: 10 digits starting with 04 (e.g., 0417248743)
+          if (digits.length === 10 && digits.startsWith('04')) {
+            return '+61' + digits.slice(1); // Remove leading 0
+          }
+          
+          // Australian landline: 9 digits starting with area code (2, 3, 7, 8)
+          if (digits.length === 9 && ['2', '3', '7', '8'].includes(digits[0])) {
+            return '+61' + digits;
+          }
+          
+          // Australian landline: 10 digits starting with 0 + area code
+          if (digits.length === 10 && digits.startsWith('0') && ['2', '3', '7', '8'].includes(digits[1])) {
+            return '+61' + digits.slice(1); // Remove leading 0
+          }
+          
+          // Return with + prefix if it looks like an international number (11+ digits)
+          if (digits.length >= 11) {
+            return '+' + digits;
+          }
+          
+          // Unknown format - return digits only (best effort)
+          return digits;
+        };
+
+        const mappedPhones = dexContact.phones?.length
+          ? dexContact.phones.map((p: { phone_number?: string; phone?: string }) => ({
+              phone: normalizePhone(p.phone_number || p.phone || ""),
+            })).filter((p: { phone: string }) => p.phone) // Filter out empty phones
+          : undefined;
+
+        // Dex API returns emails as [{email: "..."}] which matches our schema
+        const mappedEmails = dexContact.emails?.length
+          ? dexContact.emails.filter((e: { email?: string }) => e.email)
+          : undefined;
+
         const contactData = {
           dexId: dexContact.id,
           firstName: dexContact.first_name || undefined,
@@ -60,8 +120,8 @@ export const upsertContacts = internalMutation({
           description: dexContact.description || undefined,
           instagram: dexContact.instagram || undefined,
           imageUrl: dexContact.image_url || undefined,
-          emails: dexContact.emails || undefined,
-          phones: dexContact.phones || undefined,
+          emails: mappedEmails,
+          phones: mappedPhones,
           birthday: dexContact.birthday || undefined,
           lastSeenAt: dexContact.last_seen_at || undefined,
           lastSyncedAt: now,
@@ -80,8 +140,8 @@ export const upsertContacts = internalMutation({
           const dexUpdatedAt = dexContact.updated_at ? new Date(dexContact.updated_at).getTime() : 0;
           const existingLastSynced = existing.lastSyncedAt || 0;
           
-          // Skip update if Dex hasn't changed since our last sync
-          if (dexUpdatedAt <= existingLastSynced) {
+          // Skip update if Dex hasn't changed since our last sync (unless forceUpdate)
+          if (!forceUpdate && dexUpdatedAt <= existingLastSynced) {
             skippedCount++;
             continue; // No changes in Dex since last sync
           }

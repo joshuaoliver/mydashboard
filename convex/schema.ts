@@ -412,4 +412,32 @@ export default defineSchema({
     updatedAt: v.number(),
   })
     .index("by_workspace_id", ["workspaceId"]),
+
+  // Linear Issue Stats - hourly snapshots of outstanding issues per project
+  // Used for tracking task count trends over time
+  linearIssueStats: defineTable({
+    timestamp: v.number(),               // Hour timestamp (floored to hour)
+    projectId: v.optional(v.id("projects")), // Associated project (if linked)
+    projectName: v.optional(v.string()), // Project name for display
+    teamId: v.string(),                  // Linear team ID (always present)
+    teamName: v.string(),                // Linear team name
+    workspaceId: v.string(),             // Linear workspace ID
+    workspaceName: v.optional(v.string()),
+    
+    // Issue counts by status type
+    totalActive: v.number(),             // All non-completed/non-cancelled
+    backlog: v.number(),                 // statusType === "backlog"
+    unstarted: v.number(),               // statusType === "unstarted"
+    started: v.number(),                 // statusType === "started"
+    
+    // Issue counts by priority
+    urgent: v.number(),                  // priority === 1
+    high: v.number(),                    // priority === 2
+    medium: v.number(),                  // priority === 3
+    low: v.number(),                     // priority === 4
+    noPriority: v.number(),              // priority === 0
+  })
+    .index("by_timestamp", ["timestamp"])
+    .index("by_team_timestamp", ["teamId", "timestamp"])
+    .index("by_project_timestamp", ["projectId", "timestamp"]),
 });

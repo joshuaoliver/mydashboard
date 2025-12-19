@@ -144,15 +144,60 @@ export const refreshAccessToken = internalAction({
 // ==========================================
 
 /**
- * Get inbox label stats
+ * Helper to count threads matching a query by paginating through all results.
+ * Uses users.threads.list with the q parameter for filtering.
+ */
+async function countThreads(accessToken: string, query: string): Promise<number> {
+  let totalCount = 0;
+  let pageToken: string | undefined = undefined;
+  
+  do {
+    const params = new URLSearchParams({
+      q: query,
+      maxResults: "500", // Max allowed per request
+    });
+    if (pageToken) {
+      params.append("pageToken", pageToken);
+    }
+    
+    const response = await fetch(
+      `${GMAIL_API_BASE}/users/me/threads?${params.toString()}`,
+      {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      }
+    );
+    
+    if (!response.ok) {
+      const error = await response.text();
+      console.error(`Failed to fetch threads for query "${query}":`, error);
+      throw new Error(`Failed to fetch threads: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    
+    // Count threads in this page
+    if (data.threads) {
+      totalCount += data.threads.length;
+    }
+    
+    pageToken = data.nextPageToken;
+  } while (pageToken);
+  
+  return totalCount;
+}
+
+/**
+ * Get inbox stats using threads (conversations) instead of individual messages.
  * 
- * Uses labels.get API for category counts. This gives us the total
- * messages with each category label. Note that category labels are
- * automatically applied by Gmail's AI, so CATEGORY_PERSONAL (Primary)
- * will show emails that Gmail classified as primary.
+ * Uses users.threads.list API with search queries to get accurate thread counts.
+ * A thread is considered unread until all messages within it have been read.
  * 
- * For accurate inbox category counts, we use a search query approach
- * with pagination to get exact counts when resultSizeEstimate is unreliable.
+ * Stats tracked:
+ * - totalInbox: Total threads in inbox (query: "in:inbox")
+ * - unread: Unread threads in inbox (query: "in:inbox is:unread")
+ * - Category counts: Unread threads per category
  */
 export const getInboxStats = internalAction({
   args: {},
@@ -168,49 +213,28 @@ export const getInboxStats = internalAction({
     // Get fresh access token
     const accessToken = await ctx.runAction(internal.gmailActions.refreshAccessToken, {}) as string;
 
-    // Fetch INBOX label for total counts
-    const inboxResponse = await fetch(`${GMAIL_API_BASE}/users/me/labels/INBOX`, {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-      },
-    });
+    // Fetch thread counts in parallel
+    const [totalInbox, unread] = await Promise.all([
+      countThreads(accessToken, "in:inbox"),
+      countThreads(accessToken, "in:inbox is:unread"),
+    ]);
 
-    if (!inboxResponse.ok) {
-      const error = await inboxResponse.text();
-      console.error("Failed to fetch inbox:", error);
-      throw new Error(`Failed to fetch inbox stats: ${inboxResponse.status}`);
-    }
-
-    const inbox = await inboxResponse.json();
-
-    // For category counts, fetch the label stats directly
-    // This gives total messages with that category label
-    const categoryLabels = [
-      { key: "primary", label: "CATEGORY_PERSONAL" },
-      { key: "social", label: "CATEGORY_SOCIAL" },
-      { key: "promotions", label: "CATEGORY_PROMOTIONS" },
-      { key: "updates", label: "CATEGORY_UPDATES" },
-      { key: "forums", label: "CATEGORY_FORUMS" },
+    // For category counts, count unread threads per category
+    // Category labels in Gmail: category:primary, category:social, etc.
+    const categoryQueries = [
+      { key: "primary", query: "in:inbox is:unread category:primary" },
+      { key: "social", query: "in:inbox is:unread category:social" },
+      { key: "promotions", query: "in:inbox is:unread category:promotions" },
+      { key: "updates", query: "in:inbox is:unread category:updates" },
+      { key: "forums", query: "in:inbox is:unread category:forums" },
     ];
 
-    const categoryPromises = categoryLabels.map(async ({ key, label }) => {
+    const categoryPromises = categoryQueries.map(async ({ key, query }) => {
       try {
-        // Use labels.get to get the label stats directly
-        const response = await fetch(`${GMAIL_API_BASE}/users/me/labels/${label}`, {
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-          },
-        });
-        
-        if (response.ok) {
-          const data = await response.json();
-          // messagesTotal is the count of messages with this label
-          return { key, count: data.messagesTotal || 0 };
-        }
-        console.log(`Failed to fetch label ${label}:`, response.status);
-        return { key, count: 0 };
+        const count = await countThreads(accessToken, query);
+        return { key, count };
       } catch (e) {
-        console.error(`Error fetching label ${label}:`, e);
+        console.error(`Error fetching threads for ${key}:`, e);
         return { key, count: 0 };
       }
     });
@@ -220,15 +244,15 @@ export const getInboxStats = internalAction({
       categories.map((c) => [c.key, c.count])
     );
 
-    console.log("Gmail stats fetched:", {
-      totalInbox: inbox.messagesTotal,
-      unread: inbox.messagesUnread,
+    console.log("Gmail thread stats fetched:", {
+      totalInbox,
+      unread,
       categories: categoryMap,
     });
 
     return {
-      totalInbox: inbox.messagesTotal || 0,
-      unread: inbox.messagesUnread || 0,
+      totalInbox,
+      unread,
       primary: categoryMap["primary"],
       social: categoryMap["social"],
       promotions: categoryMap["promotions"],

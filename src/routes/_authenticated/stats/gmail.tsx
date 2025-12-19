@@ -143,7 +143,7 @@ function GmailStatsPage() {
             <div>
               <h1 className="text-3xl font-bold text-gray-900">Gmail Stats</h1>
               <p className="text-sm text-gray-600 mt-1">
-                Historical inbox tracking
+                Historical thread (conversation) tracking
               </p>
             </div>
           </div>
@@ -183,7 +183,7 @@ function GmailStatsPage() {
         <div className="grid gap-4 md:grid-cols-2 mb-6">
           <Card>
             <CardHeader className="pb-2">
-              <CardDescription>Total Inbox</CardDescription>
+              <CardDescription>Total Threads</CardDescription>
               <CardTitle className="text-4xl flex items-center gap-2">
                 {latestSnapshot.totalInbox}
                 {trend !== 0 && (
@@ -206,7 +206,7 @@ function GmailStatsPage() {
           </Card>
           <Card>
             <CardHeader className="pb-2">
-              <CardDescription>Unread</CardDescription>
+              <CardDescription>Unread Threads</CardDescription>
               <CardTitle className="text-4xl text-red-600">
                 {latestSnapshot.unread}
               </CardTitle>
@@ -220,7 +220,7 @@ function GmailStatsPage() {
         <Card className="mb-6">
           <CardHeader>
             <CardTitle>Daily History (Last 30 Days)</CardTitle>
-            <CardDescription>End-of-day inbox counts</CardDescription>
+            <CardDescription>End-of-day thread counts</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="h-64 flex items-end justify-between gap-1">
@@ -232,7 +232,7 @@ function GmailStatsPage() {
                     key={day.date}
                     className="flex-1 bg-red-200 hover:bg-red-300 transition-colors rounded-t cursor-pointer group relative"
                     style={{ height: `${height}%`, minHeight: '4px' }}
-                    title={`${day.date}: ${day.totalInbox} emails`}
+                    title={`${day.date}: ${day.totalInbox} threads`}
                   >
                     <div className="absolute bottom-full mb-1 left-1/2 -translate-x-1/2 hidden group-hover:block bg-gray-800 text-white text-xs px-2 py-1 rounded whitespace-nowrap">
                       {day.date}: {day.totalInbox}
@@ -261,8 +261,8 @@ function GmailStatsPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Timestamp</TableHead>
-                  <TableHead className="text-right">Total Inbox</TableHead>
-                  <TableHead className="text-right">Unread</TableHead>
+                  <TableHead className="text-right">Total Threads</TableHead>
+                  <TableHead className="text-right">Unread Threads</TableHead>
                   <TableHead className="w-12"></TableHead>
                 </TableRow>
               </TableHeader>

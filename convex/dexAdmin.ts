@@ -1,4 +1,5 @@
 import { internalAction, mutation } from "./_generated/server";
+import { v } from "convex/values";
 import { internal } from "./_generated/api";
 
 /**
@@ -19,6 +20,18 @@ export const triggerManualSync = mutation({
   args: {},
   handler: async (ctx) => {
     await ctx.scheduler.runAfter(0, internal.dexSync.syncContactsFromDex, {});
+    return { success: true };
+  },
+});
+
+/**
+ * Force resync all contacts - bypasses "unchanged" check
+ * Useful when phone normalization logic changes and we need to re-process all
+ */
+export const forceResyncAllContacts = mutation({
+  args: {},
+  handler: async (ctx) => {
+    await ctx.scheduler.runAfter(0, internal.dexSync.syncContactsFromDexForced, {});
     return { success: true };
   },
 });

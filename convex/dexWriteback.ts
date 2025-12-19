@@ -13,21 +13,21 @@ export const writeToDex = internalAction({
     firstName: v.optional(v.string()),
     lastName: v.optional(v.string()),
     instagram: v.optional(v.string()),
-    emails: v.optional(v.array(v.object({ email: v.string() }))),
-    phones: v.optional(v.array(v.object({ phone: v.string() }))),
+    // Note: We intentionally do NOT write back phones or emails
+    // These come from the user's address book and should only be read, not modified
     birthday: v.optional(v.string()),
   },
   handler: async (ctx, args): Promise<{ success: boolean; error?: string }> => {
     try {
       // Build updates object with only provided fields
+      // Map our schema format back to Dex API format
       const updates: Record<string, unknown> = {};
       if (args.description !== undefined) updates.description = args.description;
       if (args.firstName !== undefined) updates.first_name = args.firstName;
       if (args.lastName !== undefined) updates.last_name = args.lastName;
       if (args.instagram !== undefined) updates.instagram = args.instagram;
-      if (args.emails !== undefined) updates.emails = args.emails;
-      if (args.phones !== undefined) updates.phones = args.phones;
       if (args.birthday !== undefined) updates.birthday = args.birthday;
+      // Note: phones and emails are read-only from address book - never write back
 
       const result = await ctx.runAction(api.dexActions.updateDexContact, {
         dexId: args.dexId,

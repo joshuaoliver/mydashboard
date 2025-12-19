@@ -542,3 +542,205 @@ export const triggerManualSync = action({
     }
   },
 });
+
+// ==========================================
+// Hourly Stats Snapshot
+// ==========================================
+
+/**
+ * Capture hourly snapshot of outstanding Linear issues per team/project
+ * Called by cron every hour to build historical data for charts
+ */
+export const captureHourlyStats = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const now = Date.now();
+    // Floor timestamp to the current hour
+    const hourTimestamp = Math.floor(now / (1000 * 60 * 60)) * (1000 * 60 * 60);
+
+    // Get all active issues
+    const issues = await ctx.db.query("linearIssues").collect();
+    const activeIssues = issues.filter(
+      (i) => i.statusType !== "completed" && i.statusType !== "canceled"
+    );
+
+    // Group issues by teamId
+    const byTeam = new Map<string, typeof activeIssues>();
+    for (const issue of activeIssues) {
+      if (!byTeam.has(issue.teamId)) {
+        byTeam.set(issue.teamId, []);
+      }
+      byTeam.get(issue.teamId)!.push(issue);
+    }
+
+    // Get projects for mapping
+    const projects = await ctx.db.query("projects").collect();
+    const projectsByLinearTeam = new Map<string, typeof projects[0]>();
+    for (const project of projects) {
+      if (project.linearTeamId) {
+        projectsByLinearTeam.set(project.linearTeamId, project);
+      }
+    }
+
+    let snapshotsCreated = 0;
+
+    // Create a snapshot for each team
+    for (const [teamId, teamIssues] of byTeam) {
+      const firstIssue = teamIssues[0];
+      const project = projectsByLinearTeam.get(teamId);
+
+      // Calculate stats
+      const stats = {
+        totalActive: teamIssues.length,
+        backlog: teamIssues.filter((i) => i.statusType === "backlog").length,
+        unstarted: teamIssues.filter((i) => i.statusType === "unstarted").length,
+        started: teamIssues.filter((i) => i.statusType === "started").length,
+        urgent: teamIssues.filter((i) => i.priority === 1).length,
+        high: teamIssues.filter((i) => i.priority === 2).length,
+        medium: teamIssues.filter((i) => i.priority === 3).length,
+        low: teamIssues.filter((i) => i.priority === 4).length,
+        noPriority: teamIssues.filter((i) => i.priority === 0).length,
+      };
+
+      // Check if we already have a snapshot for this hour and team
+      const existing = await ctx.db
+        .query("linearIssueStats")
+        .withIndex("by_team_timestamp", (q) => 
+          q.eq("teamId", teamId).eq("timestamp", hourTimestamp)
+        )
+        .first();
+
+      if (existing) {
+        // Update existing snapshot
+        await ctx.db.patch(existing._id, stats);
+      } else {
+        // Create new snapshot
+        await ctx.db.insert("linearIssueStats", {
+          timestamp: hourTimestamp,
+          projectId: project?._id,
+          projectName: project?.name,
+          teamId,
+          teamName: firstIssue?.teamName || teamId,
+          workspaceId: firstIssue?.workspaceId || "",
+          workspaceName: firstIssue?.workspaceName,
+          ...stats,
+        });
+        snapshotsCreated++;
+      }
+    }
+
+    console.log(
+      `[LinearStats] Captured hourly snapshot: ${snapshotsCreated} new, ${byTeam.size} teams, ${activeIssues.length} active issues`
+    );
+
+    return { snapshotsCreated, teamsProcessed: byTeam.size, totalActiveIssues: activeIssues.length };
+  },
+});
+
+/**
+ * Get historical stats for a specific team/project
+ */
+export const getHistoricalStats = query({
+  args: {
+    teamId: v.optional(v.string()),
+    projectId: v.optional(v.id("projects")),
+    hoursBack: v.optional(v.number()), // Default 24 hours
+  },
+  handler: async (ctx, args) => {
+    const hoursBack = args.hoursBack ?? 24;
+    const cutoffTime = Date.now() - hoursBack * 60 * 60 * 1000;
+
+    let stats;
+    
+    if (args.teamId) {
+      stats = await ctx.db
+        .query("linearIssueStats")
+        .withIndex("by_team_timestamp", (q) => q.eq("teamId", args.teamId!))
+        .filter((q) => q.gte(q.field("timestamp"), cutoffTime))
+        .collect();
+    } else if (args.projectId) {
+      stats = await ctx.db
+        .query("linearIssueStats")
+        .withIndex("by_project_timestamp", (q) => q.eq("projectId", args.projectId!))
+        .filter((q) => q.gte(q.field("timestamp"), cutoffTime))
+        .collect();
+    } else {
+      stats = await ctx.db
+        .query("linearIssueStats")
+        .withIndex("by_timestamp")
+        .filter((q) => q.gte(q.field("timestamp"), cutoffTime))
+        .collect();
+    }
+
+    // Sort by timestamp ascending
+    stats.sort((a, b) => a.timestamp - b.timestamp);
+
+    return stats;
+  },
+});
+
+/**
+ * Get aggregated stats across all teams for dashboard
+ */
+export const getAggregatedHistoricalStats = query({
+  args: {
+    hoursBack: v.optional(v.number()), // Default 168 hours (7 days)
+  },
+  handler: async (ctx, args) => {
+    const hoursBack = args.hoursBack ?? 168;
+    const cutoffTime = Date.now() - hoursBack * 60 * 60 * 1000;
+
+    const stats = await ctx.db
+      .query("linearIssueStats")
+      .withIndex("by_timestamp")
+      .filter((q) => q.gte(q.field("timestamp"), cutoffTime))
+      .collect();
+
+    // Aggregate by timestamp across all teams
+    const byTimestamp = new Map<number, {
+      timestamp: number;
+      totalActive: number;
+      backlog: number;
+      unstarted: number;
+      started: number;
+      urgent: number;
+      high: number;
+      medium: number;
+      low: number;
+      noPriority: number;
+    }>();
+
+    for (const stat of stats) {
+      if (!byTimestamp.has(stat.timestamp)) {
+        byTimestamp.set(stat.timestamp, {
+          timestamp: stat.timestamp,
+          totalActive: 0,
+          backlog: 0,
+          unstarted: 0,
+          started: 0,
+          urgent: 0,
+          high: 0,
+          medium: 0,
+          low: 0,
+          noPriority: 0,
+        });
+      }
+      const agg = byTimestamp.get(stat.timestamp)!;
+      agg.totalActive += stat.totalActive;
+      agg.backlog += stat.backlog;
+      agg.unstarted += stat.unstarted;
+      agg.started += stat.started;
+      agg.urgent += stat.urgent;
+      agg.high += stat.high;
+      agg.medium += stat.medium;
+      agg.low += stat.low;
+      agg.noPriority += stat.noPriority;
+    }
+
+    // Convert to sorted array
+    const result = Array.from(byTimestamp.values());
+    result.sort((a, b) => a.timestamp - b.timestamp);
+
+    return result;
+  },
+});

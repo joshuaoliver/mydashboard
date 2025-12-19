@@ -79,4 +79,16 @@ crons.interval(
   {}
 );
 
+/**
+ * Linear issue stats snapshot - every hour
+ * Captures current issue counts per project/team for historical tracking
+ * Used to display task count trends over time
+ */
+crons.interval(
+  "capture-linear-stats",
+  { hours: 1 },
+  internal.linearSync.captureHourlyStats,
+  {}
+);
+
 export default crons;
