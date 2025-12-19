@@ -46,6 +46,7 @@ import type * as linearClient from "../linearClient.js";
 import type * as linearSync from "../linearSync.js";
 import type * as locationMutations from "../locationMutations.js";
 import type * as locationQueries from "../locationQueries.js";
+import type * as messageHelpers from "../messageHelpers.js";
 import type * as myFunctions from "../myFunctions.js";
 import type * as projectsStore from "../projectsStore.js";
 import type * as prompts from "../prompts.js";
@@ -99,6 +100,7 @@ declare const fullApi: ApiFromModules<{
   linearSync: typeof linearSync;
   locationMutations: typeof locationMutations;
   locationQueries: typeof locationQueries;
+  messageHelpers: typeof messageHelpers;
   myFunctions: typeof myFunctions;
   projectsStore: typeof projectsStore;
   prompts: typeof prompts;

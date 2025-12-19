@@ -1,6 +1,7 @@
 import { query, internalQuery } from "./_generated/server";
 import { v } from "convex/values";
 import { paginationOptsValidator } from "convex/server";
+import { extractMessageText } from "./messageHelpers";
 
 /**
  * Query cached chats from database with Convex pagination
@@ -334,9 +335,10 @@ export const getCachedMessages = query({
     console.log(`[getCachedMessages] 📬 Found ${result.page.length} messages for chatId: ${chatIdPreview}`);
 
     // Transform messages (page is already sorted newest-first from query)
+    // Also extract text in case any old data has JSON text objects
     const transformedPage = result.page.map((msg) => ({
       id: msg.messageId,
-      text: msg.text,
+      text: extractMessageText(msg.text),
       timestamp: msg.timestamp,
       sender: msg.senderId,
       senderName: msg.senderName,
@@ -386,7 +388,7 @@ export const getAllCachedMessages = query({
     return {
       messages: sortedMessages.map((msg) => ({
         id: msg.messageId,
-        text: msg.text,
+        text: extractMessageText(msg.text),
         timestamp: msg.timestamp,
         sender: msg.senderId,
         senderName: msg.senderName,

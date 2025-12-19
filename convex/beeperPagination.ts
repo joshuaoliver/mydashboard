@@ -2,6 +2,7 @@ import { action } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { v } from "convex/values";
 import { createBeeperClient } from "./beeperClient";
+import { extractMessageText } from "./messageHelpers";
 
 /**
  * Load older chats (backward pagination)
@@ -62,9 +63,26 @@ export const loadOlderChats = action({
         let cannotMessage: boolean | undefined;
 
         if (chat.type === "single" && chat.participants?.items) {
-          const otherPerson = chat.participants.items.find(
+          // Get all non-self participants
+          const otherParticipants = chat.participants.items.filter(
             (p: any) => p.isSelf === false
           );
+          
+          // Filter out Meta AI (bot that Instagram injects into chats)
+          // This ensures we show the real conversation partner, not the AI bot
+          const realParticipants = otherParticipants.filter(
+            (p: any) => {
+              const name = (p.fullName || '').toLowerCase();
+              const uname = (p.username || '').toLowerCase();
+              return !name.includes('meta ai') && uname !== 'meta.ai';
+            }
+          );
+          
+          // Prefer real participants, fall back to first non-self if all are bots
+          const otherPerson = realParticipants.length > 0 
+            ? realParticipants[0] 
+            : otherParticipants[0];
+
           if (otherPerson) {
             username = otherPerson.username;
             phoneNumber = otherPerson.phoneNumber;
@@ -248,7 +266,7 @@ export const loadNewerMessages = action({
             return {
               messageId: msg.id,
               accountID: msg.accountID,
-              text: msg.text || "",
+              text: extractMessageText(msg.text),
               timestamp: new Date(msg.timestamp).getTime(),
               sortKey: msg.sortKey,
               senderId: msg.senderID,
@@ -358,7 +376,7 @@ export const loadNewerMessages = action({
           return {
             messageId: msg.id,
             accountID: msg.accountID,
-            text: msg.text || "",
+            text: extractMessageText(msg.text),
             timestamp: new Date(msg.timestamp).getTime(),
             sortKey: msg.sortKey,
             senderId: msg.senderID,
@@ -518,7 +536,7 @@ export const loadOlderMessages = action({
           return {
             messageId: msg.id,
             accountID: msg.accountID,
-            text: msg.text || "",
+            text: extractMessageText(msg.text),
             timestamp: new Date(msg.timestamp).getTime(),
             sortKey: msg.sortKey,
             senderId: msg.senderID,

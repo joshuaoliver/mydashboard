@@ -2,6 +2,7 @@ import { action } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { v } from "convex/values";
 import { createBeeperClient } from "./beeperClient";
+import { extractMessageText } from "./messageHelpers";
 
 /**
  * Focus/open a chat in Beeper Desktop
@@ -180,7 +181,7 @@ export const loadFullConversation = action({
       const transformedMessages = allMessages.map((msg: any) => ({
         messageId: msg.id,
         accountID: msg.accountID,
-        text: msg.text || "",
+        text: extractMessageText(msg.text),
         timestamp: new Date(msg.timestamp).getTime(),
         sortKey: msg.sortKey,
         senderId: msg.senderID || msg.sender?.id || "unknown",

@@ -4,6 +4,7 @@ import { action } from "./_generated/server";
 import { v } from "convex/values";
 import { generateText } from "ai";
 import { createGateway } from "@ai-sdk/gateway";
+import { extractMessageText } from "./messageHelpers";
 
 // Beeper API configuration (from environment variables)
 // Using bywave proxy instead of localhost so Convex (cloud-hosted) can access it
@@ -115,7 +116,7 @@ async function fetchChatMessages(chatId: string) {
     .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
     .map((msg) => ({
       id: msg.id,
-      text: msg.text || "",
+      text: extractMessageText(msg.text),
       timestamp: new Date(msg.timestamp).getTime(),
       sender: msg.senderID,
       senderName: msg.senderName || msg.senderID,

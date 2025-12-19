@@ -2,6 +2,7 @@ import { internalMutation, internalAction, action } from "./_generated/server";
 import { internal, api } from "./_generated/api";
 import { v } from "convex/values";
 import { createBeeperClient } from "./beeperClient";
+import { extractMessageText } from "./messageHelpers";
 
 /**
  * Helper to normalize phone numbers for matching
@@ -245,6 +246,13 @@ export const upsertParticipants = internalMutation({
     let otherPersonImgURL: string | undefined = undefined;
     let otherPersonContactId: string | undefined = undefined;
 
+    // Helper to check if a participant is Meta AI (bot injected by Instagram)
+    const isMetaAI = (p: typeof args.participants[0]) => {
+      const name = (p.fullName || '').toLowerCase();
+      const uname = (p.username || '').toLowerCase();
+      return name.includes('meta ai') || uname === 'meta.ai';
+    };
+
     for (const participant of args.participants) {
       // Try to match participant to an existing contact (skip self for matching)
       let contactId: string | undefined = undefined;
@@ -252,17 +260,22 @@ export const upsertParticipants = internalMutation({
       // Only try to match non-self participants to contacts
       if (!participant.isSelf) {
         // Track "other person" data for backfill
-        if (participant.phoneNumber) {
-          otherPersonPhoneNumber = participant.phoneNumber;
-        }
-        if (participant.username) {
-          otherPersonUsername = participant.username;
-        }
-        if (participant.fullName) {
-          otherPersonFullName = participant.fullName;
-        }
-        if (participant.imgURL) {
-          otherPersonImgURL = participant.imgURL;
+        // Skip Meta AI bot when determining the "real" conversation partner
+        const shouldTrackAsOtherPerson = !isMetaAI(participant);
+        
+        if (shouldTrackAsOtherPerson) {
+          if (participant.phoneNumber) {
+            otherPersonPhoneNumber = participant.phoneNumber;
+          }
+          if (participant.username) {
+            otherPersonUsername = participant.username;
+          }
+          if (participant.fullName) {
+            otherPersonFullName = participant.fullName;
+          }
+          if (participant.imgURL) {
+            otherPersonImgURL = participant.imgURL;
+          }
         }
 
         // 1. Try matching by Instagram username
@@ -307,7 +320,10 @@ export const upsertParticipants = internalMutation({
 
         if (contactId) {
           matchedCount++;
-          otherPersonContactId = contactId;
+          // Only set otherPersonContactId for real participants (not Meta AI)
+          if (shouldTrackAsOtherPerson) {
+            otherPersonContactId = contactId;
+          }
         }
       }
 
@@ -638,19 +654,34 @@ export const syncBeeperChatsInternal = internalAction({
         let cannotMessage: boolean | undefined;
 
         if (chat.type === "single" && chat.participants?.items) {
-          // Find the participant that's not yourself
-          const otherPerson = chat.participants.items.find(
+          // Get all non-self participants
+          const otherParticipants = chat.participants.items.filter(
             (p: any) => p.isSelf === false
           );
+          
+          // Filter out Meta AI (bot that Instagram injects into chats)
+          // This ensures we show the real conversation partner, not the AI bot
+          const realParticipants = otherParticipants.filter(
+            (p: any) => {
+              const name = (p.fullName || '').toLowerCase();
+              const uname = (p.username || '').toLowerCase();
+              return !name.includes('meta ai') && uname !== 'meta.ai';
+            }
+          );
+          
+          // Prefer real participants, fall back to first non-self if all are bots
+          const otherPerson = realParticipants.length > 0 
+            ? realParticipants[0] 
+            : otherParticipants[0];
 
           if (otherPerson) {
             username = otherPerson.username;
             phoneNumber = otherPerson.phoneNumber;
             email = otherPerson.email;
             participantId = otherPerson.id;
-            participantFullName = otherPerson.fullName;  // NEW
-            participantImgURL = otherPerson.imgURL;      // NEW
-            cannotMessage = otherPerson.cannotMessage;    // NEW
+            participantFullName = otherPerson.fullName;
+            participantImgURL = otherPerson.imgURL;
+            cannotMessage = otherPerson.cannotMessage;
           }
         }
 
@@ -800,7 +831,7 @@ export const syncBeeperChatsInternal = internalAction({
                 return {
                   messageId: msg.id,
                   accountID: msg.accountID,        // NEW: Required in API
-                  text: msg.text || "",
+                  text: extractMessageText(msg.text),
                   timestamp: new Date(msg.timestamp).getTime(),
                   sortKey: msg.sortKey,            // Required for cursor tracking
                   senderId: msg.senderID,

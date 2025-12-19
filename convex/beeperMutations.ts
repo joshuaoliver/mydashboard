@@ -1,4 +1,4 @@
-import { internalMutation } from "./_generated/server";
+import { internalMutation, mutation } from "./_generated/server";
 import { v } from "convex/values";
 
 /**
@@ -125,6 +125,70 @@ export const markChatAsUnread = internalMutation({
     });
 
     return { success: true, chatId: args.chatId };
+  },
+});
+
+/**
+ * Fix chats that incorrectly show Meta AI as the participant
+ * This finds the real participant from beeperParticipants and updates the chat
+ */
+export const fixMetaAIChats = mutation({
+  args: {},
+  handler: async (ctx) => {
+    // Helper to check if a name/username is Meta AI
+    const isMetaAI = (name?: string, username?: string) => {
+      const n = (name || '').toLowerCase();
+      const u = (username || '').toLowerCase();
+      return n.includes('meta ai') || u === 'meta.ai';
+    };
+
+    // Find all chats that show Meta AI as the participant
+    const allChats = await ctx.db.query("beeperChats").collect();
+    const metaAIChats = allChats.filter(chat => 
+      isMetaAI(chat.participantFullName, chat.username) || 
+      isMetaAI(chat.title, chat.username)
+    );
+
+    console.log(`[fixMetaAIChats] Found ${metaAIChats.length} chats showing Meta AI`);
+
+    let fixedCount = 0;
+
+    for (const chat of metaAIChats) {
+      // Get all participants for this chat
+      const participants = await ctx.db
+        .query("beeperParticipants")
+        .withIndex("by_chat", (q) => q.eq("chatId", chat.chatId))
+        .collect();
+
+      // Find the real person (not self, not Meta AI)
+      const realPerson = participants.find(p => 
+        !p.isSelf && !isMetaAI(p.fullName, p.username)
+      );
+
+      if (realPerson) {
+        console.log(`[fixMetaAIChats] Fixing chat ${chat.chatId}: ${chat.title} -> ${realPerson.fullName}`);
+        
+        await ctx.db.patch(chat._id, {
+          title: realPerson.fullName || realPerson.username || chat.title,
+          participantFullName: realPerson.fullName,
+          participantId: realPerson.participantId,
+          participantImgURL: realPerson.imgURL,
+          username: realPerson.username,
+        });
+        
+        fixedCount++;
+      } else {
+        console.log(`[fixMetaAIChats] No real person found for chat ${chat.chatId}, participants:`, 
+          participants.map(p => ({ name: p.fullName, username: p.username, isSelf: p.isSelf }))
+        );
+      }
+    }
+
+    return { 
+      success: true, 
+      chatsChecked: metaAIChats.length,
+      chatsFixed: fixedCount 
+    };
   },
 });
 
