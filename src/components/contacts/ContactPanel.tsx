@@ -74,6 +74,7 @@ const leadStatusOptions = [
   { value: "Planning", label: "Planning" },
   { value: "Dated", label: "Dated" },
   { value: "Connected", label: "Connected" },
+  { value: "Current", label: "Current" },
   { value: "Former", label: "Former" },
 ] as const
 
