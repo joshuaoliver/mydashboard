@@ -4,11 +4,12 @@ import { convexQuery } from '@convex-dev/react-query'
 import { useMutation } from 'convex/react'
 import { api } from '../../../convex/_generated/api'
 import type { Id } from '../../../convex/_generated/dataModel'
-import { useState } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
 import {
   Select,
   SelectContent,
@@ -25,6 +26,9 @@ import {
   Filter,
   Calendar,
   Clock,
+  Pencil,
+  Check,
+  X,
 } from 'lucide-react'
 import { cn } from '~/lib/utils'
 
@@ -59,6 +63,194 @@ function formatRelativeTime(timestamp: number): string {
 type ProjectFilter = Id<"projects"> | "none" | "all"
 type CompletionFilter = "all" | "pending" | "completed"
 
+// Inline editable todo item component
+interface TodoItemProps {
+  todo: {
+    _id: Id<"todoItems">
+    text: string
+    isCompleted: boolean
+    documentId: Id<"todoDocuments">
+    documentTitle: string
+    projectName: string | null
+    hashtags: string[]
+    createdAt: number
+    completedAt?: number
+  }
+  onToggle: (id: Id<"todoItems">) => void
+  onUpdateText: (id: Id<"todoItems">, text: string) => Promise<void>
+  onHashtagClick: (tag: string) => void
+}
+
+function TodoItem({ todo, onToggle, onUpdateText, onHashtagClick }: TodoItemProps) {
+  const [isEditing, setIsEditing] = useState(false)
+  const [editText, setEditText] = useState(todo.text)
+  const [isSaving, setIsSaving] = useState(false)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  // Focus input when entering edit mode
+  useEffect(() => {
+    if (isEditing && inputRef.current) {
+      inputRef.current.focus()
+      inputRef.current.select()
+    }
+  }, [isEditing])
+
+  // Reset edit text when todo changes
+  useEffect(() => {
+    setEditText(todo.text)
+  }, [todo.text])
+
+  const handleSave = useCallback(async () => {
+    const trimmedText = editText.trim()
+    if (!trimmedText || trimmedText === todo.text) {
+      setEditText(todo.text)
+      setIsEditing(false)
+      return
+    }
+
+    setIsSaving(true)
+    try {
+      await onUpdateText(todo._id, trimmedText)
+      setIsEditing(false)
+    } finally {
+      setIsSaving(false)
+    }
+  }, [editText, todo._id, todo.text, onUpdateText])
+
+  const handleCancel = useCallback(() => {
+    setEditText(todo.text)
+    setIsEditing(false)
+  }, [todo.text])
+
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      handleSave()
+    } else if (e.key === 'Escape') {
+      handleCancel()
+    }
+  }, [handleSave, handleCancel])
+
+  return (
+    <div
+      className={cn(
+        "group flex items-start gap-3 p-4 rounded-lg border",
+        "hover:bg-accent/50 transition-colors",
+        todo.isCompleted && "opacity-60"
+      )}
+    >
+      <Checkbox
+        checked={todo.isCompleted}
+        onCheckedChange={() => onToggle(todo._id)}
+        className="mt-0.5"
+        disabled={isEditing}
+      />
+      <div className="flex-1 min-w-0">
+        {isEditing ? (
+          <div className="flex items-center gap-2">
+            <Input
+              ref={inputRef}
+              value={editText}
+              onChange={(e) => setEditText(e.target.value)}
+              onKeyDown={handleKeyDown}
+              onBlur={handleSave}
+              className="h-8 text-sm"
+              disabled={isSaving}
+            />
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-8 w-8 flex-shrink-0"
+              onClick={handleSave}
+              disabled={isSaving}
+            >
+              {isSaving ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Check className="w-4 h-4 text-green-600" />
+              )}
+            </Button>
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-8 w-8 flex-shrink-0"
+              onClick={handleCancel}
+              disabled={isSaving}
+            >
+              <X className="w-4 h-4 text-muted-foreground" />
+            </Button>
+          </div>
+        ) : (
+          <div 
+            className="group/text flex items-center gap-2 cursor-pointer"
+            onClick={() => !todo.isCompleted && setIsEditing(true)}
+          >
+            <p
+              className={cn(
+                "text-sm flex-1",
+                todo.isCompleted && "line-through text-muted-foreground"
+              )}
+            >
+              {todo.text}
+            </p>
+            {!todo.isCompleted && (
+              <Pencil className="w-3.5 h-3.5 text-muted-foreground opacity-0 group-hover/text:opacity-100 transition-opacity flex-shrink-0" />
+            )}
+          </div>
+        )}
+        <div className="flex flex-wrap items-center gap-2 mt-2">
+          {/* Document link */}
+          <Link
+            to="/todos/$documentId"
+            params={{ documentId: todo.documentId }}
+            className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <FileText className="w-3 h-3" />
+            {todo.documentTitle}
+          </Link>
+
+          {/* Project badge */}
+          {todo.projectName && (
+            <Badge variant="outline" className="h-5 text-xs">
+              <FolderKanban className="w-3 h-3 mr-1" />
+              {todo.projectName}
+            </Badge>
+          )}
+
+          {/* Hashtags */}
+          {todo.hashtags.map((tag) => (
+            <button
+              key={tag}
+              onClick={(e) => {
+                e.stopPropagation()
+                onHashtagClick(tag)
+              }}
+              className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+            >
+              #{tag}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Timestamps */}
+      <div className="text-right text-xs text-muted-foreground space-y-1 flex-shrink-0">
+        <div className="flex items-center gap-1 justify-end">
+          <Calendar className="w-3 h-3" />
+          {formatRelativeTime(todo.createdAt)}
+        </div>
+        {todo.completedAt && (
+          <div className="flex items-center gap-1 justify-end text-green-600 dark:text-green-400">
+            <Clock className="w-3 h-3" />
+            {formatRelativeTime(todo.completedAt)}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 function TodosListPage() {
   const [projectFilter, setProjectFilter] = useState<ProjectFilter>("all")
   const [completionFilter, setCompletionFilter] = useState<CompletionFilter>("pending")
@@ -89,9 +281,14 @@ function TodosListPage() {
   )
 
   const toggleCompletion = useMutation(api.todoItems.toggleTodoCompletion)
+  const updateTodoText = useMutation(api.todoItems.updateTodoText)
 
   const handleToggle = async (id: Id<"todoItems">) => {
     await toggleCompletion({ id })
+  }
+
+  const handleUpdateText = async (id: Id<"todoItems">, text: string) => {
+    await updateTodoText({ id, text })
   }
 
   const clearFilters = () => {
@@ -274,74 +471,13 @@ function TodosListPage() {
             ) : (
               <div className="space-y-2">
                 {todos.map((todo) => (
-                  <div
+                  <TodoItem
                     key={todo._id}
-                    className={cn(
-                      "group flex items-start gap-3 p-4 rounded-lg border",
-                      "hover:bg-accent/50 transition-colors",
-                      todo.isCompleted && "opacity-60"
-                    )}
-                  >
-                    <Checkbox
-                      checked={todo.isCompleted}
-                      onCheckedChange={() => handleToggle(todo._id)}
-                      className="mt-0.5"
-                    />
-                    <div className="flex-1 min-w-0">
-                      <p
-                        className={cn(
-                          "text-sm",
-                          todo.isCompleted && "line-through text-muted-foreground"
-                        )}
-                      >
-                        {todo.text}
-                      </p>
-                      <div className="flex flex-wrap items-center gap-2 mt-2">
-                        {/* Document link */}
-                        <Link
-                          to="/todos/$documentId"
-                          params={{ documentId: todo.documentId }}
-                          className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-                        >
-                          <FileText className="w-3 h-3" />
-                          {todo.documentTitle}
-                        </Link>
-
-                        {/* Project badge */}
-                        {todo.projectName && (
-                          <Badge variant="outline" className="h-5 text-xs">
-                            <FolderKanban className="w-3 h-3 mr-1" />
-                            {todo.projectName}
-                          </Badge>
-                        )}
-
-                        {/* Hashtags */}
-                        {todo.hashtags.map((tag) => (
-                          <button
-                            key={tag}
-                            onClick={() => setHashtagFilter(tag)}
-                            className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
-                          >
-                            #{tag}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Timestamps */}
-                    <div className="text-right text-xs text-muted-foreground space-y-1 flex-shrink-0">
-                      <div className="flex items-center gap-1 justify-end">
-                        <Calendar className="w-3 h-3" />
-                        {formatRelativeTime(todo.createdAt)}
-                      </div>
-                      {todo.completedAt && (
-                        <div className="flex items-center gap-1 justify-end text-green-600 dark:text-green-400">
-                          <Clock className="w-3 h-3" />
-                          {formatRelativeTime(todo.completedAt)}
-                        </div>
-                      )}
-                    </div>
-                  </div>
+                    todo={todo}
+                    onToggle={handleToggle}
+                    onUpdateText={handleUpdateText}
+                    onHashtagClick={setHashtagFilter}
+                  />
                 ))}
               </div>
             )}

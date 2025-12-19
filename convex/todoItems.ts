@@ -273,9 +273,62 @@ export const toggleTodoCompletion = mutation({
   },
 });
 
+// Update todo text and sync back to document
+export const updateTodoText = mutation({
+  args: {
+    id: v.id("todoItems"),
+    text: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const item = await ctx.db.get(args.id);
+    if (!item) {
+      throw new Error("Todo item not found");
+    }
+
+    // Don't update if text hasn't changed
+    if (item.text === args.text) {
+      return { success: true };
+    }
+
+    const now = Date.now();
+
+    // Update the todo item
+    await ctx.db.patch(args.id, {
+      text: args.text,
+      updatedAt: now,
+    });
+
+    // Sync the change back to the document
+    const document = await ctx.db.get(item.documentId);
+    if (document) {
+      try {
+        const content = JSON.parse(document.content);
+        updateTaskItemTextInContent(content, item.nodeId, args.text);
+        await ctx.db.patch(item.documentId, {
+          content: JSON.stringify(content),
+          updatedAt: now,
+        });
+      } catch {
+        // If we can't parse/update the content, just continue
+        // The todo item is still updated
+      }
+    }
+
+    return { success: true };
+  },
+});
+
+// Type for Tiptap node structure
+interface TiptapNodeMutable {
+  type: string;
+  attrs?: Record<string, unknown>;
+  content?: TiptapNodeMutable[];
+  text?: string;
+}
+
 // Helper to recursively update a taskItem's checked state in Tiptap content
 function updateTaskItemInContent(
-  node: { type: string; attrs?: Record<string, unknown>; content?: unknown[] },
+  node: TiptapNodeMutable,
   nodeId: string,
   checked: boolean
 ): boolean {
@@ -287,7 +340,40 @@ function updateTaskItemInContent(
   if (node.content && Array.isArray(node.content)) {
     for (const child of node.content) {
       if (typeof child === 'object' && child !== null) {
-        if (updateTaskItemInContent(child as { type: string; attrs?: Record<string, unknown>; content?: unknown[] }, nodeId, checked)) {
+        if (updateTaskItemInContent(child as TiptapNodeMutable, nodeId, checked)) {
+          return true;
+        }
+      }
+    }
+  }
+  
+  return false;
+}
+
+// Helper to recursively update a taskItem's text content in Tiptap content
+function updateTaskItemTextInContent(
+  node: TiptapNodeMutable,
+  nodeId: string,
+  newText: string
+): boolean {
+  if (node.type === "taskItem" && node.attrs?.id === nodeId) {
+    // Find the paragraph inside the taskItem and update its text
+    if (node.content) {
+      for (const child of node.content) {
+        if (child.type === "paragraph") {
+          // Replace the paragraph's content with a single text node
+          child.content = [{ type: "text", text: newText }];
+          return true;
+        }
+      }
+    }
+    return true;
+  }
+  
+  if (node.content && Array.isArray(node.content)) {
+    for (const child of node.content) {
+      if (typeof child === 'object' && child !== null) {
+        if (updateTaskItemTextInContent(child, nodeId, newText)) {
           return true;
         }
       }
