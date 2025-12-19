@@ -2,7 +2,7 @@ import { internalMutation, internalAction, action } from "./_generated/server";
 import { internal, api } from "./_generated/api";
 import { v } from "convex/values";
 import { createBeeperClient } from "./beeperClient";
-import { extractMessageText } from "./messageHelpers";
+import { extractMessageText, compareSortKeys } from "./messageHelpers";
 
 /**
  * Helper to normalize phone numbers for matching
@@ -845,7 +845,7 @@ export const syncBeeperChatsInternal = internalAction({
               // CRITICAL: Sort by sortKey (lexicographically) before syncing
               // sortKeys are designed to be sortable strings
               .sort((a: { sortKey: string }, b: { sortKey: string }) => 
-                a.sortKey.localeCompare(b.sortKey)
+                compareSortKeys(a.sortKey, b.sortKey)
               );
 
             console.log(`[Beeper Sync] Syncing ${messagesToSync.length} messages for chatId: ${chat.id} (${chat.title})`);
@@ -864,18 +864,19 @@ export const syncBeeperChatsInternal = internalAction({
             syncedMessagesCount += messageCount;
             
             // Track message cursor boundaries
-            if (messages.length > 0) {
+            if (messagesToSync.length > 0) {
               // Messages are sorted oldest to newest
               const newestSortKey = messagesToSync[messagesToSync.length - 1]?.sortKey;
               const oldestSortKey = messagesToSync[0]?.sortKey;
               
+              // Smart update: mutation will only update boundaries if they are expanded
               await ctx.runMutation(
                 internal.cursorHelpers.updateChatMessageCursors,
                 {
                   chatDocId,
                   newestMessageSortKey: newestSortKey,
                   oldestMessageSortKey: oldestSortKey,
-                  messageCount: messagesToSync.length,
+                  messageCount: messagesToSync.length, 
                 }
               );
             }
@@ -896,25 +897,41 @@ export const syncBeeperChatsInternal = internalAction({
       );
 
       // Store cursor boundaries for next sync
-      const totalChats = await ctx.runQuery(
-        internal.beeperQueries.getChatByIdInternal,
-        { chatId: "" } // Dummy call to get count
-      );
+      // SMART CURSOR UPDATE:
+      // 1. If we synced "after", only update newestCursor
+      // 2. If we synced "before", only update oldestCursor
+      // 3. If no cursor (initial), update both
+      const updateData: any = {
+        syncSource: args.syncSource,
+      };
+
+      if (direction === "after") {
+        updateData.newestCursor = response.newestCursor;
+        // Do NOT pass oldestCursor, mutation will preserve existing global oldest
+      } else if (direction === "before") {
+        updateData.oldestCursor = response.oldestCursor;
+        // Do NOT pass newestCursor, mutation will preserve existing global newest
+      } else {
+        // Initial sync or bypassCache - fetching the front of the list
+        updateData.newestCursor = response.newestCursor;
+        
+        // ONLY update oldestCursor if we don't have one yet.
+        // This prevents overwriting a deep historical boundary with the 
+        // oldest cursor of the first page of recent chats.
+        if (!syncState?.oldestCursor) {
+          updateData.oldestCursor = response.oldestCursor;
+        }
+      }
       
       await ctx.runMutation(
         internal.cursorHelpers.updateChatListSync,
-        {
-          newestCursor: response.newestCursor || syncState?.newestCursor,
-          oldestCursor: response.oldestCursor || syncState?.oldestCursor,
-          syncSource: args.syncSource,
-          totalChats: syncedChatsCount,
-        }
+        updateData
       );
 
       console.log(
-        `[Cursor Sync] Stored cursors: ` +
-        `newest=${response.newestCursor?.slice(0, 13)}..., ` +
-        `oldest=${response.oldestCursor?.slice(0, 13)}...`
+        `[Cursor Sync] Updated sync state: ` +
+        `newest=${(updateData.newestCursor || "unchanged")?.slice(0, 13)}..., ` +
+        `oldest=${(updateData.oldestCursor || "unchanged")?.slice(0, 13)}...`
       );
 
       // Cache ALL profile images that don't have them yet (run in background)

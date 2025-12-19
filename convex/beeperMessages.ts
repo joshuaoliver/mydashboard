@@ -2,7 +2,7 @@ import { action } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { v } from "convex/values";
 import { createBeeperClient } from "./beeperClient";
-import { extractMessageText } from "./messageHelpers";
+import { extractMessageText, compareSortKeys } from "./messageHelpers";
 
 /**
  * Focus/open a chat in Beeper Desktop
@@ -166,9 +166,9 @@ export const loadFullConversation = action({
       const client = createBeeperClient();
 
       // Use SDK auto-pagination to fetch ALL messages since one year ago
+      // SDK signature: list(chatID: string, query?: MessageListParams)
       const allMessages: any[] = [];
-      for await (const message of client.messages.list({
-        chatID: roomId,
+      for await (const message of client.messages.list(roomId, {
         dateAfter: oneYearAgo.toISOString(),
         limit: 100, // Fetch 100 per page
       } as any)) {
@@ -211,7 +211,7 @@ export const loadFullConversation = action({
       }));
 
       // Sort messages by sortKey (oldest first) for proper storage
-      transformedMessages.sort((a, b) => a.sortKey.localeCompare(b.sortKey));
+      transformedMessages.sort((a, b) => compareSortKeys(a.sortKey, b.sortKey));
 
       // Store messages using the existing syncChatMessages mutation
       const storedCount: number = await ctx.runMutation(

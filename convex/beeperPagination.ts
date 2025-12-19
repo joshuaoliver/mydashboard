@@ -2,7 +2,7 @@ import { action } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { v } from "convex/values";
 import { createBeeperClient } from "./beeperClient";
-import { extractMessageText } from "./messageHelpers";
+import { extractMessageText, compareSortKeys } from "./messageHelpers";
 
 /**
  * Load older chats (backward pagination)
@@ -153,10 +153,8 @@ export const loadOlderChats = action({
       await ctx.runMutation(
         internal.cursorHelpers.updateChatListSync,
         {
-          newestCursor: syncState.newestCursor, // Keep unchanged
-          oldestCursor: response.oldestCursor || syncState.oldestCursor,
+          oldestCursor: response.oldestCursor, // mutation will preserve newestCursor
           syncSource: "load_older",
-          totalChats: syncState.totalChats + syncedChatsCount,
         }
       );
       
@@ -278,7 +276,7 @@ export const loadNewerMessages = action({
             };
           })
           .sort((a: { sortKey: string }, b: { sortKey: string }) => 
-            a.sortKey.localeCompare(b.sortKey)
+            compareSortKeys(a.sortKey, b.sortKey)
           );
 
         // Store messages

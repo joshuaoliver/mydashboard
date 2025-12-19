@@ -14,6 +14,7 @@ interface ChatListItemProps {
   unreadCount?: number
   isSelected: boolean
   onClick: () => void
+  onHover?: (chatId: string) => void  // Preload on hover
   onArchive?: (chatId: string) => void
   isArchived?: boolean
   contactImageUrl?: string // From DEX integration
@@ -30,6 +31,7 @@ export const ChatListItem = memo(function ChatListItem({
   unreadCount = 0,
   isSelected,
   onClick,
+  onHover,
   onArchive,
   isArchived = false,
   contactImageUrl,
@@ -63,8 +65,12 @@ export const ChatListItem = memo(function ChatListItem({
     onArchive?.(id)
   }
 
+  const handleMouseEnter = () => {
+    onHover?.(id)
+  }
+
   return (
-    <div className="relative group">
+    <div className="relative group" onMouseEnter={handleMouseEnter}>
       <button
         onClick={onClick}
         className={cn(

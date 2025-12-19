@@ -5,6 +5,7 @@ import { api, internal } from "./_generated/api";
 import { v } from "convex/values";
 import { generateText } from "ai";
 import { createGateway } from "@ai-sdk/gateway";
+import { createBeeperClient } from "./beeperClient";
 
 // Beeper API configuration (from environment variables)
 // Using bywave proxy instead of localhost so Convex (cloud-hosted) can access it
@@ -554,6 +555,145 @@ export const sendMessage = action({
     });
 
     return { success: true };
+  },
+});
+
+/**
+ * Refresh a single chat from the Beeper API to fix participant data
+ * This fetches the chat directly by ID and updates the database
+ */
+export const refreshChatFromAPI = action({
+  args: {
+    chatId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const client = createBeeperClient();
+    
+    console.log(`[refreshChatFromAPI] Fetching chat ${args.chatId} from API...`);
+    
+    try {
+      // Fetch the chat by ID
+      const chat = await client.chats.retrieve(args.chatId);
+      
+      if (!chat) {
+        return { success: false, error: "Chat not found" };
+      }
+      
+      console.log(`[refreshChatFromAPI] Got chat: ${chat.title}, type: ${chat.type}, participants: ${chat.participants?.total}`);
+      console.log(`[refreshChatFromAPI] Participants:`, chat.participants?.items?.map((p: any) => ({
+        name: p.fullName,
+        username: p.username,
+        isSelf: p.isSelf
+      })));
+      
+      // Helper to check if Meta AI
+      const isMetaAI = (p: any) => {
+        const name = (p.fullName || '').toLowerCase();
+        const uname = (p.username || '').toLowerCase();
+        return name.includes('meta ai') || uname === 'meta.ai';
+      };
+      
+      // Extract contact info for single chats
+      let username: string | undefined;
+      let phoneNumber: string | undefined;
+      let email: string | undefined;
+      let participantId: string | undefined;
+      let participantFullName: string | undefined;
+      let participantImgURL: string | undefined;
+      let cannotMessage: boolean | undefined;
+      
+      if (chat.type === "single" && chat.participants?.items) {
+        // Get all non-self participants
+        const otherParticipants = chat.participants.items.filter(
+          (p: any) => p.isSelf === false
+        );
+        
+        // Filter out Meta AI
+        const realParticipants = otherParticipants.filter(
+          (p: any) => !isMetaAI(p)
+        );
+        
+        // Prefer real participants
+        const otherPerson = realParticipants.length > 0 
+          ? realParticipants[0] 
+          : otherParticipants[0];
+        
+        if (otherPerson) {
+          username = otherPerson.username;
+          phoneNumber = otherPerson.phoneNumber;
+          email = otherPerson.email;
+          participantId = otherPerson.id;
+          participantFullName = otherPerson.fullName;
+          participantImgURL = otherPerson.imgURL;
+          cannotMessage = otherPerson.cannotMessage;
+          
+          console.log(`[refreshChatFromAPI] Found real person: ${participantFullName} (@${username})`);
+        }
+      }
+      
+      const now = Date.now();
+      const lastActivity = chat.lastActivity ? new Date(chat.lastActivity).getTime() : now;
+      const chatType = (chat.type === "single" || chat.type === "group") ? chat.type : "single" as const;
+      
+      // Update the chat with fresh data
+      await ctx.runMutation(internal.beeperSync.upsertChat, {
+        chatData: {
+          chatId: chat.id,
+          localChatID: chat.localChatID || chat.id,
+          title: participantFullName || chat.title || "Unknown",
+          network: chat.network || chat.accountID || "Unknown",
+          accountID: chat.accountID || "",
+          type: chatType,
+          username,
+          phoneNumber,
+          email,
+          participantId,
+          participantFullName,
+          participantImgURL,
+          cannotMessage,
+          participantCount: chat.participants?.total,
+          lastActivity,
+          unreadCount: chat.unreadCount || 0,
+          lastReadMessageSortKey: chat.lastReadMessageSortKey ? String(chat.lastReadMessageSortKey) : undefined,
+          isArchived: chat.isArchived || false,
+          isMuted: chat.isMuted || false,
+          isPinned: chat.isPinned || false,
+          lastSyncedAt: now,
+          syncSource: "refresh",
+        },
+      });
+      
+      // Also sync participants
+      if (chat.participants?.items && chat.participants.items.length > 0) {
+        await ctx.runMutation(internal.beeperSync.upsertParticipants, {
+          chatId: chat.id,
+          lastSyncedAt: now,
+          participants: chat.participants.items.map((p: any) => ({
+            id: p.id,
+            fullName: p.fullName,
+            username: p.username,
+            phoneNumber: p.phoneNumber,
+            email: p.email,
+            imgURL: p.imgURL,
+            isSelf: p.isSelf || false,
+            cannotMessage: p.cannotMessage,
+          })),
+        });
+      }
+      
+      return { 
+        success: true, 
+        title: participantFullName || chat.title,
+        participantFullName,
+        username,
+      };
+    } catch (error) {
+      console.error(`[refreshChatFromAPI] Error:`, error);
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : "Unknown error" 
+      };
+    }
   },
 });
 

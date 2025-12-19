@@ -1,6 +1,6 @@
-import { useCallback, useRef, useEffect, useState } from 'react'
+import { useCallback, useRef, useEffect, useState, useMemo } from 'react'
 import { useNavigate } from '@tanstack/react-router'
-import { usePaginatedQuery, useQuery, useAction } from 'convex/react'
+import { usePaginatedQuery, useQuery, useAction, useConvex } from 'convex/react'
 import { api } from '../../../convex/_generated/api'
 import { useChatStore } from '@/stores/useChatStore'
 import { ChatListItem } from './ChatListItem'
@@ -8,10 +8,11 @@ import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { RefreshCw, AlertCircle } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
-import { useMemo } from 'react'
 
 export function ChatListPanel() {
   const navigate = useNavigate()
+  const convex = useConvex()
+  
   // Get state from Zustand store
   const selectedChatId = useChatStore((state) => state.selectedChatId)
   const tabFilter = useChatStore((state) => state.tabFilter)
@@ -21,6 +22,9 @@ export function ChatListPanel() {
   const [isSyncing, setIsSyncing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const chatListRef = useRef<HTMLDivElement>(null)
+  
+  // Track which chats we've preloaded to avoid duplicate requests
+  const preloadedChats = useRef<Set<string>>(new Set())
 
   // Queries
   const { results: allLoadedChats, status, loadMore } = usePaginatedQuery(
@@ -108,6 +112,35 @@ export function ChatListPanel() {
       setIsSyncing(false)
     }
   }, [manualSync])
+
+  // Preload chat data on hover for instant loading when clicked
+  const handleChatHover = useCallback((chatId: string) => {
+    // Skip if already preloaded or currently selected
+    if (preloadedChats.current.has(chatId) || chatId === selectedChatId) {
+      return
+    }
+    
+    // Mark as preloaded
+    preloadedChats.current.add(chatId)
+    
+    // Preload chat details and messages in background
+    // These will populate Convex's cache so they're instant on click
+    console.log(`[Preload] 🔄 Preloading chat: ${chatId.slice(0, 25)}...`)
+    
+    // Fire and forget - preload runs in background
+    Promise.all([
+      convex.query(api.beeperQueries.getChatByIdWithContact, { chatId }),
+      convex.query(api.beeperQueries.getCachedMessages, { 
+        chatId, 
+        paginationOpts: { numItems: 50, cursor: null } 
+      }),
+    ]).then(([chat, messages]) => {
+      console.log(`[Preload] ✅ Preloaded "${chat?.name || 'unknown'}" with ${messages?.page?.length || 0} messages`)
+    }).catch((err) => {
+      // Silently ignore preload errors - it's just optimization
+      console.debug('[Preload] Failed:', err)
+    })
+  }, [convex, selectedChatId])
 
   // Subtitle with count and sync time
   const subtitle = useMemo(() => [
@@ -229,6 +262,7 @@ export function ChatListPanel() {
                 unreadCount={chat.unreadCount}
                 isSelected={selectedChatId === chat.id}
                 onClick={() => handleChatSelect(chat.id)}
+                onHover={handleChatHover}
                 onArchive={handleArchiveChat}
                 contactImageUrl={chat.contactImageUrl}
               />

@@ -473,6 +473,37 @@ export const rematchChatsToContacts = internalMutation({
     let unmatchedCount = 0;
     let unchangedCount = 0;
 
+    // Helper to normalize phone numbers
+    const normalizePhone = (phone: string) => phone.replace(/[\s\-\(\)]/g, '');
+
+    // PRE-FETCH: Load all contacts ONCE and build lookup maps
+    // This avoids repeatedly querying contacts inside the loop
+    const allContacts = await ctx.db.query("contacts").collect();
+    
+    // Build lookup maps for O(1) matching
+    const instagramMap = new Map<string, string>(); // username -> contactId
+    const whatsappMap = new Map<string, string>();  // phone -> contactId
+    const phonesMap = new Map<string, string>();    // normalized phone -> contactId
+    
+    for (const contact of allContacts) {
+      if (contact.instagram) {
+        instagramMap.set(contact.instagram, contact._id);
+      }
+      if (contact.whatsapp) {
+        whatsappMap.set(contact.whatsapp, contact._id);
+      }
+      // Build phone lookup from phones array
+      if (contact.phones) {
+        for (const p of contact.phones) {
+          if (p.phone) {
+            phonesMap.set(normalizePhone(p.phone), contact._id);
+          }
+        }
+      }
+    }
+    
+    console.log(`[rematchChatsToContacts] Built lookup maps: ${instagramMap.size} instagram, ${whatsappMap.size} whatsapp, ${phonesMap.size} phones`);
+
     // Get all single chats (groups don't have contactId)
     const chats = await ctx.db
       .query("beeperChats")
@@ -484,54 +515,21 @@ export const rematchChatsToContacts = internalMutation({
     for (const chat of chats) {
       let newContactId: string | undefined = undefined;
 
-      // 1. Try matching by Instagram username
+      // 1. Try matching by Instagram username (O(1) lookup)
       if (chat.username) {
-        const contactByInstagram = await ctx.db
-          .query("contacts")
-          .withIndex("by_instagram", (q) => q.eq("instagram", chat.username!))
-          .first();
-        
-        if (contactByInstagram) {
-          newContactId = contactByInstagram._id;
-        }
+        newContactId = instagramMap.get(chat.username);
       }
 
-      // 2. Try matching by WhatsApp phone number
+      // 2. Try matching by WhatsApp phone number (O(1) lookup)
       if (!newContactId && chat.phoneNumber) {
-        const contactByWhatsapp = await ctx.db
-          .query("contacts")
-          .withIndex("by_whatsapp", (q) => q.eq("whatsapp", chat.phoneNumber!))
-          .first();
-        
-        if (contactByWhatsapp) {
-          newContactId = contactByWhatsapp._id;
-        }
+        newContactId = whatsappMap.get(chat.phoneNumber);
       }
 
-      // 3. For iMessage/SMS chats, also search the phones array
+      // 3. For iMessage/SMS chats, also search the phones array (O(1) lookup)
       if (!newContactId && chat.phoneNumber && 
           (chat.network === "iMessage" || chat.network === "SMS")) {
-        const normalizePhone = (phone: string) => phone.replace(/[\s\-\(\)]/g, '');
         const searchPhone = normalizePhone(chat.phoneNumber);
-        
-        // Get contacts that have phones array
-        const contactsWithPhones = await ctx.db
-          .query("contacts")
-          .filter((q) => q.neq(q.field("phones"), undefined))
-          .collect();
-        
-        // Search through phones arrays for a match
-        for (const contact of contactsWithPhones) {
-          if (contact.phones) {
-            const hasMatch = contact.phones.some(
-              (p) => normalizePhone(p.phone) === searchPhone
-            );
-            if (hasMatch) {
-              newContactId = contact._id;
-              break;
-            }
-          }
-        }
+        newContactId = phonesMap.get(searchPhone);
       }
 
       // Update only if contactId changed

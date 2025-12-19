@@ -26,13 +26,17 @@ export const getChatListSync = internalQuery({
 /**
  * Update or create the global chat list sync state
  * Stores cursor boundaries after each chat list sync
+ * 
+ * SMART UPDATE: Only updates fields that are provided.
+ * If newestCursor or oldestCursor is omitted, the existing value is preserved.
+ * Also automatically calculates totalChats from database if not provided.
  */
 export const updateChatListSync = internalMutation({
   args: {
     newestCursor: v.optional(v.string()),
     oldestCursor: v.optional(v.string()),
     syncSource: v.string(),
-    totalChats: v.number(),
+    totalChats: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const existing = await ctx.db
@@ -40,29 +44,59 @@ export const updateChatListSync = internalMutation({
       .withIndex("by_key", (q) => q.eq("key", "global"))
       .first();
 
-    const data = {
+    // Calculate total count if not provided
+    let totalChats = args.totalChats;
+    if (totalChats === undefined) {
+      const allChats = await ctx.db.query("beeperChats").collect();
+      totalChats = allChats.length;
+    }
+
+    const data: any = {
       key: "global",
-      newestCursor: args.newestCursor,
-      oldestCursor: args.oldestCursor,
       lastSyncedAt: Date.now(),
       syncSource: args.syncSource,
-      totalChats: args.totalChats,
+      totalChats: totalChats,
     };
+
+    // Helper to compare cursors - uses numeric comparison if both are numeric,
+    // otherwise falls back to string comparison
+    const compareCursors = (a: string, b: string): number => {
+      const aNum = Number(a);
+      const bNum = Number(b);
+      if (!isNaN(aNum) && !isNaN(bNum)) {
+        return aNum - bNum; // Numeric comparison (handles different length numbers)
+      }
+      return a.localeCompare(b); // Lexicographic fallback
+    };
+
+    // ONLY update cursors if they are explicitly provided AND better than existing
+    // This prevents accidental overwriting with undefined/null or shrinking the window
+    if (args.newestCursor !== undefined) {
+      if (!existing?.newestCursor || compareCursors(args.newestCursor, existing.newestCursor) > 0) {
+        data.newestCursor = args.newestCursor;
+      }
+    }
+    if (args.oldestCursor !== undefined) {
+      if (!existing?.oldestCursor || compareCursors(args.oldestCursor, existing.oldestCursor) < 0) {
+        data.oldestCursor = args.oldestCursor;
+      }
+    }
 
     if (existing) {
       await ctx.db.patch(existing._id, data);
       console.log(
         `[Cursor] Updated chat list sync: ` +
-        `newest=${args.newestCursor?.slice(0, 13)}..., ` +
-        `oldest=${args.oldestCursor?.slice(0, 13)}..., ` +
-        `total=${args.totalChats}`
+        `newest=${(args.newestCursor || existing.newestCursor)?.slice(0, 13)}..., ` +
+        `oldest=${(args.oldestCursor || existing.oldestCursor)?.slice(0, 13)}..., ` +
+        `total=${totalChats}`
       );
     } else {
       await ctx.db.insert("chatListSync", data);
       console.log(
         `[Cursor] Created chat list sync state: ` +
         `newest=${args.newestCursor?.slice(0, 13)}..., ` +
-        `oldest=${args.oldestCursor?.slice(0, 13)}...`
+        `oldest=${args.oldestCursor?.slice(0, 13)}..., ` +
+        `total=${totalChats}`
       );
     }
   },
@@ -71,6 +105,9 @@ export const updateChatListSync = internalMutation({
 /**
  * Update message cursor boundaries for a specific chat
  * Called after syncing messages to track our message window
+ * 
+ * SMART UPDATE: Only updates fields that are provided.
+ * Automatically recalculates messageCount from database if any sync occurred.
  */
 export const updateChatMessageCursors = internalMutation({
   args: {
@@ -81,17 +118,46 @@ export const updateChatMessageCursors = internalMutation({
     hasCompleteHistory: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
+    const chat = await ctx.db.get(args.chatDocId);
+    if (!chat) {
+      console.warn(`[Cursor] Cannot update message cursors: Chat ${args.chatDocId} not found`);
+      return;
+    }
+
     const updates: any = {};
     
+    // Helper to compare sortKeys - uses numeric comparison if both are numeric,
+    // otherwise falls back to lexicographic (localeCompare)
+    const compareSortKeys = (a: string, b: string): number => {
+      const aNum = Number(a);
+      const bNum = Number(b);
+      if (!isNaN(aNum) && !isNaN(bNum)) {
+        return aNum - bNum; // Numeric comparison
+      }
+      return a.localeCompare(b); // Lexicographic fallback
+    };
+
     if (args.newestMessageSortKey !== undefined) {
-      updates.newestMessageSortKey = args.newestMessageSortKey;
+      if (!chat.newestMessageSortKey || compareSortKeys(args.newestMessageSortKey, chat.newestMessageSortKey) > 0) {
+        updates.newestMessageSortKey = args.newestMessageSortKey;
+      }
     }
     if (args.oldestMessageSortKey !== undefined) {
-      updates.oldestMessageSortKey = args.oldestMessageSortKey;
+      if (!chat.oldestMessageSortKey || compareSortKeys(args.oldestMessageSortKey, chat.oldestMessageSortKey) < 0) {
+        updates.oldestMessageSortKey = args.oldestMessageSortKey;
+      }
     }
-    if (args.messageCount !== undefined) {
-      updates.messageCount = args.messageCount;
+    
+    // If ANY message sync activity happened (indicated by messageCount or keys being passed)
+    // recalculate the total message count for this chat from the database
+    if (args.messageCount !== undefined || args.newestMessageSortKey !== undefined || args.oldestMessageSortKey !== undefined) {
+      const allMessages = await ctx.db
+        .query("beeperMessages")
+        .withIndex("by_chat", (q) => q.eq("chatId", chat.chatId))
+        .collect();
+      updates.messageCount = allMessages.length;
     }
+    
     if (args.hasCompleteHistory !== undefined) {
       updates.hasCompleteHistory = args.hasCompleteHistory;
       if (args.hasCompleteHistory) {
@@ -102,11 +168,11 @@ export const updateChatMessageCursors = internalMutation({
     await ctx.db.patch(args.chatDocId, updates);
     
     console.log(
-      `[Cursor] Updated message cursors for chat: ` +
-      `newest=${args.newestMessageSortKey?.slice(0, 10)}..., ` +
-      `oldest=${args.oldestMessageSortKey?.slice(0, 10)}..., ` +
-      `count=${args.messageCount}, ` +
-      `complete=${args.hasCompleteHistory}`
+      `[Cursor] Updated message cursors for chat ${chat.title}: ` +
+      `newest=${(args.newestMessageSortKey || chat.newestMessageSortKey)?.slice(0, 10)}..., ` +
+      `oldest=${(args.oldestMessageSortKey || chat.oldestMessageSortKey)?.slice(0, 10)}..., ` +
+      `count=${updates.messageCount || chat.messageCount}, ` +
+      `complete=${args.hasCompleteHistory ?? chat.hasCompleteHistory}`
     );
   },
 });

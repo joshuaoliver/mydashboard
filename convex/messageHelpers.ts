@@ -34,7 +34,7 @@ export function extractMessageText(text: unknown): string {
         const parsed = JSON.parse(trimmed);
         // If it has a text property, use that
         if (typeof parsed === "object" && parsed !== null && "text" in parsed) {
-          return typeof parsed.text === "string" ? parsed.text : String(parsed.text);
+          return typeof parsed.text === "string" ? parsed.text : String(parsed.text ?? "");
         }
         // Otherwise return the original string (it was valid JSON but not our format)
         return text;
@@ -56,4 +56,28 @@ export function extractMessageText(text: unknown): string {
 
   // Fallback: convert to string
   return String(text);
+}
+
+/**
+ * Compares two Beeper sortKeys (numeric or alphanumeric).
+ * 
+ * Beeper sortKeys can be:
+ * 1. Sequential integers as strings (e.g., "368278")
+ * 2. Millisecond timestamps as strings (e.g., "1766105279134")
+ * 3. Alphanumeric strings (e.g., "aaaa1")
+ * 
+ * This function uses numeric comparison if both are numeric (to handle different 
+ * lengths correctly), and falls back to lexicographic (localeCompare) otherwise.
+ * 
+ * @param a - First sortKey
+ * @param b - Second sortKey
+ * @returns -1 if a < b, 1 if a > b, 0 if equal
+ */
+export function compareSortKeys(a: string, b: string): number {
+  const aNum = Number(a);
+  const bNum = Number(b);
+  if (!isNaN(aNum) && !isNaN(bNum)) {
+    return aNum - bNum; // Numeric comparison
+  }
+  return a.localeCompare(b); // Lexicographic fallback
 }
