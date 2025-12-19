@@ -460,6 +460,7 @@ export const createContact = mutation({
 /**
  * Update lead status (local-only)
  * Auto-sets sex to "Female" if leadStatus is set and sex is empty
+ * Auto-sets intimateConnection to true if leadStatus is Connected, Current, or Former
  */
 export const updateLeadStatus = mutation({
   args: {
@@ -469,6 +470,7 @@ export const updateLeadStatus = mutation({
       v.literal("Planning"),
       v.literal("Dated"),
       v.literal("Connected"),
+      v.literal("Current"),
       v.literal("Former"),
       v.null()
     ),
@@ -489,6 +491,16 @@ export const updateLeadStatus = mutation({
     // If setting a lead status (not clearing it) and sex is empty, set to Female
     if (args.leadStatus && (!contact.sex || contact.sex.length === 0)) {
       update.sex = ["Female"];
+    }
+
+    // Auto-set intimateConnection to true for Connected, Current, or Former statuses
+    const intimateStatuses = ["Connected", "Current", "Former"];
+    if (args.leadStatus && intimateStatuses.includes(args.leadStatus)) {
+      update.intimateConnection = true;
+      // If no date is set, set it to today
+      if (!contact.intimateConnectionDate) {
+        update.intimateConnectionDate = new Date().toISOString().split("T")[0];
+      }
     }
 
     await ctx.db.patch(args.contactId, update);

@@ -20,8 +20,8 @@ import {
 import type { DragOverEvent } from '@dnd-kit/core'
 import { cn } from '~/lib/utils'
 
-type LeadStatus = 'Talking' | 'Planning' | 'Dated' | 'Connected' | 'Former'
-type LeadStatusKey = LeadStatus | 'NoStatus'
+type LeadStatus = 'Talking' | 'Planning' | 'Dated' | 'Connected' | 'Current' | 'Former'
+type LeadStatusKey = LeadStatus | 'NoStatus' // Current is now between Connected and Former
 
 interface ContactRecord {
   _id: Id<'contacts'>
@@ -49,6 +49,7 @@ const LEAD_STATUS_METADATA: Array<{
   { id: 'Planning', name: 'Planning', key: 'Planning', label: 'Planning', accent: 'bg-amber-100 text-amber-700', border: 'border-amber-200' },
   { id: 'Dated', name: 'Drinks', key: 'Dated', label: 'Drinks', accent: 'bg-rose-100 text-rose-700', border: 'border-rose-200' },
   { id: 'Connected', name: 'Connected', key: 'Connected', label: 'Connected', accent: 'bg-emerald-100 text-emerald-700', border: 'border-emerald-200' },
+  { id: 'Current', name: 'Current', key: 'Current', label: 'Current', accent: 'bg-violet-100 text-violet-700', border: 'border-violet-200' },
   { id: 'Former', name: 'Former', key: 'Former', label: 'Former', accent: 'bg-slate-200 text-slate-700', border: 'border-slate-300' },
   { id: 'NoStatus', name: 'Unassigned', key: 'NoStatus', label: 'Unassigned', accent: 'bg-gray-100 text-gray-700', border: 'border-gray-200' },
 ]

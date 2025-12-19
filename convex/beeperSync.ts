@@ -148,9 +148,12 @@ export const upsertChat = internalMutation({
                          mutedChanged || pinnedChanged || titleChanged;
       
       if (!hasChanges) {
-        // Nothing meaningful changed - skip the write entirely
+        // Nothing meaningful changed in chat metadata - skip the write.
+        // Note: We still return shouldSyncMessages which may be true if lastActivity > lastMessagesSyncedAt.
+        // This is intentional - the caller will sync messages and syncChatMessages() will update lastMessagesSyncedAt.
+        // This handles the case where chat metadata is unchanged but messages haven't been synced yet.
         console.log(
-          `[upsertChat] Chat ${args.chatData.chatId}: SKIPPED (no changes), ` +
+          `[upsertChat] Chat ${args.chatData.chatId}: SKIPPED (no metadata changes), ` +
           `shouldSyncMessages=${shouldSyncMessages}`
         );
         return { chatDocId, shouldSyncMessages };

@@ -43,7 +43,7 @@ interface Contact {
   locationIds?: Id<"locations">[]
   intimateConnection?: boolean
   intimateConnectionDate?: string
-  leadStatus?: "Talking" | "Planning" | "Dated" | "Connected" | "Former"
+  leadStatus?: "Talking" | "Planning" | "Dated" | "Connected" | "Current" | "Former"
   setName?: string
   priority?: number
 }
