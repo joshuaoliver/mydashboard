@@ -146,9 +146,44 @@ export async function getOrganizationProjects(
 }
 
 /**
- * Get daily activities with side-loading (users, projects, tasks)
+ * Hubstaff API has a maximum of 31 days per request.
+ * This helper splits a date range into chunks of maxDays.
  */
-export async function getOrganizationActivities(
+function splitDateRange(
+  startDate: string,
+  endDate: string,
+  maxDays: number = 31
+): { start: string; end: string }[] {
+  const chunks: { start: string; end: string }[] = [];
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+
+  let chunkStart = new Date(start);
+
+  while (chunkStart <= end) {
+    const chunkEnd = new Date(chunkStart);
+    chunkEnd.setDate(chunkEnd.getDate() + maxDays - 1);
+
+    // Don't exceed the overall end date
+    const actualEnd = chunkEnd > end ? end : chunkEnd;
+
+    chunks.push({
+      start: chunkStart.toISOString().split("T")[0],
+      end: actualEnd.toISOString().split("T")[0],
+    });
+
+    // Move to next chunk
+    chunkStart = new Date(actualEnd);
+    chunkStart.setDate(chunkStart.getDate() + 1);
+  }
+
+  return chunks;
+}
+
+/**
+ * Fetch activities for a single date range chunk (max 31 days)
+ */
+async function fetchActivitiesChunk(
   accessToken: string,
   organizationId: number,
   options: {
@@ -188,6 +223,79 @@ export async function getOrganizationActivities(
 
   const endpoint = `/organizations/${organizationId}/activities/daily?${params.toString()}`;
   return makeRequest(accessToken, endpoint);
+}
+
+/**
+ * Get daily activities with side-loading (users, projects, tasks)
+ * 
+ * Automatically batches requests into 31-day chunks to comply with Hubstaff API limits.
+ */
+export async function getOrganizationActivities(
+  accessToken: string,
+  organizationId: number,
+  options: {
+    startDate: string;
+    endDate: string;
+    projectIds?: number[];
+    userIds?: number[];
+    include?: ("users" | "projects" | "tasks")[];
+    pageLimit?: number;
+  }
+): Promise<HubstaffActivitiesResponse> {
+  // Split date range into 31-day chunks
+  const chunks = splitDateRange(options.startDate, options.endDate, 31);
+
+  if (chunks.length === 1) {
+    // Single chunk, no batching needed
+    return fetchActivitiesChunk(accessToken, organizationId, options);
+  }
+
+  console.log(`Hubstaff: Fetching ${chunks.length} date range chunks (31-day API limit)`);
+
+  // Fetch all chunks and merge results
+  const allActivities: HubstaffActivity[] = [];
+  const usersMap = new Map<number, HubstaffUser>();
+  const projectsMap = new Map<number, HubstaffProject>();
+  const tasksMap = new Map<number, HubstaffTask>();
+
+  for (const chunk of chunks) {
+    console.log(`Hubstaff: Fetching chunk ${chunk.start} to ${chunk.end}`);
+    
+    const response = await fetchActivitiesChunk(accessToken, organizationId, {
+      ...options,
+      startDate: chunk.start,
+      endDate: chunk.end,
+    });
+
+    // Merge activities
+    if (response.daily_activities) {
+      allActivities.push(...response.daily_activities);
+    }
+
+    // Merge users (dedupe by id)
+    if (response.users) {
+      response.users.forEach((u) => usersMap.set(u.id, u));
+    }
+
+    // Merge projects (dedupe by id)
+    if (response.projects) {
+      response.projects.forEach((p) => projectsMap.set(p.id, p));
+    }
+
+    // Merge tasks (dedupe by id)
+    if (response.tasks) {
+      response.tasks.forEach((t) => tasksMap.set(t.id, t));
+    }
+  }
+
+  console.log(`Hubstaff: Merged ${allActivities.length} activities from ${chunks.length} chunks`);
+
+  return {
+    daily_activities: allActivities,
+    users: Array.from(usersMap.values()),
+    projects: Array.from(projectsMap.values()),
+    tasks: Array.from(tasksMap.values()),
+  };
 }
 
 /**

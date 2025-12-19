@@ -722,3 +722,112 @@ export const triggerFullRematch = action({
     return result;
   },
 });
+
+/**
+ * Backfill chat phoneNumber from participant data
+ * 
+ * This is a one-time migration for chats where the API didn't include
+ * phoneNumber in the chat list response (iMessage/SMS chats).
+ * The data exists in beeperParticipants but not in beeperChats.phoneNumber.
+ * 
+ * Run via: npx convex run contactMutations:backfillChatPhoneNumbers
+ */
+export const backfillChatPhoneNumbers = mutation({
+  args: {},
+  handler: async (ctx): Promise<{ 
+    scanned: number; 
+    updated: number; 
+    alreadyHasPhone: number;
+    noParticipantPhone: number;
+  }> => {
+    console.log("[backfillChatPhoneNumbers] Starting backfill of chat phone numbers from participants...");
+    
+    // Get all single chats without phoneNumber
+    const chatsWithoutPhone = await ctx.db
+      .query("beeperChats")
+      .filter((q) => 
+        q.and(
+          q.eq(q.field("type"), "single"),
+          q.or(
+            q.eq(q.field("phoneNumber"), undefined),
+            q.eq(q.field("phoneNumber"), null),
+            q.eq(q.field("phoneNumber"), "")
+          )
+        )
+      )
+      .collect();
+    
+    console.log(`[backfillChatPhoneNumbers] Found ${chatsWithoutPhone.length} single chats without phoneNumber`);
+    
+    let updated = 0;
+    let noParticipantPhone = 0;
+    let alreadyHasPhone = 0;
+    
+    for (const chat of chatsWithoutPhone) {
+      // Find the non-self participant for this chat
+      const participants = await ctx.db
+        .query("beeperParticipants")
+        .withIndex("by_chat", (q) => q.eq("chatId", chat.chatId))
+        .collect();
+      
+      const otherPerson = participants.find(p => !p.isSelf);
+      
+      if (otherPerson?.phoneNumber) {
+        // Update the chat with the participant's phone number
+        const updates: Record<string, any> = {
+          phoneNumber: otherPerson.phoneNumber,
+        };
+        
+        // Also backfill other missing fields
+        if (!chat.username && otherPerson.username) {
+          updates.username = otherPerson.username;
+        }
+        if (!chat.participantFullName && otherPerson.fullName) {
+          updates.participantFullName = otherPerson.fullName;
+        }
+        if (!chat.participantImgURL && otherPerson.imgURL) {
+          updates.participantImgURL = otherPerson.imgURL;
+        }
+        if (!chat.contactId && otherPerson.contactId) {
+          updates.contactId = otherPerson.contactId;
+          updates.contactMatchedAt = Date.now();
+        }
+        
+        await ctx.db.patch(chat._id, updates);
+        updated++;
+        
+        console.log(`[backfillChatPhoneNumbers] Updated chat "${chat.title}" with phone: ${otherPerson.phoneNumber}`);
+      } else {
+        noParticipantPhone++;
+      }
+    }
+    
+    // Count chats that already have phone numbers
+    const chatsWithPhone = await ctx.db
+      .query("beeperChats")
+      .filter((q) => 
+        q.and(
+          q.eq(q.field("type"), "single"),
+          q.neq(q.field("phoneNumber"), undefined),
+          q.neq(q.field("phoneNumber"), null),
+          q.neq(q.field("phoneNumber"), "")
+        )
+      )
+      .collect();
+    
+    alreadyHasPhone = chatsWithPhone.length;
+    
+    console.log(
+      `[backfillChatPhoneNumbers] Complete: ` +
+      `scanned=${chatsWithoutPhone.length}, updated=${updated}, ` +
+      `alreadyHasPhone=${alreadyHasPhone}, noParticipantPhone=${noParticipantPhone}`
+    );
+    
+    return {
+      scanned: chatsWithoutPhone.length,
+      updated,
+      alreadyHasPhone,
+      noParticipantPhone,
+    };
+  },
+});

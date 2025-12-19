@@ -166,14 +166,18 @@ export async function getMyUncompletedIssues(
 ): Promise<{ issues: LinearIssue[]; hasMore: boolean }> {
   const first = options.first ?? 100;
 
+  // Build query with or without team filter
+  const teamFilter = options.teamId ? 'team: { id: { eq: $teamId } }' : '';
+  const teamVariable = options.teamId ? ', $teamId: String' : '';
+
   const query = `
-    query($first: Int!, $teamId: String) {
+    query($first: Int!${teamVariable}) {
       issues(
         filter: {
           assignee: { isMe: { eq: true } }
           completedAt: { null: true }
           canceledAt: { null: true }
-          ${options.teamId ? 'team: { id: { eq: $teamId } }' : ''}
+          ${teamFilter}
         }
         first: $first
         orderBy: updatedAt
@@ -214,9 +218,15 @@ export async function getMyUncompletedIssues(
     }
   `;
 
+  // Only include teamId in variables if it's provided
+  const variables: { first: number; teamId?: string } = { first };
+  if (options.teamId) {
+    variables.teamId = options.teamId;
+  }
+
   const data = await makeGraphQLRequest<{
     issues: { nodes: LinearIssue[]; pageInfo: { hasNextPage: boolean } };
-  }>(apiKey, query, { first, teamId: options.teamId });
+  }>(apiKey, query, variables);
 
   return {
     issues: data.issues.nodes,

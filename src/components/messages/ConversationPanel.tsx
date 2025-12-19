@@ -1,5 +1,5 @@
-import { useState, useCallback, useMemo } from 'react'
-import { usePaginatedQuery, useAction } from 'convex/react'
+import { useState, useCallback, useEffect, useRef } from 'react'
+import { usePaginatedQuery, useAction, useQuery } from 'convex/react'
 import { api } from '../../../convex/_generated/api'
 import { useChatStore } from '@/stores/useChatStore'
 import { ChatDetail } from './ChatDetail'
@@ -7,7 +7,7 @@ import { MessageInputPanel } from './MessageInputPanel'
 import { ReplySuggestionsPanel } from './ReplySuggestionsPanel'
 import { ChatDebugPanel } from './ChatDebugPanel'
 import { Button } from '@/components/ui/button'
-import { RefreshCw, ExternalLink, Mail, MailOpen, Archive, MessageCircle, Bug } from 'lucide-react'
+import { RefreshCw, ExternalLink, Mail, MailOpen, Archive, MessageCircle, Bug, History } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 
 export function ConversationPanel() {
@@ -19,18 +19,24 @@ export function ConversationPanel() {
   const [error, setError] = useState<string | null>(null)
   const [showDebugPanel, setShowDebugPanel] = useState(false)
 
-  // Query all chats to find the selected one
-  const { results: allLoadedChats } = usePaginatedQuery(
-    api.beeperQueries.listCachedChats,
-    { filter: 'all' },
-    { initialNumItems: 100 }
+  // Query the selected chat directly by ID (not from paginated list!)
+  const selectedChat = useQuery(
+    api.beeperQueries.getChatByIdWithContact,
+    selectedChatId ? { chatId: selectedChatId } : "skip"
   )
 
-  // Memoize selected chat
-  const selectedChat = useMemo(
-    () => allLoadedChats.find((chat) => chat.id === selectedChatId),
-    [allLoadedChats, selectedChatId]
-  )
+  // Debug logging for chat loading
+  useEffect(() => {
+    if (selectedChatId) {
+      if (selectedChat === undefined) {
+        console.log(`[ConversationPanel] ⏳ Loading chat: ${selectedChatId.slice(0, 30)}...`)
+      } else if (selectedChat === null) {
+        console.log(`[ConversationPanel] ❌ Chat not found in database: ${selectedChatId}`)
+      } else {
+        console.log(`[ConversationPanel] ✅ Loaded chat: "${selectedChat.name}" (${selectedChat.network})`)
+      }
+    }
+  }, [selectedChatId, selectedChat])
 
   // Query messages for selected chat
   const { 
@@ -43,9 +49,23 @@ export function ConversationPanel() {
     { initialNumItems: 50 }
   )
 
+  // Debug logging for messages
+  useEffect(() => {
+    if (selectedChatId) {
+      console.log(`[ConversationPanel] Messages query status: ${messagesStatus}`)
+      console.log(`[ConversationPanel] Cached messages count: ${cachedMessages?.length ?? 0}`)
+      if (messagesStatus === "LoadingFirstPage") {
+        console.log(`[ConversationPanel] ⏳ Loading messages for ${selectedChatId.slice(0, 30)}...`)
+      } else if (messagesStatus === "Exhausted" && (!cachedMessages || cachedMessages.length === 0)) {
+        console.log(`[ConversationPanel] ⚠️ No cached messages for this chat - may need to load from Beeper`)
+      }
+    }
+  }, [selectedChatId, messagesStatus, cachedMessages?.length])
+
   // Actions
   const sendMessageAction = useAction(api.beeperMessages.sendMessage)
   const loadFullConversation = useAction(api.beeperMessages.loadFullConversation)
+  const loadNewerMessages = useAction(api.beeperPagination.loadNewerMessages)
   const focusChat = useAction(api.beeperMessages.focusChat)
   const archiveChat = useAction(api.chatActions.archiveChat)
   const markChatAsRead = useAction(api.chatActions.markChatAsRead)
@@ -53,6 +73,41 @@ export function ConversationPanel() {
   const pageLoadSync = useAction(api.beeperSync.pageLoadSync)
 
   const isLoadingMessages = selectedChatId !== null && messagesStatus === "LoadingFirstPage"
+  
+  // Track which chat we've loaded newer messages for to avoid duplicate calls
+  const loadedNewerForChat = useRef<string | null>(null)
+  const [isLoadingNewer, setIsLoadingNewer] = useState(false)
+
+  // Load newer messages when opening a conversation
+  useEffect(() => {
+    if (!selectedChatId) {
+      loadedNewerForChat.current = null
+      return
+    }
+    
+    // Skip if we've already loaded for this chat
+    if (loadedNewerForChat.current === selectedChatId) {
+      return
+    }
+    
+    // Mark as loading for this chat
+    loadedNewerForChat.current = selectedChatId
+    setIsLoadingNewer(true)
+    
+    // Load newer messages from Beeper
+    loadNewerMessages({ chatId: selectedChatId })
+      .then((result) => {
+        if (result.success && result.messagesLoaded > 0) {
+          console.log(`✅ Loaded ${result.messagesLoaded} newer messages for chat`)
+        }
+      })
+      .catch((err) => {
+        console.warn('Failed to load newer messages:', err)
+      })
+      .finally(() => {
+        setIsLoadingNewer(false)
+      })
+  }, [selectedChatId, loadNewerMessages])
 
   // Handle sending a message
   const handleSendMessage = useCallback(async (text: string) => {
@@ -134,6 +189,35 @@ export function ConversationPanel() {
     }
   }, [selectedChatId, loadFullConversation])
 
+  // Handle refreshing (loading newer messages)
+  const handleRefreshConversation = useCallback(async () => {
+    if (!selectedChatId) return
+
+    setIsLoadingNewer(true)
+    setError(null)
+
+    try {
+      console.log('🔄 Refreshing conversation (loading newer messages)...')
+      const result = await loadNewerMessages({ chatId: selectedChatId })
+
+      if (result.success) {
+        if (result.messagesLoaded > 0) {
+          console.log(`✅ Loaded ${result.messagesLoaded} newer messages`)
+        } else {
+          console.log('✅ Conversation is up to date')
+        }
+      } else {
+        console.error('❌ Failed to refresh:', result.error)
+        setError(result.error || 'Failed to refresh conversation')
+      }
+    } catch (err) {
+      console.error('Error refreshing conversation:', err)
+      setError(err instanceof Error ? err.message : 'Failed to refresh conversation')
+    } finally {
+      setIsLoadingNewer(false)
+    }
+  }, [selectedChatId, loadNewerMessages])
+
   // Handle archive
   const handleArchive = useCallback(async () => {
     if (!selectedChatId) return
@@ -170,7 +254,7 @@ export function ConversationPanel() {
   }, [])
 
   // No chat selected
-  if (!selectedChatId || !selectedChat) {
+  if (!selectedChatId) {
     return (
       <div className="h-full flex items-center justify-center bg-white">
         <div className="text-center text-gray-500">
@@ -178,6 +262,36 @@ export function ConversationPanel() {
           <p className="text-lg font-medium mb-2">👈 Select a conversation</p>
           <p className="text-sm">
             Choose a chat from the left to view messages and get AI-powered reply suggestions
+          </p>
+        </div>
+      </div>
+    )
+  }
+
+  // Chat is loading
+  if (selectedChat === undefined) {
+    return (
+      <div className="h-full flex items-center justify-center bg-white">
+        <div className="text-center">
+          <RefreshCw className="w-8 h-8 text-blue-500 animate-spin mx-auto mb-2" />
+          <p className="text-sm text-gray-600">Loading chat...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Chat not found in database
+  if (selectedChat === null) {
+    return (
+      <div className="h-full flex items-center justify-center bg-white">
+        <div className="text-center text-gray-500">
+          <MessageCircle className="w-16 h-16 mx-auto mb-4 text-gray-300" />
+          <p className="text-lg font-medium mb-2">Chat not found</p>
+          <p className="text-sm">
+            This chat may not have been synced yet. Try refreshing the chat list.
+          </p>
+          <p className="text-xs text-gray-400 mt-2 font-mono">
+            ID: {selectedChatId.slice(0, 40)}...
           </p>
         </div>
       </div>
@@ -214,15 +328,33 @@ export function ConversationPanel() {
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={handleLoadFullConversation}
-                  disabled={isLoadingFullConversation}
-                  title="Load full conversation history"
+                  onClick={handleRefreshConversation}
+                  disabled={isLoadingNewer}
+                  title="Refresh conversation (load new messages)"
                 >
-                  <RefreshCw className={`w-4 h-4 ${isLoadingFullConversation ? 'animate-spin' : ''}`} />
+                  <RefreshCw className={`w-4 h-4 ${isLoadingNewer ? 'animate-spin' : ''}`} />
                 </Button>
               </TooltipTrigger>
               <TooltipContent>
-                <p>Load full conversation history (1 year)</p>
+                <p>Refresh (load new messages)</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleLoadFullConversation}
+                  disabled={isLoadingFullConversation}
+                  title="Load full conversation history (1 year)"
+                >
+                  <History className={`w-4 h-4 ${isLoadingFullConversation ? 'animate-pulse' : ''}`} />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Load full history (1 year)</p>
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>

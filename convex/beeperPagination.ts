@@ -1,8 +1,7 @@
-import { action, internalAction } from "./_generated/server";
+import { action } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { v } from "convex/values";
 import { createBeeperClient } from "./beeperClient";
-import { api } from "./_generated/api";
 
 /**
  * Load older chats (backward pagination)
@@ -162,6 +161,262 @@ export const loadOlderChats = action({
         success: false,
         error: errorMsg,
         chatsLoaded: 0,
+        hasMore: false,
+      };
+    }
+  },
+});
+
+/**
+ * Load newer messages for a specific chat (forward pagination)
+ * Called when opening a conversation to fetch any messages that arrived since last sync
+ */
+export const loadNewerMessages = action({
+  args: {
+    chatId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    try {
+      const client = createBeeperClient();
+      
+      // Get chat to find newestMessageSortKey
+      const chat: any = await ctx.runQuery(
+        internal.beeperQueries.getChatByIdInternal,
+        { chatId: args.chatId }
+      );
+      
+      if (!chat) {
+        return {
+          success: false,
+          error: "Chat not found",
+          messagesLoaded: 0,
+        };
+      }
+      
+      // If no newestMessageSortKey, we need to do an initial load
+      if (!chat.newestMessageSortKey) {
+        console.log(
+          `[Load Newer Messages] Chat ${args.chatId} has no cursor - ` +
+          `fetching initial batch of messages`
+        );
+        
+        // Fetch last 50 messages without cursor
+        const response = await client.get(
+          `/v1/chats/${encodeURIComponent(args.chatId)}/messages`,
+          {
+            query: {
+              limit: 50,
+            }
+          }
+        ) as any;
+        
+        const messages = response.items || [];
+        
+        if (messages.length === 0) {
+          return {
+            success: true,
+            messagesLoaded: 0,
+            hasMore: false,
+          };
+        }
+        
+        // Transform and store messages
+        const messagesToSync = messages
+          .map((msg: any) => {
+            const attachments = msg.attachments?.map((att: any) => ({
+              type: att.type || "unknown",
+              srcURL: att.srcURL,
+              mimeType: att.mimeType,
+              fileName: att.fileName,
+              fileSize: att.fileSize,
+              isGif: att.isGif,
+              isSticker: att.isSticker,
+              isVoiceNote: att.isVoiceNote,
+              posterImg: att.posterImg,
+              width: att.size?.width,
+              height: att.size?.height,
+            }));
+            
+            const reactions = msg.reactions?.map((r: any) => ({
+              id: r.id,
+              participantID: r.participantID,
+              reactionKey: r.reactionKey,
+              emoji: r.emoji,
+              imgURL: r.imgURL,
+            }));
+
+            return {
+              messageId: msg.id,
+              accountID: msg.accountID,
+              text: msg.text || "",
+              timestamp: new Date(msg.timestamp).getTime(),
+              sortKey: msg.sortKey,
+              senderId: msg.senderID,
+              senderName: msg.senderName || msg.senderID,
+              isFromUser: msg.isSender || false,
+              isUnread: msg.isUnread,
+              attachments: attachments && attachments.length > 0 ? attachments : undefined,
+              reactions: reactions && reactions.length > 0 ? reactions : undefined,
+            };
+          })
+          .sort((a: { sortKey: string }, b: { sortKey: string }) => 
+            a.sortKey.localeCompare(b.sortKey)
+          );
+
+        // Store messages
+        const messageCount: number = await ctx.runMutation(
+          internal.beeperSync.syncChatMessages,
+          {
+            chatId: args.chatId,
+            messages: messagesToSync,
+            chatDocId: chat._id,
+            lastMessagesSyncedAt: Date.now(),
+          }
+        );
+        
+        // Update cursor boundaries
+        const newestSortKey = messagesToSync[messagesToSync.length - 1]?.sortKey;
+        const oldestSortKey = messagesToSync[0]?.sortKey;
+        
+        await ctx.runMutation(
+          internal.cursorHelpers.updateChatMessageCursors,
+          {
+            chatDocId: chat._id,
+            newestMessageSortKey: newestSortKey,
+            oldestMessageSortKey: oldestSortKey,
+            messageCount: messagesToSync.length,
+          }
+        );
+        
+        console.log(
+          `[Load Newer Messages] Initial load: stored ${messageCount} messages`
+        );
+        
+        return {
+          success: true,
+          messagesLoaded: messageCount,
+          hasMore: response.hasMore || false,
+          timestamp: Date.now(),
+        };
+      }
+      
+      console.log(
+        `[Load Newer Messages] Fetching newer messages for chat ${args.chatId} ` +
+        `using cursor: ${chat.newestMessageSortKey.slice(0, 10)}...`
+      );
+      
+      // Fetch messages NEWER than our newest sortKey
+      const response = await client.get(
+        `/v1/chats/${encodeURIComponent(args.chatId)}/messages`,
+        {
+          query: {
+            cursor: chat.newestMessageSortKey,
+            direction: "after", // Get NEWER messages
+          }
+        }
+      ) as any;
+      
+      const messages = response.items || [];
+      console.log(
+        `[Load Newer Messages] Fetched ${messages.length} newer messages ` +
+        `(hasMore: ${response.hasMore || false})`
+      );
+      
+      if (messages.length === 0) {
+        return {
+          success: true,
+          messagesLoaded: 0,
+          hasMore: false,
+        };
+      }
+      
+      // Transform and store messages - match API spec exactly
+      const messagesToSync = messages
+        .map((msg: any) => {
+          const attachments = msg.attachments?.map((att: any) => ({
+            type: att.type || "unknown",
+            srcURL: att.srcURL,
+            mimeType: att.mimeType,
+            fileName: att.fileName,
+            fileSize: att.fileSize,
+            isGif: att.isGif,
+            isSticker: att.isSticker,
+            isVoiceNote: att.isVoiceNote,
+            posterImg: att.posterImg,
+            width: att.size?.width,
+            height: att.size?.height,
+          }));
+          
+          const reactions = msg.reactions?.map((r: any) => ({
+            id: r.id,
+            participantID: r.participantID,
+            reactionKey: r.reactionKey,
+            emoji: r.emoji,
+            imgURL: r.imgURL,
+          }));
+
+          return {
+            messageId: msg.id,
+            accountID: msg.accountID,
+            text: msg.text || "",
+            timestamp: new Date(msg.timestamp).getTime(),
+            sortKey: msg.sortKey,
+            senderId: msg.senderID,
+            senderName: msg.senderName || msg.senderID,
+            isFromUser: msg.isSender || false,
+            isUnread: msg.isUnread,
+            attachments: attachments && attachments.length > 0 ? attachments : undefined,
+            reactions: reactions && reactions.length > 0 ? reactions : undefined,
+          };
+        })
+        .sort((a: { sortKey: string }, b: { sortKey: string }) => 
+          a.sortKey.localeCompare(b.sortKey)
+        );
+
+      // Store messages
+      const messageCount: number = await ctx.runMutation(
+        internal.beeperSync.syncChatMessages,
+        {
+          chatId: args.chatId,
+          messages: messagesToSync,
+          chatDocId: chat._id,
+          lastMessagesSyncedAt: Date.now(),
+        }
+      );
+      
+      // Update newestMessageSortKey to extend window forward
+      if (messages.length > 0) {
+        const newestSortKey = messagesToSync[messagesToSync.length - 1]?.sortKey;
+        
+        await ctx.runMutation(
+          internal.cursorHelpers.updateChatMessageCursors,
+          {
+            chatDocId: chat._id,
+            newestMessageSortKey: newestSortKey,
+            oldestMessageSortKey: chat.oldestMessageSortKey, // Keep unchanged
+            messageCount: (chat.messageCount || 0) + messageCount,
+          }
+        );
+      }
+      
+      console.log(
+        `[Load Newer Messages] Stored ${messageCount} newer messages`
+      );
+      
+      return {
+        success: true,
+        messagesLoaded: messageCount,
+        hasMore: response.hasMore || false,
+        timestamp: Date.now(),
+      };
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : "Unknown error";
+      console.error(`[Load Newer Messages] Error: ${errorMsg}`);
+      
+      return {
+        success: false,
+        error: errorMsg,
+        messagesLoaded: 0,
         hasMore: false,
       };
     }

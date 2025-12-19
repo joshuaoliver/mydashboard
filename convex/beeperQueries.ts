@@ -200,7 +200,7 @@ export const getChatInfo = query({
 });
 
 /**
- * Get a specific chat by ID
+ * Get a specific chat by ID (raw database record)
  */
 export const getChatById = query({
   args: { chatId: v.string() },
@@ -211,6 +211,69 @@ export const getChatById = query({
       .first();
 
     return chat;
+  },
+});
+
+/**
+ * Get a specific chat by ID with contact info (for conversation panel)
+ * Returns the same shape as listCachedChats items
+ */
+export const getChatByIdWithContact = query({
+  args: { chatId: v.string() },
+  handler: async (ctx, args) => {
+    const chat = await ctx.db
+      .query("beeperChats")
+      .withIndex("by_chat_id", (q) => q.eq("chatId", args.chatId))
+      .first();
+
+    if (!chat) {
+      console.log(`[getChatByIdWithContact] Chat not found: ${args.chatId}`);
+      return null;
+    }
+
+    // Get contact if linked
+    let contactName: string | undefined = undefined;
+    let profileImageUrl: string | undefined = undefined;
+
+    if (chat.contactId) {
+      const contact = await ctx.db.get(chat.contactId);
+      if (contact) {
+        const nameParts = [contact.firstName, contact.lastName].filter(Boolean);
+        if (nameParts.length > 0) {
+          contactName = nameParts.join(" ");
+        }
+        profileImageUrl = contact.imageUrl;
+      }
+    }
+
+    // Get cached profile image if available
+    if (!profileImageUrl && chat.participantImgURL) {
+      const cachedImage = await ctx.db
+        .query("cachedImages")
+        .withIndex("by_source_url", (q) => q.eq("sourceUrl", chat.participantImgURL!))
+        .first();
+      if (cachedImage) {
+        profileImageUrl = cachedImage.convexUrl;
+      }
+    }
+
+    return {
+      id: chat.chatId,
+      roomId: chat.localChatID,
+      name: contactName || chat.title,
+      network: chat.network,
+      accountID: chat.accountID,
+      type: chat.type,
+      username: chat.username,
+      phoneNumber: chat.phoneNumber,
+      lastMessage: chat.lastMessage || "Recent activity",
+      lastMessageTime: chat.lastActivity,
+      unreadCount: chat.unreadCount,
+      lastSyncedAt: chat.lastSyncedAt,
+      needsReply: chat.needsReply,
+      lastMessageFrom: chat.lastMessageFrom,
+      contactImageUrl: profileImageUrl,
+    };
   },
 });
 
@@ -241,7 +304,23 @@ export const getCachedMessages = query({
     paginationOpts: paginationOptsValidator,
   },
   handler: async (ctx, args) => {
-    console.log(`[getCachedMessages] Querying for chatId: ${args.chatId}`);
+    const chatIdPreview = args.chatId.length > 40 
+      ? `${args.chatId.slice(0, 20)}...${args.chatId.slice(-15)}` 
+      : args.chatId;
+    
+    console.log(`[getCachedMessages] 📨 Querying for chatId: ${chatIdPreview}`);
+    
+    // First check if the chat exists in our database
+    const chat = await ctx.db
+      .query("beeperChats")
+      .withIndex("by_chat_id", (q) => q.eq("chatId", args.chatId))
+      .first();
+    
+    if (!chat) {
+      console.log(`[getCachedMessages] ⚠️ Chat NOT FOUND in beeperChats table: ${chatIdPreview}`);
+    } else {
+      console.log(`[getCachedMessages] ✅ Chat found: "${chat.title}" (network: ${chat.network}, messageCount: ${chat.messageCount ?? 'unknown'})`);
+    }
     
     // Query with compound index - filters by chatId and sorts by timestamp (DESC to get newest first)
     const result = await ctx.db
@@ -252,7 +331,7 @@ export const getCachedMessages = query({
       .order("desc") // Newest first for pagination
       .paginate(args.paginationOpts);
 
-    console.log(`[getCachedMessages] Found ${result.page.length} messages for chatId: ${args.chatId}`);
+    console.log(`[getCachedMessages] 📬 Found ${result.page.length} messages for chatId: ${chatIdPreview}`);
 
     // Transform messages (page is already sorted newest-first from query)
     const transformedPage = result.page.map((msg) => ({

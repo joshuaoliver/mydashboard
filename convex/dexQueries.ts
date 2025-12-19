@@ -2,8 +2,96 @@ import { v } from "convex/values";
 import { query } from "./_generated/server";
 
 /**
+ * List contacts with cursor-based pagination and search
+ * Uses efficient database-level pagination for large contact lists
+ * 
+ * @param cursor - Pagination cursor (from previous response)
+ * @param limit - Number of contacts per page (default 50, max 100)
+ * @param searchTerm - Optional search filter (searches name, instagram, email, phone)
+ */
+export const listContactsPaginated = query({
+  args: {
+    cursor: v.optional(v.string()),
+    limit: v.optional(v.number()),
+    searchTerm: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const limit = Math.min(args.limit || 50, 100); // Cap at 100 for performance
+    
+    // For search, we need to filter in memory (Convex doesn't support LIKE queries)
+    // But we still use pagination to limit memory usage
+    if (args.searchTerm && args.searchTerm.trim().length > 0) {
+      const searchLower = args.searchTerm.toLowerCase().trim();
+      
+      // Fetch all contacts for search (unavoidable for text search)
+      // But only return paginated results
+      const allContacts = await ctx.db.query("contacts").collect();
+      
+      // Filter by search term
+      const filtered = allContacts.filter((contact) => {
+        const firstName = contact.firstName?.toLowerCase() || "";
+        const lastName = contact.lastName?.toLowerCase() || "";
+        const description = contact.description?.toLowerCase() || "";
+        const instagram = contact.instagram?.toLowerCase() || "";
+        const email = contact.emails?.[0]?.email?.toLowerCase() || "";
+        const phone = contact.phones?.[0]?.phone || "";
+        
+        return (
+          firstName.includes(searchLower) ||
+          lastName.includes(searchLower) ||
+          description.includes(searchLower) ||
+          instagram.includes(searchLower) ||
+          email.includes(searchLower) ||
+          phone.includes(searchLower)
+        );
+      });
+      
+      // Sort by last name, then first name
+      filtered.sort((a, b) => {
+        const aLast = a.lastName?.toLowerCase() || "";
+        const bLast = b.lastName?.toLowerCase() || "";
+        const aFirst = a.firstName?.toLowerCase() || "";
+        const bFirst = b.firstName?.toLowerCase() || "";
+        
+        if (aLast !== bLast) return aLast.localeCompare(bLast);
+        return aFirst.localeCompare(bFirst);
+      });
+      
+      // Simple offset-based pagination for search results
+      const offset = args.cursor ? parseInt(args.cursor, 10) : 0;
+      const page = filtered.slice(offset, offset + limit);
+      const nextOffset = offset + limit;
+      
+      return {
+        contacts: page,
+        nextCursor: nextOffset < filtered.length ? String(nextOffset) : null,
+        total: filtered.length,
+      };
+    }
+    
+    // For non-search queries, use efficient Convex pagination
+    // Order by _creationTime (default) which is indexed
+    const paginatedResult = await ctx.db
+      .query("contacts")
+      .order("desc") // Most recently added first
+      .paginate({ numItems: limit, cursor: args.cursor ?? null });
+    
+    // Get total count (cached query, fast for Convex)
+    const totalContacts = await ctx.db.query("contacts").collect();
+    
+    return {
+      contacts: paginatedResult.page,
+      nextCursor: paginatedResult.isDone ? null : paginatedResult.continueCursor,
+      total: totalContacts.length,
+    };
+  },
+});
+
+/**
  * List all contacts with optional filtering and pagination
  * Returns contacts sorted by last name, then first name
+ * 
+ * @deprecated Use listContactsPaginated for better performance with large contact lists
  */
 export const listContacts = query({
   args: {

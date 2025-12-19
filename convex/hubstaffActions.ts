@@ -243,9 +243,20 @@ export const triggerManualSync = action({
       const taskMap = new Map((activities.tasks || []).map((t: any) => [t.id, t]));
 
       // Store entries
+      // Note: Convert null values to undefined for Convex validation (v.optional() doesn't accept null)
       const result = await ctx.runMutation(internal.hubstaffSync.upsertTimeEntries, {
         activities: activities.daily_activities.map((activity: any) => ({
-          ...activity,
+          id: activity.id,
+          user_id: activity.user_id,
+          project_id: activity.project_id,
+          task_id: activity.task_id ?? undefined,
+          date: activity.date,
+          tracked: activity.tracked,
+          overall: activity.overall ?? undefined,
+          keyboard: activity.keyboard ?? undefined,
+          mouse: activity.mouse ?? undefined,
+          input_tracked: activity.input_tracked ?? undefined,
+          billable: activity.billable ?? undefined,
           userName: (userMap.get(activity.user_id) as any)?.name || `User ${activity.user_id}`,
           projectName: (projectMap.get(activity.project_id) as any)?.name || `Project ${activity.project_id}`,
           taskName: activity.task_id ? (taskMap.get(activity.task_id) as any)?.summary : undefined,

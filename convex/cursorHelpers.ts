@@ -136,6 +136,115 @@ export const getLatestChatActivity = internalQuery({
 });
 
 /**
+ * Reset all cursor state - clears sync boundaries
+ * Used when wanting to force a full re-sync
+ */
+export const resetAllCursors = mutation({
+  args: {},
+  handler: async (ctx) => {
+    // Reset chat list sync state
+    const syncState = await ctx.db
+      .query("chatListSync")
+      .withIndex("by_key", (q) => q.eq("key", "global"))
+      .first();
+    
+    if (syncState) {
+      await ctx.db.patch(syncState._id, {
+        newestCursor: undefined,
+        oldestCursor: undefined,
+        totalChats: 0,
+        lastSyncedAt: Date.now(),
+        syncSource: "cursor_reset",
+      });
+    }
+    
+    // Reset message cursors on all chats
+    const allChats = await ctx.db.query("beeperChats").collect();
+    let chatsReset = 0;
+    
+    for (const chat of allChats) {
+      await ctx.db.patch(chat._id, {
+        newestMessageSortKey: undefined,
+        oldestMessageSortKey: undefined,
+        messageCount: undefined,
+        hasCompleteHistory: undefined,
+        lastFullSyncAt: undefined,
+        lastMessagesSyncedAt: undefined,
+      });
+      chatsReset++;
+    }
+    
+    console.log(`[Reset Cursors] Reset sync state and ${chatsReset} chat cursors`);
+    
+    return {
+      success: true,
+      chatsReset,
+      timestamp: Date.now(),
+    };
+  },
+});
+
+/**
+ * Get sync diagnostics for the settings UI
+ * Shows cursor boundaries and sync health
+ */
+export const getSyncDiagnostics = query({
+  args: {},
+  handler: async (ctx) => {
+    // Get chat list sync state
+    const syncState = await ctx.db
+      .query("chatListSync")
+      .withIndex("by_key", (q) => q.eq("key", "global"))
+      .first();
+    
+    // Count chats and messages
+    const allChats = await ctx.db.query("beeperChats").collect();
+    const allMessages = await ctx.db.query("beeperMessages").collect();
+    
+    // Count chats with message cursors
+    const chatsWithCursors = allChats.filter(
+      (chat) => chat.newestMessageSortKey !== undefined
+    ).length;
+    
+    // Count chats with complete history
+    const chatsWithCompleteHistory = allChats.filter(
+      (chat) => chat.hasCompleteHistory === true
+    ).length;
+    
+    // Find oldest and newest messages synced
+    let oldestMessageTime: number | null = null;
+    let newestMessageTime: number | null = null;
+    
+    for (const msg of allMessages) {
+      if (oldestMessageTime === null || msg.timestamp < oldestMessageTime) {
+        oldestMessageTime = msg.timestamp;
+      }
+      if (newestMessageTime === null || msg.timestamp > newestMessageTime) {
+        newestMessageTime = msg.timestamp;
+      }
+    }
+    
+    return {
+      chatListSync: syncState ? {
+        newestCursor: syncState.newestCursor ? `${syncState.newestCursor.slice(0, 20)}...` : null,
+        oldestCursor: syncState.oldestCursor ? `${syncState.oldestCursor.slice(0, 20)}...` : null,
+        totalChats: syncState.totalChats,
+        lastSyncedAt: syncState.lastSyncedAt,
+        syncSource: syncState.syncSource,
+      } : null,
+      stats: {
+        totalChats: allChats.length,
+        totalMessages: allMessages.length,
+        chatsWithCursors,
+        chatsWithCompleteHistory,
+        oldestMessageTime,
+        newestMessageTime,
+      },
+    };
+  },
+});
+
+/**
  * Check if we might have gaps in our data
  * Diagnostic function to detect potential issues
  */

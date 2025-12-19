@@ -8,7 +8,7 @@ import { useQuery } from '@tanstack/react-query'
 import { convexQuery } from '@convex-dev/react-query'
 import { api } from '../../../../convex/_generated/api'
 import { useState } from 'react'
-import { Trash2, Database, AlertCircle, CheckCircle, Settings as SettingsIcon, Users, RefreshCw, Bot, MessageSquare, MapPin, RotateCcw } from 'lucide-react'
+import { Trash2, Database, AlertCircle, CheckCircle, Settings as SettingsIcon, Users, RefreshCw, Bot, MessageSquare, MapPin, RotateCcw, Compass, Clock } from 'lucide-react'
 
 export const Route = createFileRoute('/_authenticated/settings/')({
   component: SettingsPage,
@@ -22,12 +22,19 @@ function SettingsPage() {
   const [isResyncing, setIsResyncing] = useState(false)
   const [resyncResult, setResyncResult] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
   const [messageLimit, setMessageLimit] = useState(50)
+  const [isResettingCursors, setIsResettingCursors] = useState(false)
+  const [cursorResetResult, setCursorResetResult] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
+  const [isRematching, setIsRematching] = useState(false)
+  const [rematchResult, setRematchResult] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
 
   const clearMessages = useMutation(api.cleanupMessages.clearAllMessages)
   const clearChats = useMutation(api.cleanupMessages.clearAllChats)
   const triggerDexSync = useMutation(api.dexAdmin.triggerManualSync)
   const fullResync = useAction(api.beeperSync.fullResync)
+  const resetCursors = useMutation(api.cursorHelpers.resetAllCursors)
+  const triggerRematch = useAction(api.contactMutations.triggerFullRematch)
   const { data: dexStats } = useQuery(convexQuery(api.dexQueries.getSyncStats, {}))
+  const { data: syncDiagnostics } = useQuery(convexQuery(api.cursorHelpers.getSyncDiagnostics, {}))
 
   const handleClearMessages = async () => {
     if (!confirm('Delete all cached messages?')) return
@@ -68,6 +75,39 @@ function SettingsPage() {
       setResyncResult({ type: 'error', message: `Failed: ${e instanceof Error ? e.message : 'Unknown'}` }) 
     }
     finally { setIsResyncing(false) }
+  }
+
+  const handleResetCursors = async () => {
+    if (!confirm('Reset all sync cursors? This will force a full re-sync on next sync but keeps existing cached data.')) return
+    setIsResettingCursors(true); setCursorResetResult(null)
+    try {
+      const result = await resetCursors()
+      if (result.success) {
+        setCursorResetResult({ 
+          type: 'success', 
+          message: `Reset cursors for ${result.chatsReset} chats. Run a sync to refresh data.` 
+        })
+      } else {
+        setCursorResetResult({ type: 'error', message: 'Reset failed' })
+      }
+    } catch (e) { 
+      setCursorResetResult({ type: 'error', message: `Failed: ${e instanceof Error ? e.message : 'Unknown'}` }) 
+    }
+    finally { setIsResettingCursors(false) }
+  }
+
+  const handleRematch = async () => {
+    setIsRematching(true); setRematchResult(null)
+    try {
+      const result = await triggerRematch()
+      setRematchResult({ 
+        type: 'success', 
+        message: `Matched ${result.matchedCount} chats to contacts. ${result.unchangedCount} already matched.` 
+      })
+    } catch (e) { 
+      setRematchResult({ type: 'error', message: `Failed: ${e instanceof Error ? e.message : 'Unknown'}` }) 
+    }
+    finally { setIsRematching(false) }
   }
 
   const formatTimestamp = (ts: number | null) => {
@@ -136,6 +176,134 @@ function SettingsPage() {
               <div>
                 <p className="text-sm font-medium">Manual Sync</p>
                 <p className="text-xs text-muted-foreground">Trigger immediate sync from Dex</p>
+              </div>
+            </div>
+            
+            <div className="border-t pt-4 mt-2">
+              <h4 className="text-sm font-medium mb-3">Contact Matching</h4>
+              {rematchResult && (
+                <div className={`rounded-lg p-4 flex items-start gap-3 border mb-4 ${
+                  rematchResult.type === 'success' 
+                    ? 'bg-green-500/10 border-green-500/20' 
+                    : 'bg-destructive/10 border-destructive/20'
+                }`}>
+                  {rematchResult.type === 'success' 
+                    ? <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0" /> 
+                    : <AlertCircle className="w-5 h-5 text-destructive flex-shrink-0" />
+                  }
+                  <p className={`text-sm ${rematchResult.type === 'success' ? 'text-green-500' : 'text-destructive'}`}>
+                    {rematchResult.message}
+                  </p>
+                </div>
+              )}
+              <div className="flex items-start gap-4">
+                <Button 
+                  onClick={handleRematch} 
+                  disabled={isRematching} 
+                  variant="outline" 
+                >
+                  <Users className={`w-4 h-4 mr-2 ${isRematching ? 'animate-spin' : ''}`} />
+                  {isRematching ? 'Matching...' : 'Rematch Chats'}
+                </Button>
+                <div>
+                  <p className="text-sm font-medium">Link Chats to Contacts</p>
+                  <p className="text-xs text-muted-foreground">Match iMessage/WhatsApp chats to Dex contacts by phone number</p>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Beeper Sync State */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Compass className="w-5 h-5 text-orange-500" />
+              <CardTitle>Beeper Sync State</CardTitle>
+            </div>
+            <CardDescription>Cursor boundaries and sync diagnostics</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {cursorResetResult && (
+              <div className={`rounded-lg p-4 flex items-start gap-3 border ${
+                cursorResetResult.type === 'success' 
+                  ? 'bg-green-500/10 border-green-500/20' 
+                  : 'bg-destructive/10 border-destructive/20'
+              }`}>
+                {cursorResetResult.type === 'success' 
+                  ? <CheckCircle className="w-5 h-5 text-green-500" /> 
+                  : <AlertCircle className="w-5 h-5 text-destructive" />
+                }
+                <p className={`text-sm ${cursorResetResult.type === 'success' ? 'text-green-500' : 'text-destructive'}`}>
+                  {cursorResetResult.message}
+                </p>
+              </div>
+            )}
+            
+            {/* Sync Stats */}
+            {syncDiagnostics && (
+              <div className="bg-muted rounded-lg p-4 space-y-3">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">Total Chats</p>
+                    <p className="text-2xl font-bold">{syncDiagnostics.stats.totalChats}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">Total Messages</p>
+                    <p className="text-2xl font-bold">{syncDiagnostics.stats.totalMessages}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">Chats with Cursors</p>
+                    <p className="text-2xl font-bold">{syncDiagnostics.stats.chatsWithCursors}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">Complete History</p>
+                    <p className="text-2xl font-bold">{syncDiagnostics.stats.chatsWithCompleteHistory}</p>
+                  </div>
+                </div>
+                
+                {syncDiagnostics.chatListSync && (
+                  <div className="border-t pt-3 mt-3">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Clock className="w-4 h-4 text-muted-foreground" />
+                      <span className="text-sm font-medium">Chat List Cursors</span>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs font-mono">
+                      <div className="bg-background rounded px-2 py-1">
+                        <span className="text-muted-foreground">newest: </span>
+                        <span>{syncDiagnostics.chatListSync.newestCursor || 'none'}</span>
+                      </div>
+                      <div className="bg-background rounded px-2 py-1">
+                        <span className="text-muted-foreground">oldest: </span>
+                        <span>{syncDiagnostics.chatListSync.oldestCursor || 'none'}</span>
+                      </div>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-2">
+                      Last synced: {formatTimestamp(syncDiagnostics.chatListSync.lastSyncedAt)} ({syncDiagnostics.chatListSync.syncSource})
+                    </p>
+                  </div>
+                )}
+                
+                {syncDiagnostics.stats.newestMessageTime && (
+                  <div className="border-t pt-3 mt-3 text-xs text-muted-foreground">
+                    <p>Message range: {new Date(syncDiagnostics.stats.oldestMessageTime!).toLocaleDateString()} → {new Date(syncDiagnostics.stats.newestMessageTime).toLocaleDateString()}</p>
+                  </div>
+                )}
+              </div>
+            )}
+            
+            <div className="flex items-start gap-4">
+              <Button 
+                onClick={handleResetCursors} 
+                disabled={isResettingCursors} 
+                variant="outline" 
+              >
+                <Compass className={`w-4 h-4 mr-2 ${isResettingCursors ? 'animate-spin' : ''}`} />
+                {isResettingCursors ? 'Resetting...' : 'Reset Cursors'}
+              </Button>
+              <div>
+                <p className="text-sm font-medium">Reset Sync Cursors</p>
+                <p className="text-xs text-muted-foreground">Clears cursor boundaries, forcing full re-fetch on next sync. Keeps cached data.</p>
               </div>
             </div>
           </CardContent>

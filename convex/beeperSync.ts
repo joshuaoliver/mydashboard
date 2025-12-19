@@ -210,6 +210,9 @@ export const upsertChat = internalMutation({
  * Helper mutation to upsert participants for a chat
  * Stores all participant data from the API (both single and group chats)
  * Also matches participants to existing contacts by username/phone
+ * 
+ * IMPORTANT: Also backfills beeperChats.phoneNumber for iMessage/SMS chats
+ * where the API doesn't include phone numbers in the chat list response
  */
 export const upsertParticipants = internalMutation({
   args: {
@@ -234,12 +237,34 @@ export const upsertParticipants = internalMutation({
     // Helper to normalize phone numbers for matching
     const normalizePhone = (phone: string) => phone.replace(/[\s\-\(\)]/g, '');
 
+    // Track the "other person" participant for single chats
+    // Used to backfill chat phoneNumber if missing
+    let otherPersonPhoneNumber: string | undefined = undefined;
+    let otherPersonUsername: string | undefined = undefined;
+    let otherPersonFullName: string | undefined = undefined;
+    let otherPersonImgURL: string | undefined = undefined;
+    let otherPersonContactId: string | undefined = undefined;
+
     for (const participant of args.participants) {
       // Try to match participant to an existing contact (skip self for matching)
       let contactId: string | undefined = undefined;
 
       // Only try to match non-self participants to contacts
       if (!participant.isSelf) {
+        // Track "other person" data for backfill
+        if (participant.phoneNumber) {
+          otherPersonPhoneNumber = participant.phoneNumber;
+        }
+        if (participant.username) {
+          otherPersonUsername = participant.username;
+        }
+        if (participant.fullName) {
+          otherPersonFullName = participant.fullName;
+        }
+        if (participant.imgURL) {
+          otherPersonImgURL = participant.imgURL;
+        }
+
         // 1. Try matching by Instagram username
         if (participant.username) {
           const contactByInstagram = await ctx.db
@@ -282,6 +307,7 @@ export const upsertParticipants = internalMutation({
 
         if (contactId) {
           matchedCount++;
+          otherPersonContactId = contactId;
         }
       }
 
@@ -323,6 +349,51 @@ export const upsertParticipants = internalMutation({
           contactId: contactId as any, // Link to matched contact
         });
         insertedCount++;
+      }
+    }
+
+    // BACKFILL: Update the chat record with participant data if missing
+    // This is critical for iMessage/SMS chats where the API doesn't include
+    // phone numbers in the chat list response
+    const chat = await ctx.db
+      .query("beeperChats")
+      .withIndex("by_chat_id", (q) => q.eq("chatId", args.chatId))
+      .first();
+
+    if (chat && chat.type === "single") {
+      const updates: Record<string, any> = {};
+      
+      // Backfill phoneNumber if missing but we have it from participant
+      if (!chat.phoneNumber && otherPersonPhoneNumber) {
+        updates.phoneNumber = otherPersonPhoneNumber;
+        console.log(`[upsertParticipants] Backfilling phoneNumber for chat ${args.chatId}: ${otherPersonPhoneNumber}`);
+      }
+      
+      // Backfill username if missing
+      if (!chat.username && otherPersonUsername) {
+        updates.username = otherPersonUsername;
+      }
+      
+      // Backfill participantFullName if missing
+      if (!chat.participantFullName && otherPersonFullName) {
+        updates.participantFullName = otherPersonFullName;
+      }
+      
+      // Backfill participantImgURL if missing
+      if (!chat.participantImgURL && otherPersonImgURL) {
+        updates.participantImgURL = otherPersonImgURL;
+      }
+      
+      // Backfill contactId if missing but we matched one
+      if (!chat.contactId && otherPersonContactId) {
+        updates.contactId = otherPersonContactId;
+        updates.contactMatchedAt = args.lastSyncedAt;
+      }
+      
+      // Apply updates if we have any
+      if (Object.keys(updates).length > 0) {
+        await ctx.db.patch(chat._id, updates);
+        console.log(`[upsertParticipants] Backfilled ${Object.keys(updates).length} fields for chat ${args.chatId}`);
       }
     }
 
