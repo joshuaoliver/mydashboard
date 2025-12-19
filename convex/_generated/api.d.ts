@@ -55,6 +55,8 @@ import type * as settingsStore from "../settingsStore.js";
 import type * as tagMutations from "../tagMutations.js";
 import type * as tagQueries from "../tagQueries.js";
 import type * as timezone from "../timezone.js";
+import type * as todoDocuments from "../todoDocuments.js";
+import type * as todoItems from "../todoItems.js";
 
 import type {
   ApiFromModules,
@@ -110,6 +112,8 @@ declare const fullApi: ApiFromModules<{
   tagMutations: typeof tagMutations;
   tagQueries: typeof tagQueries;
   timezone: typeof timezone;
+  todoDocuments: typeof todoDocuments;
+  todoItems: typeof todoItems;
 }>;
 
 /**

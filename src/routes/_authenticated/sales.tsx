@@ -19,6 +19,7 @@ import {
 } from '@/components/ui/shadcn-io/kanban'
 import type { DragOverEvent } from '@dnd-kit/core'
 import { cn } from '~/lib/utils'
+import { PinEntry } from '@/components/auth/PinEntry'
 
 type LeadStatus = 'Potential' | 'Talking' | 'Planning' | 'Dated' | 'Connected' | 'Current' | 'Former'
 type LeadStatusKey = LeadStatus | 'NoStatus'
@@ -56,8 +57,27 @@ const LEAD_STATUS_METADATA: Array<{
 ]
 
 export const Route = createFileRoute('/_authenticated/sales')({
-  component: SalesPage,
+  component: SalesPageWrapper,
 })
+
+// Wrapper component to handle PIN protection
+function SalesPageWrapper() {
+  const [isSalesUnlocked, setIsSalesUnlocked] = useState(() => {
+    return sessionStorage.getItem('sales-unlocked') === 'true'
+  })
+
+  const handlePinUnlock = () => {
+    sessionStorage.setItem('sales-unlocked', 'true')
+    setIsSalesUnlocked(true)
+  }
+
+  // Show PIN entry if sales page is not unlocked
+  if (!isSalesUnlocked) {
+    return <PinEntry onUnlock={handlePinUnlock} />
+  }
+
+  return <SalesPage />
+}
 
 function SalesPage() {
   const [selectedContactId, setSelectedContactId] = useState<Id<'contacts'> | null>(null)

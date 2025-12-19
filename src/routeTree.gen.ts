@@ -14,14 +14,18 @@ import { Route as SignInRouteImport } from './routes/sign-in'
 import { Route as GmailCallbackRouteImport } from './routes/gmail-callback'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
+import { Route as AuthenticatedTodosListRouteImport } from './routes/_authenticated/todos-list'
+import { Route as AuthenticatedTodosRouteImport } from './routes/_authenticated/todos'
 import { Route as AuthenticatedStatsRouteImport } from './routes/_authenticated/stats'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
 import { Route as AuthenticatedSalesRouteImport } from './routes/_authenticated/sales'
 import { Route as AuthenticatedMessagesRouteImport } from './routes/_authenticated/messages'
 import { Route as AuthenticatedContactsRouteImport } from './routes/_authenticated/contacts'
+import { Route as AuthenticatedTodosIndexRouteImport } from './routes/_authenticated/todos/index'
 import { Route as AuthenticatedStatsIndexRouteImport } from './routes/_authenticated/stats/index'
 import { Route as AuthenticatedSettingsIndexRouteImport } from './routes/_authenticated/settings/index'
 import { Route as AuthenticatedContactsIndexRouteImport } from './routes/_authenticated/contacts/index'
+import { Route as AuthenticatedTodosDocumentIdRouteImport } from './routes/_authenticated/todos/$documentId'
 import { Route as AuthenticatedStatsMessagesRouteImport } from './routes/_authenticated/stats/messages'
 import { Route as AuthenticatedStatsLinearRouteImport } from './routes/_authenticated/stats/linear'
 import { Route as AuthenticatedStatsHubstaffRouteImport } from './routes/_authenticated/stats/hubstaff'
@@ -62,6 +66,16 @@ const AuthenticatedIndexRoute = AuthenticatedIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedTodosListRoute = AuthenticatedTodosListRouteImport.update({
+  id: '/todos-list',
+  path: '/todos-list',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedTodosRoute = AuthenticatedTodosRouteImport.update({
+  id: '/todos',
+  path: '/todos',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 const AuthenticatedStatsRoute = AuthenticatedStatsRouteImport.update({
   id: '/stats',
   path: '/stats',
@@ -87,6 +101,11 @@ const AuthenticatedContactsRoute = AuthenticatedContactsRouteImport.update({
   path: '/contacts',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedTodosIndexRoute = AuthenticatedTodosIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AuthenticatedTodosRoute,
+} as any)
 const AuthenticatedStatsIndexRoute = AuthenticatedStatsIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -103,6 +122,12 @@ const AuthenticatedContactsIndexRoute =
     id: '/',
     path: '/',
     getParentRoute: () => AuthenticatedContactsRoute,
+  } as any)
+const AuthenticatedTodosDocumentIdRoute =
+  AuthenticatedTodosDocumentIdRouteImport.update({
+    id: '/$documentId',
+    path: '/$documentId',
+    getParentRoute: () => AuthenticatedTodosRoute,
   } as any)
 const AuthenticatedStatsMessagesRoute =
   AuthenticatedStatsMessagesRouteImport.update({
@@ -202,6 +227,8 @@ export interface FileRoutesByFullPath {
   '/sales': typeof AuthenticatedSalesRoute
   '/settings': typeof AuthenticatedSettingsRouteWithChildren
   '/stats': typeof AuthenticatedStatsRouteWithChildren
+  '/todos': typeof AuthenticatedTodosRouteWithChildren
+  '/todos-list': typeof AuthenticatedTodosListRoute
   '/': typeof AuthenticatedIndexRoute
   '/contacts/$contactId': typeof AuthenticatedContactsContactIdRoute
   '/settings/ai': typeof AuthenticatedSettingsAiRoute
@@ -217,9 +244,11 @@ export interface FileRoutesByFullPath {
   '/stats/hubstaff': typeof AuthenticatedStatsHubstaffRoute
   '/stats/linear': typeof AuthenticatedStatsLinearRoute
   '/stats/messages': typeof AuthenticatedStatsMessagesRoute
+  '/todos/$documentId': typeof AuthenticatedTodosDocumentIdRoute
   '/contacts/': typeof AuthenticatedContactsIndexRoute
   '/settings/': typeof AuthenticatedSettingsIndexRoute
   '/stats/': typeof AuthenticatedStatsIndexRoute
+  '/todos/': typeof AuthenticatedTodosIndexRoute
   '/settings/projects/$projectId': typeof AuthenticatedSettingsProjectsProjectIdRoute
 }
 export interface FileRoutesByTo {
@@ -228,6 +257,7 @@ export interface FileRoutesByTo {
   '/sign-up': typeof SignUpRoute
   '/messages': typeof AuthenticatedMessagesRoute
   '/sales': typeof AuthenticatedSalesRoute
+  '/todos-list': typeof AuthenticatedTodosListRoute
   '/': typeof AuthenticatedIndexRoute
   '/contacts/$contactId': typeof AuthenticatedContactsContactIdRoute
   '/settings/ai': typeof AuthenticatedSettingsAiRoute
@@ -243,9 +273,11 @@ export interface FileRoutesByTo {
   '/stats/hubstaff': typeof AuthenticatedStatsHubstaffRoute
   '/stats/linear': typeof AuthenticatedStatsLinearRoute
   '/stats/messages': typeof AuthenticatedStatsMessagesRoute
+  '/todos/$documentId': typeof AuthenticatedTodosDocumentIdRoute
   '/contacts': typeof AuthenticatedContactsIndexRoute
   '/settings': typeof AuthenticatedSettingsIndexRoute
   '/stats': typeof AuthenticatedStatsIndexRoute
+  '/todos': typeof AuthenticatedTodosIndexRoute
   '/settings/projects/$projectId': typeof AuthenticatedSettingsProjectsProjectIdRoute
 }
 export interface FileRoutesById {
@@ -259,6 +291,8 @@ export interface FileRoutesById {
   '/_authenticated/sales': typeof AuthenticatedSalesRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRouteWithChildren
   '/_authenticated/stats': typeof AuthenticatedStatsRouteWithChildren
+  '/_authenticated/todos': typeof AuthenticatedTodosRouteWithChildren
+  '/_authenticated/todos-list': typeof AuthenticatedTodosListRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
   '/_authenticated/contacts/$contactId': typeof AuthenticatedContactsContactIdRoute
   '/_authenticated/settings/ai': typeof AuthenticatedSettingsAiRoute
@@ -274,9 +308,11 @@ export interface FileRoutesById {
   '/_authenticated/stats/hubstaff': typeof AuthenticatedStatsHubstaffRoute
   '/_authenticated/stats/linear': typeof AuthenticatedStatsLinearRoute
   '/_authenticated/stats/messages': typeof AuthenticatedStatsMessagesRoute
+  '/_authenticated/todos/$documentId': typeof AuthenticatedTodosDocumentIdRoute
   '/_authenticated/contacts/': typeof AuthenticatedContactsIndexRoute
   '/_authenticated/settings/': typeof AuthenticatedSettingsIndexRoute
   '/_authenticated/stats/': typeof AuthenticatedStatsIndexRoute
+  '/_authenticated/todos/': typeof AuthenticatedTodosIndexRoute
   '/_authenticated/settings/projects/$projectId': typeof AuthenticatedSettingsProjectsProjectIdRoute
 }
 export interface FileRouteTypes {
@@ -290,6 +326,8 @@ export interface FileRouteTypes {
     | '/sales'
     | '/settings'
     | '/stats'
+    | '/todos'
+    | '/todos-list'
     | '/'
     | '/contacts/$contactId'
     | '/settings/ai'
@@ -305,9 +343,11 @@ export interface FileRouteTypes {
     | '/stats/hubstaff'
     | '/stats/linear'
     | '/stats/messages'
+    | '/todos/$documentId'
     | '/contacts/'
     | '/settings/'
     | '/stats/'
+    | '/todos/'
     | '/settings/projects/$projectId'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -316,6 +356,7 @@ export interface FileRouteTypes {
     | '/sign-up'
     | '/messages'
     | '/sales'
+    | '/todos-list'
     | '/'
     | '/contacts/$contactId'
     | '/settings/ai'
@@ -331,9 +372,11 @@ export interface FileRouteTypes {
     | '/stats/hubstaff'
     | '/stats/linear'
     | '/stats/messages'
+    | '/todos/$documentId'
     | '/contacts'
     | '/settings'
     | '/stats'
+    | '/todos'
     | '/settings/projects/$projectId'
   id:
     | '__root__'
@@ -346,6 +389,8 @@ export interface FileRouteTypes {
     | '/_authenticated/sales'
     | '/_authenticated/settings'
     | '/_authenticated/stats'
+    | '/_authenticated/todos'
+    | '/_authenticated/todos-list'
     | '/_authenticated/'
     | '/_authenticated/contacts/$contactId'
     | '/_authenticated/settings/ai'
@@ -361,9 +406,11 @@ export interface FileRouteTypes {
     | '/_authenticated/stats/hubstaff'
     | '/_authenticated/stats/linear'
     | '/_authenticated/stats/messages'
+    | '/_authenticated/todos/$documentId'
     | '/_authenticated/contacts/'
     | '/_authenticated/settings/'
     | '/_authenticated/stats/'
+    | '/_authenticated/todos/'
     | '/_authenticated/settings/projects/$projectId'
   fileRoutesById: FileRoutesById
 }
@@ -411,6 +458,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedIndexRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/todos-list': {
+      id: '/_authenticated/todos-list'
+      path: '/todos-list'
+      fullPath: '/todos-list'
+      preLoaderRoute: typeof AuthenticatedTodosListRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/todos': {
+      id: '/_authenticated/todos'
+      path: '/todos'
+      fullPath: '/todos'
+      preLoaderRoute: typeof AuthenticatedTodosRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/stats': {
       id: '/_authenticated/stats'
       path: '/stats'
@@ -446,6 +507,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedContactsRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/todos/': {
+      id: '/_authenticated/todos/'
+      path: '/'
+      fullPath: '/todos/'
+      preLoaderRoute: typeof AuthenticatedTodosIndexRouteImport
+      parentRoute: typeof AuthenticatedTodosRoute
+    }
     '/_authenticated/stats/': {
       id: '/_authenticated/stats/'
       path: '/'
@@ -466,6 +534,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/contacts/'
       preLoaderRoute: typeof AuthenticatedContactsIndexRouteImport
       parentRoute: typeof AuthenticatedContactsRoute
+    }
+    '/_authenticated/todos/$documentId': {
+      id: '/_authenticated/todos/$documentId'
+      path: '/$documentId'
+      fullPath: '/todos/$documentId'
+      preLoaderRoute: typeof AuthenticatedTodosDocumentIdRouteImport
+      parentRoute: typeof AuthenticatedTodosRoute
     }
     '/_authenticated/stats/messages': {
       id: '/_authenticated/stats/messages'
@@ -658,12 +733,27 @@ const AuthenticatedStatsRouteChildren: AuthenticatedStatsRouteChildren = {
 const AuthenticatedStatsRouteWithChildren =
   AuthenticatedStatsRoute._addFileChildren(AuthenticatedStatsRouteChildren)
 
+interface AuthenticatedTodosRouteChildren {
+  AuthenticatedTodosDocumentIdRoute: typeof AuthenticatedTodosDocumentIdRoute
+  AuthenticatedTodosIndexRoute: typeof AuthenticatedTodosIndexRoute
+}
+
+const AuthenticatedTodosRouteChildren: AuthenticatedTodosRouteChildren = {
+  AuthenticatedTodosDocumentIdRoute: AuthenticatedTodosDocumentIdRoute,
+  AuthenticatedTodosIndexRoute: AuthenticatedTodosIndexRoute,
+}
+
+const AuthenticatedTodosRouteWithChildren =
+  AuthenticatedTodosRoute._addFileChildren(AuthenticatedTodosRouteChildren)
+
 interface AuthenticatedRouteChildren {
   AuthenticatedContactsRoute: typeof AuthenticatedContactsRouteWithChildren
   AuthenticatedMessagesRoute: typeof AuthenticatedMessagesRoute
   AuthenticatedSalesRoute: typeof AuthenticatedSalesRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRouteWithChildren
   AuthenticatedStatsRoute: typeof AuthenticatedStatsRouteWithChildren
+  AuthenticatedTodosRoute: typeof AuthenticatedTodosRouteWithChildren
+  AuthenticatedTodosListRoute: typeof AuthenticatedTodosListRoute
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
 }
 
@@ -673,6 +763,8 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedSalesRoute: AuthenticatedSalesRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRouteWithChildren,
   AuthenticatedStatsRoute: AuthenticatedStatsRouteWithChildren,
+  AuthenticatedTodosRoute: AuthenticatedTodosRouteWithChildren,
+  AuthenticatedTodosListRoute: AuthenticatedTodosListRoute,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
 }
 

@@ -19,8 +19,6 @@ export function PinEntry({ onUnlock }: PinEntryProps) {
   const handleComplete = (value: string) => {
     if (value === CORRECT_PIN) {
       setError(false)
-      // Store unlock state in session storage
-      sessionStorage.setItem('app-unlocked', 'true')
       onUnlock()
     } else {
       setError(true)

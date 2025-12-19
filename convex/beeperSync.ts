@@ -676,26 +676,41 @@ export const syncBeeperChatsInternal = internalAction({
         // Use hasMore flag to determine if there are more chats to load
       }
 
-      // Fetch chats using official SDK method (matches API spec)
-      const allChats: any[] = [];
-      const query: any = {};
-      if (cursor) query.cursor = cursor;
-      if (direction) query.direction = direction;
-      
-      // Manual pagination (not auto-pagination) - we control when to fetch more
-      const response = await client.chats.list(query) as any;
-
-      const chats = response.items || [];
-      
-      console.log(
-        `[Cursor Sync] Received ${chats.length} chats from API ` +
-        `(hasMore: ${response.hasMore || false})`
-      );
-
       let syncedChatsCount = 0;
       let syncedMessagesCount = 0;
 
-      // Process each chat
+      // Pagination loop to "catch up" if there are multiple pages of new activity
+      // TWO-TIER SYNC STRATEGY:
+      // 1. Scheduled/triggered sync: Fetch chat list + last 15 messages per active chat
+      // 2. On-demand: Full conversation history via loadFullConversation action
+      let hasMore = true;
+      let currentPage = 0;
+      const MAX_CATCHUP_PAGES = 5; // Prevent hanging on extremely old cursors
+      let lastResponse: any = null;
+      
+      // Use local variables for pagination so we can update them in the loop
+      let currentCursor = cursor;
+      let currentDirection = direction;
+
+      while (hasMore && currentPage < MAX_CATCHUP_PAGES) {
+        currentPage++;
+        
+        // Build query params for this page
+        const query: any = {};
+        if (currentCursor) query.cursor = currentCursor;
+        if (currentDirection) query.direction = currentDirection;
+        
+        // Fetch page of chats
+        const response = await client.chats.list(query) as any;
+        lastResponse = response;
+        const chats = response.items || [];
+        
+        console.log(
+          `[Cursor Sync] Received ${chats.length} chats from API (page ${currentPage}) ` +
+          `(hasMore: ${response.hasMore || false})`
+        );
+
+        // Process each chat in this page
       for (const chat of chats) {
         // Extract contact info for single chats
         let username: string | undefined;
@@ -713,7 +728,6 @@ export const syncBeeperChatsInternal = internalAction({
           );
           
           // Filter out Meta AI (bot that Instagram injects into chats)
-          // This ensures we show the real conversation partner, not the AI bot
           const realParticipants = otherParticipants.filter(
             (p: any) => {
               const name = (p.fullName || '').toLowerCase();
@@ -743,7 +757,7 @@ export const syncBeeperChatsInternal = internalAction({
         // Ensure type is properly typed as "single" | "group"
         const chatType = (chat.type === "single" || chat.type === "group") ? chat.type : "single" as const;
 
-        // Extract preview data if available (last message preview from API)
+          // Extract preview data if available
         const preview = chat.preview;
         let lastMessage: string | undefined;
         let lastMessageFrom: "user" | "them" | undefined;
@@ -754,16 +768,9 @@ export const syncBeeperChatsInternal = internalAction({
         if (preview) {
           lastMessage = preview.text || undefined;
           lastMessageFrom = preview.isSender ? "user" : "them";
-          needsReply = !preview.isSender; // Need to reply if they sent last message
+            needsReply = !preview.isSender;
           previewTimestamp = new Date(preview.timestamp).getTime();
-          newestMessageSortKey = preview.sortKey; // ← CRITICAL: Use preview sortKey as newest!
-          
-          console.log(
-            `[Beeper Sync] Chat ${chat.id} preview: ` +
-            `lastFrom=${lastMessageFrom}, needsReply=${needsReply}, ` +
-            `sortKey=${preview.sortKey}, ` +
-            `previewTime=${new Date(previewTimestamp).toISOString()}`
-          );
+            newestMessageSortKey = preview.sortKey;
         }
 
         const chatData = {
@@ -778,32 +785,31 @@ export const syncBeeperChatsInternal = internalAction({
           phoneNumber,
           email,
           participantId,
-          participantFullName,  // NEW
-          participantImgURL,    // NEW
-          cannotMessage,        // NEW
+            participantFullName,
+            participantImgURL,
+            cannotMessage,
           participantCount: chat.participants?.total,
           lastActivity,
           unreadCount: chat.unreadCount || 0,
           lastMessage,
           lastMessageFrom,
           needsReply,
-          // Convert lastReadMessageSortKey to string (API may return as number)
           lastReadMessageSortKey: chat.lastReadMessageSortKey ? String(chat.lastReadMessageSortKey) : undefined,
           isArchived: chat.isArchived || false,
           isMuted: chat.isMuted || false,
           isPinned: chat.isPinned || false,
           lastSyncedAt: now,
           syncSource: args.syncSource,
-          newestMessageSortKey,  // NEW: From preview.sortKey
+            newestMessageSortKey,
         };
 
-        // Upsert chat via mutation (returns chatDocId and shouldSyncMessages)
+          // Upsert chat via mutation
         const { chatDocId, shouldSyncMessages } = await ctx.runMutation(
           internal.beeperSync.upsertChat,
           { chatData }
         );
 
-        // Sync ALL participants to beeperParticipants table (for both single and group chats)
+          // Sync participants
         if (chat.participants?.items && chat.participants.items.length > 0) {
           await ctx.runMutation(
             internal.beeperSync.upsertParticipants,
@@ -826,38 +832,18 @@ export const syncBeeperChatsInternal = internalAction({
 
         syncedChatsCount++;
 
-        // TWO-TIER SYNC STRATEGY:
-        // 1. Scheduled/triggered sync: Only fetch last 10-20 messages (lightweight)
-        // 2. On-demand full load: User opens chat → loadFullConversation (in beeperMessages.ts)
-        const shouldFetchMessages = shouldSyncMessages;
-
-        if (shouldFetchMessages) {
+          if (shouldSyncMessages) {
           try {
-            // Lightweight sync: Only fetch last 10-20 recent messages
-            // Full conversation history is loaded on-demand when user opens the chat
             const RECENT_MESSAGE_LIMIT = 15;
-            
-            const messageQueryParams: any = {
-              limit: RECENT_MESSAGE_LIMIT, // Only fetch last 15 messages
-            };
-            
-            console.log(
-              `[Beeper Sync] Fetching last ${RECENT_MESSAGE_LIMIT} messages for chat ${chat.id} (${chat.title})...`
-            );
+              const messageQueryParams: any = { limit: RECENT_MESSAGE_LIMIT };
             
             const messagesResponse = await client.get(`/v1/chats/${encodeURIComponent(chat.id)}/messages`, {
               query: messageQueryParams
             }) as any;
             const messages = messagesResponse.items || [];
 
-            console.log(
-              `[Beeper Sync] Received ${messages.length} recent messages from API for chat ${chat.id} (${chat.title})`
-            );
-
-            // Prepare messages for mutation - match API spec exactly
             const messagesToSync = messages
               .map((msg: any) => {
-                // Extract attachments if present (all fields from API)
                 const attachments = msg.attachments?.map((att: any) => ({
                   type: att.type || "unknown",
                   srcURL: att.srcURL,
@@ -866,13 +852,12 @@ export const syncBeeperChatsInternal = internalAction({
                   fileSize: att.fileSize,
                   isGif: att.isGif,
                   isSticker: att.isSticker,
-                  isVoiceNote: att.isVoiceNote,    // NEW
-                  posterImg: att.posterImg,        // NEW
+                    isVoiceNote: att.isVoiceNote,
+                    posterImg: att.posterImg,
                   width: att.size?.width,
                   height: att.size?.height,
                 }));
                 
-                // Extract reactions if present (all fields from API)
                 const reactions = msg.reactions?.map((r: any) => ({
                   id: r.id,
                   participantID: r.participantID,
@@ -883,27 +868,22 @@ export const syncBeeperChatsInternal = internalAction({
 
                 return {
                   messageId: msg.id,
-                  accountID: msg.accountID,        // NEW: Required in API
+                    accountID: msg.accountID,
                   text: extractMessageText(msg.text),
                   timestamp: new Date(msg.timestamp).getTime(),
-                  sortKey: msg.sortKey,            // Required for cursor tracking
+                    sortKey: msg.sortKey,
                   senderId: msg.senderID,
                   senderName: msg.senderName || msg.senderID,
                   isFromUser: msg.isSender || false,
-                  isUnread: msg.isUnread,          // NEW
+                    isUnread: msg.isUnread,
                   attachments: attachments && attachments.length > 0 ? attachments : undefined,
-                  reactions: reactions && reactions.length > 0 ? reactions : undefined,  // NEW
+                    reactions: reactions && reactions.length > 0 ? reactions : undefined,
                 };
               })
-              // CRITICAL: Sort by sortKey (lexicographically) before syncing
-              // sortKeys are designed to be sortable strings
               .sort((a: { sortKey: string }, b: { sortKey: string }) => 
                 compareSortKeys(a.sortKey, b.sortKey)
               );
 
-            console.log(`[Beeper Sync] Syncing ${messagesToSync.length} messages for chatId: ${chat.id} (${chat.title})`);
-            
-            // Sync messages via mutation
             const messageCount = await ctx.runMutation(
               internal.beeperSync.syncChatMessages,
               {
@@ -916,13 +896,10 @@ export const syncBeeperChatsInternal = internalAction({
 
             syncedMessagesCount += messageCount;
             
-            // Track message cursor boundaries
             if (messagesToSync.length > 0) {
-              // Messages are sorted oldest to newest
               const newestSortKey = messagesToSync[messagesToSync.length - 1]?.sortKey;
               const oldestSortKey = messagesToSync[0]?.sortKey;
               
-              // Smart update: mutation will only update boundaries if they are expanded
               await ctx.runMutation(
                 internal.cursorHelpers.updateChatMessageCursors,
                 {
@@ -933,15 +910,7 @@ export const syncBeeperChatsInternal = internalAction({
                 }
               );
               
-              // SYNC-TRIGGERED AI GENERATION:
-              // If new messages were inserted AND needsReply=true (other person sent last message),
-              // schedule AI reply suggestions generation in the background
               if (messageCount > 0 && needsReply) {
-                console.log(
-                  `[Beeper Sync] Scheduling AI reply suggestions for chat ${chat.id} (${chat.title}) - needsReply=true, ${messageCount} new messages`
-                );
-                
-                // Schedule immediately but non-blocking
                 await ctx.scheduler.runAfter(0, api.beeperActions.generateReplySuggestions, {
                   chatId: chat.id,
                   chatName: chat.title || "Unknown",
@@ -950,14 +919,17 @@ export const syncBeeperChatsInternal = internalAction({
               }
             }
           } catch (msgError) {
-            // SDK handles retries, but log if it still fails
-            const msgErrorMsg = msgError instanceof Error ? msgError.message : "Unknown error";
-            console.warn(
-              `[Beeper Sync] Error syncing messages for chat ${chat.id}: ${msgErrorMsg}`
-            );
+              console.warn(`[Beeper Sync] Error syncing messages for chat ${chat.id}: ${msgError instanceof Error ? msgError.message : "Unknown error"}`);
+            }
           }
+        }
+
+        // Check if we need to fetch another page (forward sync only)
+        if (currentDirection === "after" && response.hasMore) {
+          currentCursor = response.newestCursor;
+          console.log(`[Cursor Sync] Fetching next page of newer chats (cursor: ${currentCursor?.slice(0, 13)})...`);
         } else {
-          console.log(`[Beeper Sync] Skipping message sync for chat ${chat.id} (already up to date)`);
+          hasMore = false;
         }
       }
 
@@ -965,43 +937,37 @@ export const syncBeeperChatsInternal = internalAction({
         `[Beeper Sync] Synced ${syncedChatsCount} chats, ${syncedMessagesCount} messages (source: ${args.syncSource})`
       );
 
-      // Store cursor boundaries for next sync
-      // SMART CURSOR UPDATE:
-      // 1. If we synced "after", only update newestCursor
-      // 2. If we synced "before", only update oldestCursor
-      // 3. If no cursor (initial), update both
-      const updateData: any = {
-        syncSource: args.syncSource,
-      };
+      // Store cursor boundaries for next sync using LAST response
+      // Only update if we got a valid response from the API
+      if (lastResponse) {
+        const updateData: any = {
+          syncSource: args.syncSource,
+        };
 
-      if (direction === "after") {
-        updateData.newestCursor = response.newestCursor;
-        // Do NOT pass oldestCursor, mutation will preserve existing global oldest
-      } else if (direction === "before") {
-        updateData.oldestCursor = response.oldestCursor;
-        // Do NOT pass newestCursor, mutation will preserve existing global newest
-      } else {
-        // Initial sync or bypassCache - fetching the front of the list
-        updateData.newestCursor = response.newestCursor;
-        
-        // ONLY update oldestCursor if we don't have one yet.
-        // This prevents overwriting a deep historical boundary with the 
-        // oldest cursor of the first page of recent chats.
-        if (!syncState?.oldestCursor) {
-          updateData.oldestCursor = response.oldestCursor;
+        if (direction === "after") {
+          updateData.newestCursor = lastResponse.newestCursor;
+        } else if (direction === "before") {
+          updateData.oldestCursor = lastResponse.oldestCursor;
+        } else {
+          updateData.newestCursor = lastResponse.newestCursor;
+          if (!syncState?.oldestCursor) {
+            updateData.oldestCursor = lastResponse.oldestCursor;
+          }
         }
-      }
-      
-      await ctx.runMutation(
-        internal.cursorHelpers.updateChatListSync,
-        updateData
-      );
+        
+        await ctx.runMutation(
+          internal.cursorHelpers.updateChatListSync,
+          updateData
+        );
 
-      console.log(
-        `[Cursor Sync] Updated sync state: ` +
-        `newest=${(updateData.newestCursor || "unchanged")?.slice(0, 13)}..., ` +
-        `oldest=${(updateData.oldestCursor || "unchanged")?.slice(0, 13)}...`
-      );
+        console.log(
+          `[Cursor Sync] Updated sync state: ` +
+          `newest=${(updateData.newestCursor || "unchanged")?.slice(0, 13)}..., ` +
+          `oldest=${(updateData.oldestCursor || "unchanged")?.slice(0, 13)}...`
+        );
+      } else {
+        console.warn(`[Cursor Sync] No API response received - skipping cursor update`);
+      }
 
       // Cache ALL profile images that don't have them yet (run in background)
       // Schedule as a separate action so it doesn't block the sync response
@@ -1113,7 +1079,7 @@ export const manualSync = action({
   }> => {
     const result = await ctx.runAction(internal.beeperSync.syncBeeperChatsInternal, {
       syncSource: "manual",
-      bypassCache: true, // Bypass cache for manual refresh
+      bypassCache: false, // Use incremental sync for manual refresh
     });
     return result;
   },

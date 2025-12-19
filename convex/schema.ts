@@ -488,4 +488,38 @@ export default defineSchema({
     .index("by_timestamp", ["timestamp"])
     .index("by_team_timestamp", ["teamId", "timestamp"])
     .index("by_project_timestamp", ["projectId", "timestamp"]),
+
+  // ===========================================
+  // Notes / Documents Tables
+  // ===========================================
+
+  // Note documents - stores full editor content
+  todoDocuments: defineTable({
+    title: v.string(),
+    content: v.string(),           // Tiptap JSON stringified
+    projectId: v.optional(v.id("projects")), // Associated project
+    todoCount: v.number(),         // Denormalized for sidebar
+    completedCount: v.number(),    // Denormalized for sidebar
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_updated", ["updatedAt"])
+    .index("by_project", ["projectId"]),
+
+  // Individual todo items - extracted from documents
+  todoItems: defineTable({
+    documentId: v.id("todoDocuments"),
+    projectId: v.optional(v.id("projects")), // Inherited from parent document
+    text: v.string(),
+    isCompleted: v.boolean(),
+    order: v.number(),             // Position in document
+    nodeId: v.string(),            // Tiptap node ID for matching
+    createdAt: v.number(),
+    updatedAt: v.number(),
+    completedAt: v.optional(v.number()),
+  })
+    .index("by_document", ["documentId"])
+    .index("by_completed", ["isCompleted"])
+    .index("by_document_order", ["documentId", "order"])
+    .index("by_project", ["projectId"]),
 });

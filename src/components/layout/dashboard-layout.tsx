@@ -35,6 +35,7 @@ import {
   Bot,
   FileText,
   MapPin,
+  CheckSquare,
 } from "lucide-react"
 import { ModeToggle } from "@/components/ui/mode-toggle"
 import { Link, useNavigate } from '@tanstack/react-router'
@@ -88,6 +89,34 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                 >
                   <LayoutDashboard className="h-5 w-5" />
                   Home
+                </Link>
+                <Link 
+                  to="/todos"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={cn(
+                    "flex items-center gap-3 px-4 py-3 rounded-md",
+                    "text-base font-medium transition-all",
+                    "text-slate-300 hover:text-white hover:bg-slate-800/80",
+                    "[&.active]:bg-slate-800 [&.active]:text-white"
+                  )}
+                  activeProps={{ className: "active" }}
+                >
+                  <FileText className="h-5 w-5" />
+                  Notes
+                </Link>
+                <Link 
+                  to="/todos-list"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={cn(
+                    "flex items-center gap-3 px-4 py-3 rounded-md",
+                    "text-base font-medium transition-all",
+                    "text-slate-300 hover:text-white hover:bg-slate-800/80",
+                    "[&.active]:bg-slate-800 [&.active]:text-white"
+                  )}
+                  activeProps={{ className: "active" }}
+                >
+                  <CheckSquare className="h-5 w-5" />
+                  Todos
                 </Link>
                 <Link 
                   to="/messages"
@@ -242,6 +271,40 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                   >
                     <LayoutDashboard className="h-4 w-4" />
                     Home
+                  </Link>
+                </NavigationMenuItem>
+                <NavigationMenuItem>
+                  <Link 
+                    to="/todos" 
+                    className={cn(
+                      "inline-flex items-center gap-2 px-4 py-2 rounded-md",
+                      "text-sm font-medium transition-all",
+                      "text-slate-300 hover:text-white hover:bg-slate-800/80",
+                      "[&.active]:bg-slate-800 [&.active]:text-white"
+                    )}
+                    activeProps={{
+                      className: "active"
+                    }}
+                  >
+                    <FileText className="h-4 w-4" />
+                    Notes
+                  </Link>
+                </NavigationMenuItem>
+                <NavigationMenuItem>
+                  <Link 
+                    to="/todos-list" 
+                    className={cn(
+                      "inline-flex items-center gap-2 px-4 py-2 rounded-md",
+                      "text-sm font-medium transition-all",
+                      "text-slate-300 hover:text-white hover:bg-slate-800/80",
+                      "[&.active]:bg-slate-800 [&.active]:text-white"
+                    )}
+                    activeProps={{
+                      className: "active"
+                    }}
+                  >
+                    <CheckSquare className="h-4 w-4" />
+                    Todos
                   </Link>
                 </NavigationMenuItem>
                 <NavigationMenuItem>

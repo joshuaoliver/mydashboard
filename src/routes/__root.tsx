@@ -7,7 +7,6 @@ import {
 import { QueryClient } from '@tanstack/react-query'
 import { useConvexAuth } from 'convex/react'
 import * as React from 'react'
-import { PinEntry } from '@/components/auth/PinEntry'
 
 export const Route = createRootRouteWithContext<{
   queryClient: QueryClient
@@ -38,7 +37,7 @@ function RootComponent() {
     window.location.pathname.startsWith(route)
   )
   
-  // Skip all auth/PIN logic for callbacks - render immediately
+  // Skip auth logic for callbacks - render immediately
   const shouldBypassAuth = isCallbackRoute
   
   // Debug: Log on every render to track what's happening
@@ -48,13 +47,6 @@ function RootComponent() {
     windowSearch: window.location.search,
     isCallbackRoute, 
     shouldBypassAuth 
-  })
-
-  // Check PIN unlock state from sessionStorage
-  const [isAppUnlocked, setIsAppUnlocked] = React.useState(() => {
-    // Bypass PIN for callback routes/popups
-    if (shouldBypassAuth) return true
-    return sessionStorage.getItem('app-unlocked') === 'true'
   })
 
   // Use Convex's built-in auth hook - this updates reactively
@@ -73,7 +65,7 @@ function RootComponent() {
       return
     }
     
-    if (!isAppUnlocked || isLoading) return
+    if (isLoading) return
 
     console.log('Auth state:', { isAuthenticated, isPublicRoute, pathname: location.pathname })
 
@@ -87,21 +79,11 @@ function RootComponent() {
       console.log('Authenticated on auth page, redirecting to dashboard')
       navigate({ to: '/' })
     }
-  }, [isAuthenticated, isPublicRoute, shouldBypassAuth, navigate, isLoading, isAppUnlocked, location.pathname])
+  }, [isAuthenticated, isPublicRoute, shouldBypassAuth, navigate, isLoading, location.pathname])
 
-  // Handle PIN unlock
-  const handlePinUnlock = () => {
-    setIsAppUnlocked(true)
-  }
-
-  // For callback routes/popups, skip PIN and render immediately
+  // For callback routes/popups, skip auth and render immediately
   if (shouldBypassAuth) {
     return <Outlet />
-  }
-
-  // Show PIN entry if not unlocked
-  if (!isAppUnlocked) {
-    return <PinEntry onUnlock={handlePinUnlock} />
   }
 
   // Show loading while checking auth

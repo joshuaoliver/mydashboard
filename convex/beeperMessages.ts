@@ -99,7 +99,7 @@ export const sendMessage = action({
       }
 
       // Send message via V1 API
-      const response = await client.post(`/v1/chats/${args.chatId}/messages`, {
+      const response = await client.post(`/v1/chats/${encodeURIComponent(args.chatId)}/messages`, {
         body: requestBody,
       }) as any;
 
