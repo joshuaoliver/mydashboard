@@ -30,10 +30,8 @@ import {
   LogOut,
   Menu,
   BarChart3,
-  Mail,
-  Clock,
-  LayoutList,
-  FolderKanban
+  FolderKanban,
+  Zap,
 } from "lucide-react"
 import { ModeToggle } from "@/components/ui/mode-toggle"
 import { Link, useNavigate } from '@tanstack/react-router'
@@ -150,28 +148,12 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                     Settings
                   </div>
                   <Link 
-                    to="/settings/gmail"
+                    to="/settings/integrations"
                     onClick={() => setMobileMenuOpen(false)}
                     className="flex items-center gap-3 px-4 py-3 rounded-md text-base text-slate-300 hover:text-white hover:bg-slate-800/80 transition-all"
                   >
-                    <Mail className="h-5 w-5" />
-                    Gmail Settings
-                  </Link>
-                  <Link 
-                    to="/settings/hubstaff"
-                    onClick={() => setMobileMenuOpen(false)}
-                    className="flex items-center gap-3 px-4 py-3 rounded-md text-base text-slate-300 hover:text-white hover:bg-slate-800/80 transition-all"
-                  >
-                    <Clock className="h-5 w-5" />
-                    Hubstaff Settings
-                  </Link>
-                  <Link 
-                    to="/settings/linear"
-                    onClick={() => setMobileMenuOpen(false)}
-                    className="flex items-center gap-3 px-4 py-3 rounded-md text-base text-slate-300 hover:text-white hover:bg-slate-800/80 transition-all"
-                  >
-                    <LayoutList className="h-5 w-5" />
-                    Linear Settings
+                    <Zap className="h-5 w-5" />
+                    Integrations
                   </Link>
                   <Link 
                     to="/settings/projects"
@@ -179,7 +161,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                     className="flex items-center gap-3 px-4 py-3 rounded-md text-base text-slate-300 hover:text-white hover:bg-slate-800/80 transition-all"
                   >
                     <FolderKanban className="h-5 w-5" />
-                    Project Settings
+                    Projects
                   </Link>
                   <Link 
                     to="/settings"
@@ -311,33 +293,11 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                       <li>
                         <NavigationMenuLink asChild>
                           <Link 
-                            to="/settings/gmail"
+                            to="/settings/integrations"
                             className="flex flex-row items-center gap-2 px-3 py-2 rounded-md text-sm text-slate-300 hover:text-white hover:bg-slate-700 transition-colors w-full"
                           >
-                            <Mail className="h-4 w-4 flex-shrink-0" />
-                            <span>Gmail Settings</span>
-                          </Link>
-                        </NavigationMenuLink>
-                      </li>
-                      <li>
-                        <NavigationMenuLink asChild>
-                          <Link 
-                            to="/settings/hubstaff"
-                            className="flex flex-row items-center gap-2 px-3 py-2 rounded-md text-sm text-slate-300 hover:text-white hover:bg-slate-700 transition-colors w-full"
-                          >
-                            <Clock className="h-4 w-4 flex-shrink-0" />
-                            <span>Hubstaff Settings</span>
-                          </Link>
-                        </NavigationMenuLink>
-                      </li>
-                      <li>
-                        <NavigationMenuLink asChild>
-                          <Link 
-                            to="/settings/linear"
-                            className="flex flex-row items-center gap-2 px-3 py-2 rounded-md text-sm text-slate-300 hover:text-white hover:bg-slate-700 transition-colors w-full"
-                          >
-                            <LayoutList className="h-4 w-4 flex-shrink-0" />
-                            <span>Linear Settings</span>
+                            <Zap className="h-4 w-4 flex-shrink-0" />
+                            <span>Integrations</span>
                           </Link>
                         </NavigationMenuLink>
                       </li>
@@ -348,7 +308,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                             className="flex flex-row items-center gap-2 px-3 py-2 rounded-md text-sm text-slate-300 hover:text-white hover:bg-slate-700 transition-colors w-full"
                           >
                             <FolderKanban className="h-4 w-4 flex-shrink-0" />
-                            <span>Project Settings</span>
+                            <span>Projects</span>
                           </Link>
                         </NavigationMenuLink>
                       </li>

@@ -1,4 +1,4 @@
-import { mutation, query, internalMutation } from "./_generated/server";
+import { mutation, query, internalMutation, action } from "./_generated/server";
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
 
@@ -408,6 +408,12 @@ export const createContact = mutation({
       lastModifiedAt: now,
     });
 
+    // Trigger rematch to link existing chats to this new contact
+    // This runs in the same transaction, so it's atomic
+    await ctx.scheduler.runAfter(0, internal.contactMutations.rematchChatsForContact, {
+      contactId,
+    });
+
     return { contactId, existed: false };
   },
 });
@@ -502,6 +508,32 @@ export const rematchChatsToContacts = internalMutation({
         }
       }
 
+      // 3. For iMessage/SMS chats, also search the phones array
+      if (!newContactId && chat.phoneNumber && 
+          (chat.network === "iMessage" || chat.network === "SMS")) {
+        const normalizePhone = (phone: string) => phone.replace(/[\s\-\(\)]/g, '');
+        const searchPhone = normalizePhone(chat.phoneNumber);
+        
+        // Get contacts that have phones array
+        const contactsWithPhones = await ctx.db
+          .query("contacts")
+          .filter((q) => q.neq(q.field("phones"), undefined))
+          .collect();
+        
+        // Search through phones arrays for a match
+        for (const contact of contactsWithPhones) {
+          if (contact.phones) {
+            const hasMatch = contact.phones.some(
+              (p) => normalizePhone(p.phone) === searchPhone
+            );
+            if (hasMatch) {
+              newContactId = contact._id;
+              break;
+            }
+          }
+        }
+      }
+
       // Update only if contactId changed
       const currentContactId = chat.contactId;
       if (newContactId !== currentContactId) {
@@ -584,6 +616,43 @@ export const rematchChatsForContact = internalMutation({
       }
     }
 
+    // 3. By phones array (for iMessage/SMS matching)
+    if (contact.phones && contact.phones.length > 0) {
+      const normalizePhone = (phone: string) => phone.replace(/[\s\-\(\)]/g, '');
+      
+      // Get all iMessage/SMS chats that have a phone number
+      const iMessageChats = await ctx.db
+        .query("beeperChats")
+        .filter((q) => 
+          q.and(
+            q.neq(q.field("phoneNumber"), undefined),
+            q.or(
+              q.eq(q.field("network"), "iMessage"),
+              q.eq(q.field("network"), "SMS")
+            )
+          )
+        )
+        .collect();
+      
+      // Check each chat's phone against contact's phones array
+      for (const chat of iMessageChats) {
+        if (chat.contactId !== args.contactId && chat.phoneNumber) {
+          const chatPhoneNormalized = normalizePhone(chat.phoneNumber);
+          const hasMatch = contact.phones.some(
+            (p) => normalizePhone(p.phone) === chatPhoneNormalized
+          );
+          
+          if (hasMatch) {
+            await ctx.db.patch(chat._id, {
+              contactId: args.contactId,
+              contactMatchedAt: now,
+            });
+            updated++;
+          }
+        }
+      }
+    }
+
     // Also update any chats that WERE linked to this contact but shouldn't be anymore
     // (in case the contact's identifiers changed)
     const linkedChats = await ctx.db
@@ -596,7 +665,13 @@ export const rematchChatsForContact = internalMutation({
       const matchesInstagram = contact.instagram && chat.username === contact.instagram;
       const matchesWhatsapp = contact.whatsapp && chat.phoneNumber === contact.whatsapp;
       
-      if (!matchesInstagram && !matchesWhatsapp) {
+      // Also check phones array for iMessage/SMS
+      const normalizePhone = (phone: string) => phone.replace(/[\s\-\(\)]/g, '');
+      const matchesPhones = chat.phoneNumber && contact.phones?.some(
+        (p) => normalizePhone(p.phone) === normalizePhone(chat.phoneNumber!)
+      );
+      
+      if (!matchesInstagram && !matchesWhatsapp && !matchesPhones) {
         // This chat no longer matches - try to find a new match or clear
         let newContactId: string | undefined = undefined;
         
@@ -630,3 +705,20 @@ export const rematchChatsForContact = internalMutation({
   },
 });
 
+/**
+ * Public action to trigger a full rematch of all chats to contacts
+ * Use this after bulk importing contacts (e.g., from Dex)
+ */
+export const triggerFullRematch = action({
+  args: {},
+  handler: async (ctx): Promise<{ matchedCount: number; unmatchedCount: number; unchangedCount: number }> => {
+    console.log("[triggerFullRematch] Starting full rematch of chats to contacts...");
+    
+    const result: { matchedCount: number; unmatchedCount: number; unchangedCount: number } = 
+      await ctx.runMutation(internal.contactMutations.rematchChatsToContacts, {});
+    
+    console.log(`[triggerFullRematch] Complete: ${result.matchedCount} matched, ${result.unmatchedCount} unmatched, ${result.unchangedCount} unchanged`);
+    
+    return result;
+  },
+});

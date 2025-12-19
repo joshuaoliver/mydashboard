@@ -29,6 +29,7 @@ import { Route as AuthenticatedSettingsPromptsRouteImport } from './routes/_auth
 import { Route as AuthenticatedSettingsProjectsRouteImport } from './routes/_authenticated/settings/projects'
 import { Route as AuthenticatedSettingsLocationsRouteImport } from './routes/_authenticated/settings/locations'
 import { Route as AuthenticatedSettingsLinearRouteImport } from './routes/_authenticated/settings/linear'
+import { Route as AuthenticatedSettingsIntegrationsRouteImport } from './routes/_authenticated/settings/integrations'
 import { Route as AuthenticatedSettingsHubstaffRouteImport } from './routes/_authenticated/settings/hubstaff'
 import { Route as AuthenticatedSettingsGmailRouteImport } from './routes/_authenticated/settings/gmail'
 import { Route as AuthenticatedSettingsAiRouteImport } from './routes/_authenticated/settings/ai'
@@ -142,6 +143,12 @@ const AuthenticatedSettingsLinearRoute =
     path: '/linear',
     getParentRoute: () => AuthenticatedSettingsRoute,
   } as any)
+const AuthenticatedSettingsIntegrationsRoute =
+  AuthenticatedSettingsIntegrationsRouteImport.update({
+    id: '/integrations',
+    path: '/integrations',
+    getParentRoute: () => AuthenticatedSettingsRoute,
+  } as any)
 const AuthenticatedSettingsHubstaffRoute =
   AuthenticatedSettingsHubstaffRouteImport.update({
     id: '/hubstaff',
@@ -186,6 +193,7 @@ export interface FileRoutesByFullPath {
   '/settings/ai': typeof AuthenticatedSettingsAiRoute
   '/settings/gmail': typeof AuthenticatedSettingsGmailRoute
   '/settings/hubstaff': typeof AuthenticatedSettingsHubstaffRoute
+  '/settings/integrations': typeof AuthenticatedSettingsIntegrationsRoute
   '/settings/linear': typeof AuthenticatedSettingsLinearRoute
   '/settings/locations': typeof AuthenticatedSettingsLocationsRoute
   '/settings/projects': typeof AuthenticatedSettingsProjectsRouteWithChildren
@@ -209,6 +217,7 @@ export interface FileRoutesByTo {
   '/settings/ai': typeof AuthenticatedSettingsAiRoute
   '/settings/gmail': typeof AuthenticatedSettingsGmailRoute
   '/settings/hubstaff': typeof AuthenticatedSettingsHubstaffRoute
+  '/settings/integrations': typeof AuthenticatedSettingsIntegrationsRoute
   '/settings/linear': typeof AuthenticatedSettingsLinearRoute
   '/settings/locations': typeof AuthenticatedSettingsLocationsRoute
   '/settings/projects': typeof AuthenticatedSettingsProjectsRouteWithChildren
@@ -237,6 +246,7 @@ export interface FileRoutesById {
   '/_authenticated/settings/ai': typeof AuthenticatedSettingsAiRoute
   '/_authenticated/settings/gmail': typeof AuthenticatedSettingsGmailRoute
   '/_authenticated/settings/hubstaff': typeof AuthenticatedSettingsHubstaffRoute
+  '/_authenticated/settings/integrations': typeof AuthenticatedSettingsIntegrationsRoute
   '/_authenticated/settings/linear': typeof AuthenticatedSettingsLinearRoute
   '/_authenticated/settings/locations': typeof AuthenticatedSettingsLocationsRoute
   '/_authenticated/settings/projects': typeof AuthenticatedSettingsProjectsRouteWithChildren
@@ -265,6 +275,7 @@ export interface FileRouteTypes {
     | '/settings/ai'
     | '/settings/gmail'
     | '/settings/hubstaff'
+    | '/settings/integrations'
     | '/settings/linear'
     | '/settings/locations'
     | '/settings/projects'
@@ -288,6 +299,7 @@ export interface FileRouteTypes {
     | '/settings/ai'
     | '/settings/gmail'
     | '/settings/hubstaff'
+    | '/settings/integrations'
     | '/settings/linear'
     | '/settings/locations'
     | '/settings/projects'
@@ -315,6 +327,7 @@ export interface FileRouteTypes {
     | '/_authenticated/settings/ai'
     | '/_authenticated/settings/gmail'
     | '/_authenticated/settings/hubstaff'
+    | '/_authenticated/settings/integrations'
     | '/_authenticated/settings/linear'
     | '/_authenticated/settings/locations'
     | '/_authenticated/settings/projects'
@@ -477,6 +490,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSettingsLinearRouteImport
       parentRoute: typeof AuthenticatedSettingsRoute
     }
+    '/_authenticated/settings/integrations': {
+      id: '/_authenticated/settings/integrations'
+      path: '/integrations'
+      fullPath: '/settings/integrations'
+      preLoaderRoute: typeof AuthenticatedSettingsIntegrationsRouteImport
+      parentRoute: typeof AuthenticatedSettingsRoute
+    }
     '/_authenticated/settings/hubstaff': {
       id: '/_authenticated/settings/hubstaff'
       path: '/hubstaff'
@@ -549,6 +569,7 @@ interface AuthenticatedSettingsRouteChildren {
   AuthenticatedSettingsAiRoute: typeof AuthenticatedSettingsAiRoute
   AuthenticatedSettingsGmailRoute: typeof AuthenticatedSettingsGmailRoute
   AuthenticatedSettingsHubstaffRoute: typeof AuthenticatedSettingsHubstaffRoute
+  AuthenticatedSettingsIntegrationsRoute: typeof AuthenticatedSettingsIntegrationsRoute
   AuthenticatedSettingsLinearRoute: typeof AuthenticatedSettingsLinearRoute
   AuthenticatedSettingsLocationsRoute: typeof AuthenticatedSettingsLocationsRoute
   AuthenticatedSettingsProjectsRoute: typeof AuthenticatedSettingsProjectsRouteWithChildren
@@ -560,6 +581,8 @@ const AuthenticatedSettingsRouteChildren: AuthenticatedSettingsRouteChildren = {
   AuthenticatedSettingsAiRoute: AuthenticatedSettingsAiRoute,
   AuthenticatedSettingsGmailRoute: AuthenticatedSettingsGmailRoute,
   AuthenticatedSettingsHubstaffRoute: AuthenticatedSettingsHubstaffRoute,
+  AuthenticatedSettingsIntegrationsRoute:
+    AuthenticatedSettingsIntegrationsRoute,
   AuthenticatedSettingsLinearRoute: AuthenticatedSettingsLinearRoute,
   AuthenticatedSettingsLocationsRoute: AuthenticatedSettingsLocationsRoute,
   AuthenticatedSettingsProjectsRoute:

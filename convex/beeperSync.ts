@@ -88,8 +88,31 @@ export const upsertChat = internalMutation({
         }
       }
       
-      // Note: We intentionally skip the expensive phones array scan here
-      // If needed, a separate background job can do exhaustive matching
+      // 3. For iMessage/SMS chats, also search the phones array (slightly more expensive)
+      // This enables matching when phone numbers are in Dex but not in the whatsapp field
+      if (!contactId && args.chatData.phoneNumber && 
+          (args.chatData.network === "iMessage" || args.chatData.network === "SMS")) {
+        const searchPhone = normalizePhone(args.chatData.phoneNumber);
+        
+        // Get contacts that have phones array
+        const contactsWithPhones = await ctx.db
+          .query("contacts")
+          .filter((q) => q.neq(q.field("phones"), undefined))
+          .collect();
+        
+        // Search through phones arrays for a match
+        for (const contact of contactsWithPhones) {
+          if (contact.phones) {
+            const hasMatch = contact.phones.some(
+              (p) => normalizePhone(p.phone) === searchPhone
+            );
+            if (hasMatch) {
+              contactId = contact._id;
+              break;
+            }
+          }
+        }
+      }
     }
 
     if (existingChat) {

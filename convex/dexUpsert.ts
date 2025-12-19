@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { internalMutation } from "./_generated/server";
+import { internal } from "./_generated/api";
 import type { DexContact } from "./dexActions";
 
 /**
@@ -85,13 +86,29 @@ export const upsertContacts = internalMutation({
             continue; // No changes in Dex since last sync
           }
 
+          // Check if phone numbers changed (triggers rematch)
+          const phonesChanged = JSON.stringify(existing.phones) !== JSON.stringify(contactData.phones);
+          const instagramChanged = existing.instagram !== contactData.instagram;
+
           // Contact changed in Dex - update it
           await ctx.db.patch(existing._id, contactData);
           updatedCount++;
+
+          // If phones or instagram changed, trigger rematch for this contact
+          if (phonesChanged || instagramChanged) {
+            await ctx.scheduler.runAfter(0, internal.contactMutations.rematchChatsForContact, {
+              contactId: existing._id,
+            });
+          }
         } else {
           // New contact - insert it
-          await ctx.db.insert("contacts", contactData);
+          const contactId = await ctx.db.insert("contacts", contactData);
           addedCount++;
+
+          // Trigger rematch to link existing chats to this new contact
+          await ctx.scheduler.runAfter(0, internal.contactMutations.rematchChatsForContact, {
+            contactId,
+          });
         }
       } catch (error) {
         errorCount++;
