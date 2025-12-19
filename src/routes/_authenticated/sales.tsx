@@ -20,8 +20,8 @@ import {
 import type { DragOverEvent } from '@dnd-kit/core'
 import { cn } from '~/lib/utils'
 
-type LeadStatus = 'Talking' | 'Planning' | 'Dated' | 'Connected' | 'Current' | 'Former'
-type LeadStatusKey = LeadStatus | 'NoStatus' // Current is now between Connected and Former
+type LeadStatus = 'Potential' | 'Talking' | 'Planning' | 'Dated' | 'Connected' | 'Current' | 'Former'
+type LeadStatusKey = LeadStatus | 'NoStatus'
 
 interface ContactRecord {
   _id: Id<'contacts'>
@@ -45,6 +45,7 @@ const LEAD_STATUS_METADATA: Array<{
   accent: string
   border: string
 }> = [
+  { id: 'Potential', name: 'Potential', key: 'Potential', label: 'Potential', accent: 'bg-purple-100 text-purple-700', border: 'border-purple-200' },
   { id: 'Talking', name: 'Talking', key: 'Talking', label: 'Talking', accent: 'bg-sky-100 text-sky-700', border: 'border-sky-200' },
   { id: 'Planning', name: 'Planning', key: 'Planning', label: 'Planning', accent: 'bg-amber-100 text-amber-700', border: 'border-amber-200' },
   { id: 'Dated', name: 'Drinks', key: 'Dated', label: 'Drinks', accent: 'bg-rose-100 text-rose-700', border: 'border-rose-200' },

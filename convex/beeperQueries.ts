@@ -142,7 +142,7 @@ export const listCachedChats = query({
       return {
         id: chat.chatId,
         roomId: chat.localChatID,
-        name: contactName || chat.title, // Use contact name from Dex if available
+        name: contactName || chat.participantFullName || chat.title, // Priority: Dex contact > Beeper participant > raw title
         network: chat.network,
         accountID: chat.accountID,
         type: chat.type,
@@ -263,7 +263,7 @@ export const getChatByIdWithContact = query({
     return {
       id: chat.chatId,
       roomId: chat.localChatID,
-      name: contactName || chat.title,
+      name: contactName || chat.participantFullName || chat.title, // Priority: Dex contact > Beeper participant > raw title
       network: chat.network,
       accountID: chat.accountID,
       type: chat.type,

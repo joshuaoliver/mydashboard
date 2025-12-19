@@ -457,6 +457,7 @@ export const updateLeadStatus = mutation({
   args: {
     contactId: v.id("contacts"),
     leadStatus: v.union(
+      v.literal("Potential"),
       v.literal("Talking"),
       v.literal("Planning"),
       v.literal("Dated"),

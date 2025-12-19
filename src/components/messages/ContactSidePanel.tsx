@@ -66,6 +66,7 @@ export function ContactSidePanel() {
       isLoading={isLoading}
       searchedUsername={selectedChat?.username}
       searchedPhoneNumber={selectedChat?.phoneNumber}
+      participantName={selectedChat?.name}
     />
   )
 }

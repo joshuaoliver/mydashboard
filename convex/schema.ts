@@ -186,6 +186,7 @@ export default defineSchema({
     tagIds: v.optional(v.array(v.id("tags"))), // User-defined tags for organizing contacts
     locationIds: v.optional(v.array(v.id("locations"))), // Multiple locations (tags)
     leadStatus: v.optional(v.union(
+      v.literal("Potential"),
       v.literal("Talking"),
       v.literal("Planning"),
       v.literal("Dated"),

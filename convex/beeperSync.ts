@@ -130,11 +130,18 @@ export const upsertChat = internalMutation({
       const archivedChanged = args.chatData.isArchived !== existingChat.isArchived;
       const mutedChanged = args.chatData.isMuted !== existingChat.isMuted;
       const pinnedChanged = args.chatData.isPinned !== existingChat.isPinned;
-      const titleChanged = args.chatData.title !== existingChat.title;
+      
+      // Only consider title change meaningful if we DON'T have better name sources
+      // (contactId or participantFullName take priority in display, so raw title changes don't matter)
+      const hasBetterNameSource = existingChat.contactId || existingChat.participantFullName;
+      const titleChanged = !hasBetterNameSource && args.chatData.title !== existingChat.title;
+      
+      // Check if participantFullName changed (this IS meaningful)
+      const participantNameChanged = args.chatData.participantFullName !== existingChat.participantFullName;
       
       const hasChanges = hasNewActivity || contactChanged || usernameChanged || 
                          phoneChanged || unreadChanged || archivedChanged || 
-                         mutedChanged || pinnedChanged || titleChanged;
+                         mutedChanged || pinnedChanged || titleChanged || participantNameChanged;
       
       if (!hasChanges) {
         // Nothing meaningful changed in chat metadata - skip the write.
@@ -151,7 +158,6 @@ export const upsertChat = internalMutation({
       // Build selective update - only include fields that are provided
       const updates: any = {
         localChatID: args.chatData.localChatID,
-        title: args.chatData.title,
         network: args.chatData.network,
         accountID: args.chatData.accountID,
         type: args.chatData.type,
@@ -163,6 +169,12 @@ export const upsertChat = internalMutation({
         lastSyncedAt: args.chatData.lastSyncedAt,
         syncSource: args.chatData.syncSource,
       };
+      
+      // Only update title if we don't have a better name source
+      // This prevents overwriting a good title with a phone number from the API
+      if (!hasBetterNameSource) {
+        updates.title = args.chatData.title;
+      }
       
       // Only update optional fields if they're provided
       if (args.chatData.description !== undefined) updates.description = args.chatData.description;

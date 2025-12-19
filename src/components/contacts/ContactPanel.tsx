@@ -43,7 +43,7 @@ interface Contact {
   locationIds?: Id<"locations">[]
   intimateConnection?: boolean
   intimateConnectionDate?: string
-  leadStatus?: "Talking" | "Planning" | "Dated" | "Connected" | "Current" | "Former"
+  leadStatus?: "Potential" | "Talking" | "Planning" | "Dated" | "Connected" | "Current" | "Former"
   setName?: string
   priority?: number
 }
@@ -53,6 +53,7 @@ interface ContactPanelProps {
   isLoading?: boolean
   searchedUsername?: string
   searchedPhoneNumber?: string // WhatsApp phone number
+  participantName?: string // Name from chat participant (for creating contacts)
 }
 
 const connectionOptions = [
@@ -70,6 +71,7 @@ const sexOptions = [
 ] as const
 
 const leadStatusOptions = [
+  { value: "Potential", label: "Potential" },
   { value: "Talking", label: "Talking" },
   { value: "Planning", label: "Planning" },
   { value: "Dated", label: "Dated" },
@@ -78,7 +80,7 @@ const leadStatusOptions = [
   { value: "Former", label: "Former" },
 ] as const
 
-export function ContactPanel({ contact, isLoading, searchedUsername, searchedPhoneNumber }: ContactPanelProps) {
+export function ContactPanel({ contact, isLoading, searchedUsername, searchedPhoneNumber, participantName }: ContactPanelProps) {
   const [notes, setNotes] = useState(contact?.notes || "")
   const [objective, setObjective] = useState(contact?.objective || "")
   const [isSaving, setIsSaving] = useState(false)
@@ -460,6 +462,7 @@ export function ContactPanel({ contact, isLoading, searchedUsername, searchedPho
         instagram: searchedUsername,
         whatsapp: searchedPhoneNumber,
         phoneNumber: searchedPhoneNumber, // For iMessage contacts
+        firstName: participantName, // Use the participant's display name
       })
       // Contact will be refetched automatically via Convex reactivity
     } catch (error) {
@@ -614,7 +617,7 @@ export function ContactPanel({ contact, isLoading, searchedUsername, searchedPho
           </div>
           
           {/* Priority Slider */}
-          <div className="flex flex-col items-center flex-shrink-0 w-8">
+          <div className="flex items-center flex-shrink-0 w-20">
             <Slider
               value={[priority]}
               onValueChange={handlePriorityChange}
@@ -622,8 +625,7 @@ export function ContactPanel({ contact, isLoading, searchedUsername, searchedPho
               min={1}
               max={100}
               step={1}
-              orientation="vertical"
-              className="h-10 min-h-10"
+              className="w-full"
             />
           </div>
           
