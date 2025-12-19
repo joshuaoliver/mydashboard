@@ -387,6 +387,137 @@ function SettingsPage() {
           </CardContent>
         </Card>
 
+        {/* Historical Sync */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <History className="w-5 h-5 text-indigo-500" />
+              <CardTitle>Historical Sync</CardTitle>
+            </div>
+            <CardDescription>Load older chats and messages going back in time</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {historicalSyncResult && (
+              <div className={`rounded-lg p-4 flex items-start gap-3 border ${
+                historicalSyncResult.type === 'success' 
+                  ? 'bg-green-500/10 border-green-500/20' 
+                  : 'bg-destructive/10 border-destructive/20'
+              }`}>
+                {historicalSyncResult.type === 'success' 
+                  ? <CheckCircle className="w-5 h-5 text-green-500" /> 
+                  : <AlertCircle className="w-5 h-5 text-destructive" />
+                }
+                <p className={`text-sm ${historicalSyncResult.type === 'success' ? 'text-green-500' : 'text-destructive'}`}>
+                  {historicalSyncResult.message}
+                </p>
+              </div>
+            )}
+            
+            {/* Live Status */}
+            {historicalSyncStatus && (historicalSyncStatus.isRunning || historicalSyncStatus.chatsProcessed > 0) && (
+              <div className="bg-muted rounded-lg p-4 space-y-2">
+                <div className="flex items-center gap-2">
+                  {historicalSyncStatus.isRunning && (
+                    <RefreshCw className="w-4 h-4 text-indigo-500 animate-spin" />
+                  )}
+                  <span className="text-sm font-medium">
+                    {historicalSyncStatus.isRunning ? 'Syncing...' : 'Last sync'}
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
+                  <div>
+                    <p className="text-muted-foreground text-xs">Chats Processed</p>
+                    <p className="font-semibold">{historicalSyncStatus.chatsProcessed}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground text-xs">Messages Loaded</p>
+                    <p className="font-semibold">{historicalSyncStatus.messagesLoaded}</p>
+                  </div>
+                  {historicalSyncStatus.currentChat && (
+                    <div>
+                      <p className="text-muted-foreground text-xs">Current Chat</p>
+                      <p className="font-semibold truncate">{historicalSyncStatus.currentChat}</p>
+                    </div>
+                  )}
+                </div>
+                {historicalSyncStatus.error && (
+                  <p className="text-xs text-destructive mt-2">{historicalSyncStatus.error}</p>
+                )}
+              </div>
+            )}
+            
+            {/* Settings */}
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label className="text-xs text-muted-foreground">Chats per batch</Label>
+                <Input
+                  type="number"
+                  min={1}
+                  max={20}
+                  value={chatsPerBatch}
+                  onChange={(e) => setChatsPerBatch(Number(e.target.value))}
+                  className="w-full"
+                  disabled={isHistoricalSyncing}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs text-muted-foreground">Messages per chat</Label>
+                <Input
+                  type="number"
+                  min={50}
+                  max={500}
+                  value={messagesPerChat}
+                  onChange={(e) => setMessagesPerChat(Number(e.target.value))}
+                  className="w-full"
+                  disabled={isHistoricalSyncing}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs text-muted-foreground">Options</Label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={loadOlderChatsFirst}
+                    onChange={(e) => setLoadOlderChatsFirst(e.target.checked)}
+                    disabled={isHistoricalSyncing}
+                    className="rounded"
+                  />
+                  <span className="text-sm">Load older chats</span>
+                </label>
+              </div>
+            </div>
+            
+            {/* Controls */}
+            <div className="flex items-start gap-4">
+              {!isHistoricalSyncing ? (
+                <Button 
+                  onClick={handleStartHistoricalSync} 
+                  variant="outline"
+                  className="border-indigo-500/50 hover:bg-indigo-500/10"
+                >
+                  <Play className="w-4 h-4 mr-2" />
+                  Start Sync
+                </Button>
+              ) : (
+                <Button 
+                  onClick={handleStopHistoricalSync} 
+                  variant="outline"
+                  className="border-red-500/50 hover:bg-red-500/10"
+                >
+                  <Square className="w-4 h-4 mr-2" />
+                  Stop
+                </Button>
+              )}
+              <div className="flex-1">
+                <p className="text-sm font-medium">Batch Historical Sync</p>
+                <p className="text-xs text-muted-foreground">
+                  Loads older chats and messages in batches. Runs continuously until stopped or complete.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Beeper Cache */}
         <Card>
           <CardHeader>

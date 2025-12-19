@@ -186,6 +186,7 @@ export default defineSchema({
       v.literal("Planning"),
       v.literal("Dated"),
       v.literal("Connected"),
+      v.literal("Current"),
       v.literal("Former")
     )), // Lead status for relationship tracking
     // PIN-protected fields
