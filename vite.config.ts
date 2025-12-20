@@ -11,6 +11,10 @@ export default defineConfig({
     TanStackRouterVite({
       target: 'react',
       autoCodeSplitting: true,
+      // Enable experimental HMR support for code splitting
+      experimental: {
+        enableCodeSplittingCache: true,
+      },
     }),
     tailwindcss(),
     react(),
@@ -18,6 +22,15 @@ export default defineConfig({
   ],
   server: {
     port: 5174,
+    // Reduce HMR sensitivity for generated files
+    hmr: {
+      overlay: true,
+    },
+    watch: {
+      // Ignore the generated route tree from triggering additional rebuilds
+      // The router plugin handles this file specially
+      ignored: ['**/routeTree.gen.ts'],
+    },
   },
   build: {
     target: 'esnext',

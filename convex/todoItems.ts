@@ -303,11 +303,15 @@ export const updateTodoText = mutation({
     if (document) {
       try {
         const content = JSON.parse(document.content);
-        updateTaskItemTextInContent(content, item.nodeId, args.text);
-        await ctx.db.patch(item.documentId, {
-          content: JSON.stringify(content),
-          updatedAt: now,
-        });
+        const updated = updateTaskItemTextInContent(content, item.nodeId, args.text);
+        if (updated) {
+          await ctx.db.patch(item.documentId, {
+            content: JSON.stringify(content),
+            updatedAt: now,
+          });
+        } else {
+          console.warn(`[updateTodoText] Failed to find taskItem ${item.nodeId} in document content`);
+        }
       } catch {
         // If we can't parse/update the content, just continue
         // The todo item is still updated
@@ -365,9 +369,15 @@ function updateTaskItemTextInContent(
           child.content = [{ type: "text", text: newText }];
           return true;
         }
+        // Recursively search nested content within the taskItem
+        if (child.content && updateTaskItemTextInContent(child, nodeId, newText)) {
+          return true;
+        }
       }
     }
-    return true;
+    // Only return false - we found the taskItem but couldn't update the text
+    // This allows the caller to know the update failed
+    return false;
   }
   
   if (node.content && Array.isArray(node.content)) {
