@@ -1,5 +1,4 @@
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -40,7 +39,6 @@ import {
   CalendarClock,
   BookOpen,
   Target,
-  Clock,
   Play,
   Pause,
 } from "lucide-react"
@@ -64,11 +62,7 @@ function formatTimerDisplay(seconds: number): string {
 
 function ActiveSessionTimer() {
   const navigate = useNavigate()
-  const plan = useConvexQuery(api.todayPlan.getTodayPlan, {})
-  const dbSession = useConvexQuery(
-    api.todayPlan.getActiveSession,
-    plan?._id ? { planId: plan._id } : "skip"
-  )
+  const dbSession = useConvexQuery(api.todayPlan.getActiveSession, {})
   
   const [elapsedSeconds, setElapsedSeconds] = React.useState(0)
 

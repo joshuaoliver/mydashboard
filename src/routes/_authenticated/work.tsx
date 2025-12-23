@@ -391,10 +391,7 @@ function WorkPage() {
   const planLoading = plan === undefined
 
   // Get active session from DB if exists
-  const dbSession = useConvexQuery(
-    api.todayPlan.getActiveSession,
-    plan?._id ? { planId: plan._id } : "skip"
-  )
+  const dbSession = useConvexQuery(api.todayPlan.getActiveSession, {})
 
   // Mutations
   const startTimerSession = useMutation(api.todayPlan.startTimerSession)

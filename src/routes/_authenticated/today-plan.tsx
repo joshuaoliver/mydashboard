@@ -52,14 +52,6 @@ export const Route = createFileRoute('/_authenticated/today-plan')({
 // Helper Functions
 // ==========================================
 
-function formatTime(timestamp: number): string {
-  return new Date(timestamp).toLocaleTimeString('en-US', {
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true,
-  })
-}
-
 function formatDuration(minutes: number): string {
   if (minutes < 60) return `${minutes}m`
   const hours = Math.floor(minutes / 60)
