@@ -1,6 +1,5 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { convexQuery, useConvexAction, useConvexMutation } from '@convex-dev/react-query'
+import { useQuery as useConvexQuery, useAction, useMutation } from 'convex/react'
 import { api } from '../../../../convex/_generated/api'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -31,33 +30,31 @@ export const Route = createFileRoute('/_authenticated/stats/gmail')({
 })
 
 function GmailStatsPage() {
-  const queryClient = useQueryClient()
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [refreshResult, setRefreshResult] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
   const [deletingId, setDeletingId] = useState<Id<"gmailSnapshots"> | null>(null)
 
-  const triggerSync = useConvexAction(api.gmailSync.triggerManualSync)
-  const { mutateAsync: deleteSnapshot } = useConvexMutation(api.gmailSync.deleteSnapshot)
+  const triggerSync = useAction(api.gmailSync.triggerManualSync)
+  const deleteSnapshot = useMutation(api.gmailSync.deleteSnapshot)
 
-  const { data: settings } = useQuery(
-    convexQuery(api.settingsStore.getGmailSettings, {})
+  // Use Convex native useQuery with "skip" for conditional queries
+  const settings = useConvexQuery(api.settingsStore.getGmailSettings, {})
+  const latestSnapshot = useConvexQuery(
+    api.gmailSync.getLatestSnapshot,
+    settings?.isConfigured ? {} : "skip"
   )
-  const { data: latestSnapshot } = useQuery({
-    ...convexQuery(api.gmailSync.getLatestSnapshot, {}),
-    enabled: !!settings?.isConfigured,
-  })
-  const { data: dailySummary } = useQuery({
-    ...convexQuery(api.gmailSync.getDailySummary, { days: 30 }),
-    enabled: !!settings?.isConfigured,
-  })
-  const { data: recentSnapshots } = useQuery({
-    ...convexQuery(api.gmailSync.getSnapshots, { limit: 20 }),
-    enabled: !!settings?.isConfigured,
-  })
-  const { data: stats } = useQuery({
-    ...convexQuery(api.gmailSync.getStats, {}),
-    enabled: !!settings?.isConfigured,
-  })
+  const dailySummary = useConvexQuery(
+    api.gmailSync.getDailySummary,
+    settings?.isConfigured ? { days: 30 } : "skip"
+  )
+  const recentSnapshots = useConvexQuery(
+    api.gmailSync.getSnapshots,
+    settings?.isConfigured ? { limit: 20 } : "skip"
+  )
+  const stats = useConvexQuery(
+    api.gmailSync.getStats,
+    settings?.isConfigured ? {} : "skip"
+  )
 
   const isConfigured = settings?.isConfigured ?? false
 
@@ -89,7 +86,7 @@ function GmailStatsPage() {
     setDeletingId(id)
     try {
       await deleteSnapshot({ id })
-      queryClient.invalidateQueries()
+      // Convex queries are reactive - they auto-update when backend data changes
     } catch (e) {
       console.error('Failed to delete snapshot:', e)
     } finally {

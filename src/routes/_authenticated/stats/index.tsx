@@ -21,25 +21,22 @@ export const Route = createFileRoute('/_authenticated/stats/')({
 })
 
 function StatsOverviewPage() {
-  // Gmail stats (with caching)
+  // Gmail stats (with caching) - use "skip" for conditional queries
   const gmailSettings = useCachedQuery(api.settingsStore.getGmailSettings, {})
   const gmailSnapshot = useCachedQuery(
-    api.gmailSync.getLatestSnapshot, 
-    {},
-    { enabled: !!gmailSettings?.isConfigured }
+    api.gmailSync.getLatestSnapshot,
+    gmailSettings?.isConfigured ? {} : "skip"
   )
 
-  // Hubstaff stats (with caching)
+  // Hubstaff stats (with caching) - use "skip" for conditional queries
   const hubstaffSettings = useCachedQuery(api.settingsStore.getHubstaffSettings, {})
   const hubstaffToday = useCachedQuery(
     api.hubstaffSync.getTodayStats,
-    {},
-    { enabled: !!hubstaffSettings?.isConfigured }
+    hubstaffSettings?.isConfigured ? {} : "skip"
   )
   const hubstaffWeek = useCachedQuery(
     api.hubstaffSync.getWeekStats,
-    {},
-    { enabled: !!hubstaffSettings?.isConfigured }
+    hubstaffSettings?.isConfigured ? {} : "skip"
   )
 
   // Linear stats (with caching)

@@ -1,7 +1,5 @@
 import { createFileRoute, useSearch } from '@tanstack/react-router'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { convexQuery } from '@convex-dev/react-query'
-import { useConvexMutation, useConvexAction } from '@convex-dev/react-query'
+import { useQuery as useConvexQuery, useMutation, useAction } from 'convex/react'
 import { api } from '../../../../convex/_generated/api'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -36,22 +34,18 @@ export const Route = createFileRoute('/_authenticated/settings/calendar')({
 
 function CalendarSettingsPage() {
   const searchParams = useSearch({ from: '/_authenticated/settings/calendar' })
-  const queryClient = useQueryClient()
 
-  const { data: calendarSettings } = useQuery(
-    convexQuery(api.googleCalendar.getSettings, {})
+  // Use Convex native useQuery with "skip" for conditional queries
+  const calendarSettings = useConvexQuery(api.googleCalendar.getSettings, {})
+  const appSettings = useConvexQuery(api.settingsStore.getCalendarSettings, {})
+  const todayEvents = useConvexQuery(
+    api.googleCalendar.getTodayEvents,
+    calendarSettings?.isConfigured ? {} : "skip"
   )
-  const { data: appSettings } = useQuery(
-    convexQuery(api.settingsStore.getCalendarSettings, {})
-  )
-  const { data: todayEvents } = useQuery({
-    ...convexQuery(api.googleCalendar.getTodayEvents, {}),
-    enabled: !!calendarSettings?.isConfigured,
-  })
 
-  const setSetting = useConvexMutation(api.settingsStore.setSetting)
-  const triggerSync = useConvexAction(api.googleCalendar.triggerSync)
-  const disconnect = useConvexMutation(api.googleCalendar.disconnect)
+  const setSetting = useMutation(api.settingsStore.setSetting)
+  const triggerSync = useAction(api.googleCalendar.triggerSync)
+  const disconnect = useMutation(api.googleCalendar.disconnect)
 
   const [clientId, setClientId] = useState(appSettings?.clientId ?? '')
   const [clientSecret, setClientSecret] = useState(appSettings?.clientSecret ?? '')
@@ -67,13 +61,13 @@ function CalendarSettingsPage() {
   } | null>(null)
 
   // Handle OAuth callback results from query params
+  // Note: Convex queries are reactive - they auto-update when backend data changes
   useEffect(() => {
     if (searchParams.oauth_success === 'true') {
       setOauthMessage({
         type: 'success',
         message: 'Google Calendar connected successfully!',
       })
-      queryClient.invalidateQueries()
       window.history.replaceState({}, '', '/settings/calendar')
     } else if (searchParams.oauth_error) {
       setOauthMessage({
@@ -82,7 +76,7 @@ function CalendarSettingsPage() {
       })
       window.history.replaceState({}, '', '/settings/calendar')
     }
-  }, [searchParams, queryClient])
+  }, [searchParams])
 
   // Update local state when settings load
   useEffect(() => {
@@ -164,7 +158,7 @@ function CalendarSettingsPage() {
           success: true,
           message: `Synced ${result.count ?? 0} events for today`,
         })
-        queryClient.invalidateQueries()
+        // Convex queries are reactive - they auto-update when backend data changes
       } else {
         setSyncResult({
           success: false,
@@ -186,7 +180,7 @@ function CalendarSettingsPage() {
     if (!confirm('Are you sure you want to disconnect Google Calendar?')) return
     try {
       await disconnect({})
-      queryClient.invalidateQueries()
+      // Convex queries are reactive - they auto-update when backend data changes
       setOauthMessage({
         type: 'success',
         message: 'Google Calendar disconnected',

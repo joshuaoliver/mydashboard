@@ -1,7 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { useQuery } from '@tanstack/react-query'
-import { convexQuery } from '@convex-dev/react-query'
-import { useAction } from 'convex/react'
+import { useQuery as useConvexQuery, useAction } from 'convex/react'
 import { api } from '../../../convex/_generated/api'
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
@@ -46,18 +44,24 @@ function SummariesPage() {
   const [isGenerating, setIsGenerating] = useState(false)
   const [generateError, setGenerateError] = useState<string | null>(null)
 
-  // Get recent summaries
-  const { data: summaries, isLoading: summariesLoading, refetch: refetchSummaries } = useQuery(
-    convexQuery(api.dailySummary.getRecentSummaries, { limit: 14 })
-  )
+  // Get recent summaries - using Convex's native useQuery
+  const summaries = useConvexQuery(api.dailySummary.getRecentSummaries, { limit: 14 })
+  const summariesLoading = summaries === undefined
 
-  // Get selected summary detail
-  const { data: selectedSummary, isLoading: summaryLoading } = useQuery(
-    convexQuery(api.dailySummary.getSummary, { date: selectedDate ?? '' }),
-    { enabled: !!selectedDate }
+  // Get selected summary detail - use "skip" for conditional queries
+  const selectedSummary = useConvexQuery(
+    api.dailySummary.getSummary,
+    selectedDate ? { date: selectedDate } : "skip"
   )
+  const summaryLoading = selectedDate ? selectedSummary === undefined : false
 
   const triggerGeneration = useAction(api.dailySummary.triggerSummaryGeneration)
+  
+  // Refetch is not needed with Convex - data is reactive and auto-updates
+  const refetchSummaries = () => {
+    // Convex queries are reactive, so this is a no-op
+    // The data will automatically update when the backend changes
+  }
 
   const handleGenerate = async (date?: string) => {
     setIsGenerating(true)

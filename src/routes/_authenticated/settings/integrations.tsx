@@ -1,6 +1,5 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { useQuery } from '@tanstack/react-query'
-import { convexQuery, useConvexAction } from '@convex-dev/react-query'
+import { useQuery as useConvexQuery, useAction } from 'convex/react'
 import { api } from '../../../../convex/_generated/api'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -26,42 +25,34 @@ export const Route = createFileRoute('/_authenticated/settings/integrations')({
 })
 
 function IntegrationsPage() {
-  // Gmail
-  const { data: gmailSettings } = useQuery(
-    convexQuery(api.settingsStore.getGmailSettings, {})
+  // Gmail - use Convex native useQuery with "skip" for conditional queries
+  const gmailSettings = useConvexQuery(api.settingsStore.getGmailSettings, {})
+  const gmailStats = useConvexQuery(
+    api.gmailSync.getStats,
+    gmailSettings?.isConfigured ? {} : "skip"
   )
-  const { data: gmailStats } = useQuery({
-    ...convexQuery(api.gmailSync.getStats, {}),
-    enabled: !!gmailSettings?.isConfigured,
-  })
-  const gmailSync = useConvexAction(api.gmailSync.triggerManualSync)
+  const gmailSync = useAction(api.gmailSync.triggerManualSync)
 
   // Hubstaff
-  const { data: hubstaffSettings } = useQuery(
-    convexQuery(api.settingsStore.getHubstaffSettings, {})
+  const hubstaffSettings = useConvexQuery(api.settingsStore.getHubstaffSettings, {})
+  const hubstaffStats = useConvexQuery(
+    api.hubstaffSync.getStats,
+    hubstaffSettings?.isConfigured ? {} : "skip"
   )
-  const { data: hubstaffStats } = useQuery({
-    ...convexQuery(api.hubstaffSync.getStats, {}),
-    enabled: !!hubstaffSettings?.isConfigured,
-  })
-  const hubstaffSync = useConvexAction(api.hubstaffSync.triggerManualSync)
-  const hubstaffBackfill = useConvexAction(api.hubstaffSync.backfillHistoricalData)
+  const hubstaffSync = useAction(api.hubstaffSync.triggerManualSync)
+  const hubstaffBackfill = useAction(api.hubstaffSync.backfillHistoricalData)
 
   // Linear
-  const { data: linearStats } = useQuery(
-    convexQuery(api.linearSync.getStats, {})
-  )
-  const linearSync = useConvexAction(api.linearSync.triggerManualSync)
+  const linearStats = useConvexQuery(api.linearSync.getStats, {})
+  const linearSync = useAction(api.linearSync.triggerManualSync)
 
   // Google Calendar
-  const { data: calendarSettings } = useQuery(
-    convexQuery(api.googleCalendar.getSettings, {})
+  const calendarSettings = useConvexQuery(api.googleCalendar.getSettings, {})
+  const calendarEvents = useConvexQuery(
+    api.googleCalendar.getTodayEvents,
+    calendarSettings?.isConfigured ? {} : "skip"
   )
-  const { data: calendarEvents } = useQuery({
-    ...convexQuery(api.googleCalendar.getTodayEvents, {}),
-    enabled: !!calendarSettings?.isConfigured,
-  })
-  const calendarSync = useConvexAction(api.googleCalendar.triggerSync)
+  const calendarSync = useAction(api.googleCalendar.triggerSync)
 
   // State for sync/backfill operations
   const [syncing, setSyncing] = useState<string | null>(null)
