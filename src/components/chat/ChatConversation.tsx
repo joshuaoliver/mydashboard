@@ -28,15 +28,21 @@ interface ChatConversationProps {
   onThreadCreated?: (threadId: string) => void;
 }
 
-// Default model to use when none is selected
-const DEFAULT_MODEL = "google/gemini-3-flash";
+// Fallback model if settings haven't loaded yet
+const FALLBACK_MODEL = "google/gemini-3-flash";
 
 export function ChatConversation({ threadId, onThreadCreated }: ChatConversationProps) {
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [selectedModel, setSelectedModel] = useState<string>(DEFAULT_MODEL);
   const [attachment, setAttachment] = useState<AttachmentInfo | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Query the chat-agent setting for default model
+  const chatAgentSetting = useQuery(api.aiSettings.getSetting, { key: "chat-agent" });
+  const defaultModel = chatAgentSetting?.modelId || FALLBACK_MODEL;
+
+  // State for selected model - initialized from settings
+  const [selectedModel, setSelectedModel] = useState<string | null>(null);
 
   // Query the current thread to get its model
   const thread = useQuery(
@@ -44,12 +50,17 @@ export function ChatConversation({ threadId, onThreadCreated }: ChatConversation
     threadId ? { threadId: threadId as Id<"agentThreads"> } : "skip"
   );
 
-  // Sync selected model with thread's model when thread loads
+  // Initialize selected model from thread or settings
   useEffect(() => {
     if (thread?.modelId) {
       setSelectedModel(thread.modelId);
+    } else if (!selectedModel && defaultModel) {
+      setSelectedModel(defaultModel);
     }
-  }, [thread?.modelId]);
+  }, [thread?.modelId, defaultModel, selectedModel]);
+
+  // Effective model to use (with fallback chain)
+  const effectiveModel = selectedModel || defaultModel;
 
   // Mutations
   const sendMessage = useMutation(api.chat.sendMessage);
@@ -205,7 +216,7 @@ export function ChatConversation({ threadId, onThreadCreated }: ChatConversation
         >
           <PromptInputToolbar className="px-2 py-1.5 border-b">
             <ModelSelector
-              value={selectedModel}
+              value={effectiveModel}
               onChange={handleModelChange}
               disabled={isLoading || isStreamingAny}
             />

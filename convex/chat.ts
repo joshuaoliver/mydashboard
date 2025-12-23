@@ -3,12 +3,9 @@ import { v } from "convex/values";
 import { paginationOptsValidator } from "convex/server";
 import { listUIMessages, syncStreams, vStreamArgs } from "@convex-dev/agent";
 import { components, internal } from "./_generated/api";
-import { chatAgent } from "./agentChat";
+import { chatAgent, createAgentWithModel, createModelFromId, getDefaultModelId } from "./agentChat";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { generateText } from "ai";
-import { createGoogleGenerativeAI } from "@ai-sdk/google";
-import { createOpenAI } from "@ai-sdk/openai";
-import { createAnthropic } from "@ai-sdk/anthropic";
 import { DEFAULT_SETTINGS } from "./aiSettings";
 
 // =============================================================================
@@ -316,10 +313,19 @@ export const generateResponseWithAttachment = internalAction({
       promptWithAttachment = `[File attached: ${args.fileName || "file"} (${args.mimeType})]\n\n${args.prompt}`;
     }
 
-    // Stream the AI response
-    // Note: For full multimodal support, the agent would need to be configured
-    // to handle image inputs directly. For now, we describe the attachment.
-    await chatAgent.streamText(
+    // Get the thread's selected model or fall back to settings default
+    const threadModelId = await ctx.runQuery(internal.chat.getThreadModel, {
+      threadId: args.threadId,
+    });
+    let modelId = threadModelId;
+    if (!modelId) {
+      const setting = await ctx.runQuery(internal.chat.getChatAgentSetting, {});
+      modelId = setting?.modelId || getDefaultModelId();
+    }
+
+    // Create agent with the appropriate model and stream response
+    const agent = createAgentWithModel(modelId);
+    await agent.streamText(
       ctx,
       { threadId: args.threadId },
       { prompt: promptWithAttachment },
@@ -347,6 +353,19 @@ export const getThreadModel = internalQuery({
 });
 
 /**
+ * Internal query to get chat-agent setting
+ */
+export const getChatAgentSetting = internalQuery({
+  args: {},
+  handler: async (ctx) => {
+    return await ctx.db
+      .query("aiSettings")
+      .withIndex("by_key", (q) => q.eq("key", "chat-agent"))
+      .first();
+  },
+});
+
+/**
  * Generate AI response asynchronously with streaming
  */
 export const generateResponseAsync = internalAction({
@@ -355,20 +374,25 @@ export const generateResponseAsync = internalAction({
     prompt: v.string(),
   },
   handler: async (ctx, args) => {
-    // Get the thread's selected model (for future use)
-    const modelId = await ctx.runQuery(internal.chat.getThreadModel, {
+    // Get the thread's selected model or fall back to settings default
+    const threadModelId = await ctx.runQuery(internal.chat.getThreadModel, {
       threadId: args.threadId,
     });
 
-    // Stream the AI response
-    // Note: The model is stored for future implementation when we add
-    // dynamic model switching. Currently using the agent's default model.
-    await chatAgent.streamText(
+    // Get model from settings if thread has no model set
+    let modelId = threadModelId;
+    if (!modelId) {
+      const setting = await ctx.runQuery(internal.chat.getChatAgentSetting, {});
+      modelId = setting?.modelId || getDefaultModelId();
+    }
+
+    // Create agent with the appropriate model and stream response
+    const agent = createAgentWithModel(modelId);
+    await agent.streamText(
       ctx,
       { threadId: args.threadId },
       { prompt: args.prompt },
       {
-        // Model ID is available as `modelId` for future dynamic model selection
         saveStreamDeltas: {
           chunking: "word",
           throttleMs: 100,
@@ -456,37 +480,6 @@ export const updateThreadTitleInternal = internalMutation({
     }
   },
 });
-
-/**
- * Helper to create a model instance from a model ID string
- */
-function createModelFromId(modelId: string) {
-  const [provider, modelName] = modelId.split("/");
-
-  switch (provider) {
-    case "google":
-      const google = createGoogleGenerativeAI({
-        apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY,
-      });
-      return google(modelName);
-    case "openai":
-      const openai = createOpenAI({
-        apiKey: process.env.OPENAI_API_KEY,
-      });
-      return openai(modelName);
-    case "anthropic":
-      const anthropic = createAnthropic({
-        apiKey: process.env.ANTHROPIC_API_KEY,
-      });
-      return anthropic(modelName);
-    default:
-      // Default to Google for unknown providers
-      const defaultGoogle = createGoogleGenerativeAI({
-        apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY,
-      });
-      return defaultGoogle("gemini-2.0-flash");
-  }
-}
 
 /**
  * Generate a title for a thread based on the first message
