@@ -889,6 +889,7 @@ export default defineSchema({
     userId: v.string(),                       // User who owns this thread
     lastMessageAt: v.optional(v.number()),   // Timestamp of last message
     messageCount: v.number(),                 // Number of messages in thread
+    modelId: v.optional(v.string()),         // User-selected model for this thread (e.g., "openai/gpt-4o")
     createdAt: v.number(),
     updatedAt: v.number(),
   })

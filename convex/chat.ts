@@ -1,5 +1,7 @@
-import { query, mutation, internalAction } from "./_generated/server";
+import { query, mutation, internalAction, internalQuery } from "./_generated/server";
 import { v } from "convex/values";
+import { paginationOptsValidator } from "convex/server";
+import { listUIMessages, syncStreams, vStreamArgs } from "@convex-dev/agent";
 import { components, internal } from "./_generated/api";
 import { chatAgent } from "./agentChat";
 import { getAuthUserId } from "@convex-dev/auth/server";
@@ -48,6 +50,7 @@ export const getThread = query({
       title: thread.title || "New conversation",
       lastMessageAt: thread.lastMessageAt,
       messageCount: thread.messageCount,
+      modelId: thread.modelId,
       createdAt: thread.createdAt,
     };
   },
@@ -99,6 +102,22 @@ export const updateThreadTitle = mutation({
 });
 
 /**
+ * Update thread model
+ */
+export const updateThreadModel = mutation({
+  args: {
+    threadId: v.id("agentThreads"),
+    modelId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.threadId, {
+      modelId: args.modelId,
+      updatedAt: Date.now(),
+    });
+  },
+});
+
+/**
  * Delete a thread
  */
 export const deleteThread = mutation({
@@ -127,6 +146,37 @@ export const deleteThread = mutation({
 
     // Delete the thread
     await ctx.db.delete(args.threadId);
+  },
+});
+
+// =============================================================================
+// Message Queries with Streaming Support
+// =============================================================================
+
+/**
+ * List messages for a thread with streaming support
+ * This is the main query for the chat UI - returns paginated messages + active streams
+ */
+export const listThreadMessages = query({
+  args: {
+    threadId: v.string(),
+    paginationOpts: paginationOptsValidator,
+    streamArgs: vStreamArgs,
+  },
+  handler: async (ctx, args) => {
+    // Get paginated messages from the agent component
+    const paginated = await listUIMessages(ctx, components.agent, {
+      threadId: args.threadId,
+      paginationOpts: args.paginationOpts,
+    });
+
+    // Get active stream deltas for real-time streaming
+    const streams = await syncStreams(ctx, components.agent, {
+      threadId: args.threadId,
+      streamArgs: args.streamArgs,
+    });
+
+    return { ...paginated, streams };
   },
 });
 
@@ -173,6 +223,19 @@ export const sendMessage = mutation({
 });
 
 /**
+ * Internal query to get thread model
+ */
+export const getThreadModel = internalQuery({
+  args: { threadId: v.string() },
+  handler: async (ctx, args) => {
+    // Find the thread by string ID
+    const threads = await ctx.db.query("agentThreads").collect();
+    const thread = threads.find((t) => t._id.toString() === args.threadId);
+    return thread?.modelId || null;
+  },
+});
+
+/**
  * Generate AI response asynchronously with streaming
  */
 export const generateResponseAsync = internalAction({
@@ -181,12 +244,20 @@ export const generateResponseAsync = internalAction({
     prompt: v.string(),
   },
   handler: async (ctx, args) => {
+    // Get the thread's selected model (for future use)
+    const modelId = await ctx.runQuery(internal.chat.getThreadModel, {
+      threadId: args.threadId,
+    });
+
     // Stream the AI response
+    // Note: The model is stored for future implementation when we add
+    // dynamic model switching. Currently using the agent's default model.
     await chatAgent.streamText(
       ctx,
       { threadId: args.threadId },
       { prompt: args.prompt },
       {
+        // Model ID is available as `modelId` for future dynamic model selection
         saveStreamDeltas: {
           chunking: "word",
           throttleMs: 100,
