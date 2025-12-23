@@ -48,6 +48,11 @@ function ChatPage() {
   );
   const pendingCount = pendingActions?.filter((a) => a.status === "pending").length || 0;
 
+  // Get thread title for mobile header
+  const threads = useQuery(api.chat.listThreads);
+  const currentThread = threads?.find((t) => t.id.toString() === selectedThreadId);
+  const threadTitle = currentThread?.title || "Conversation";
+
   const handleSelectThread = (threadId: string) => {
     setSelectedThreadId(threadId);
     if (isMobile) {
@@ -129,7 +134,7 @@ function ChatPage() {
                     <ArrowLeft className="h-4 w-4" />
                   </Button>
                   <SheetTitle className="text-lg font-semibold truncate flex-1 min-w-0">
-                    Conversation
+                    {threadTitle}
                   </SheetTitle>
                   {pendingCount > 0 && (
                     <Button
