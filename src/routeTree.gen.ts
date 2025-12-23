@@ -14,6 +14,7 @@ import { Route as SignInRouteImport } from './routes/sign-in'
 import { Route as GmailCallbackRouteImport } from './routes/gmail-callback'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
+import { Route as AuthenticatedWorkRouteImport } from './routes/_authenticated/work'
 import { Route as AuthenticatedTodosListRouteImport } from './routes/_authenticated/todos-list'
 import { Route as AuthenticatedTodosRouteImport } from './routes/_authenticated/todos'
 import { Route as AuthenticatedTodayPlanRouteImport } from './routes/_authenticated/today-plan'
@@ -67,6 +68,11 @@ const AuthenticatedRoute = AuthenticatedRouteImport.update({
 const AuthenticatedIndexRoute = AuthenticatedIndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedWorkRoute = AuthenticatedWorkRouteImport.update({
+  id: '/work',
+  path: '/work',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedTodosListRoute = AuthenticatedTodosListRouteImport.update({
@@ -250,6 +256,7 @@ export interface FileRoutesByFullPath {
   '/today-plan': typeof AuthenticatedTodayPlanRoute
   '/todos': typeof AuthenticatedTodosRouteWithChildren
   '/todos-list': typeof AuthenticatedTodosListRoute
+  '/work': typeof AuthenticatedWorkRoute
   '/': typeof AuthenticatedIndexRoute
   '/contacts/$contactId': typeof AuthenticatedContactsContactIdRoute
   '/settings/ai': typeof AuthenticatedSettingsAiRoute
@@ -282,6 +289,7 @@ export interface FileRoutesByTo {
   '/summaries': typeof AuthenticatedSummariesRoute
   '/today-plan': typeof AuthenticatedTodayPlanRoute
   '/todos-list': typeof AuthenticatedTodosListRoute
+  '/work': typeof AuthenticatedWorkRoute
   '/': typeof AuthenticatedIndexRoute
   '/contacts/$contactId': typeof AuthenticatedContactsContactIdRoute
   '/settings/ai': typeof AuthenticatedSettingsAiRoute
@@ -320,6 +328,7 @@ export interface FileRoutesById {
   '/_authenticated/today-plan': typeof AuthenticatedTodayPlanRoute
   '/_authenticated/todos': typeof AuthenticatedTodosRouteWithChildren
   '/_authenticated/todos-list': typeof AuthenticatedTodosListRoute
+  '/_authenticated/work': typeof AuthenticatedWorkRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
   '/_authenticated/contacts/$contactId': typeof AuthenticatedContactsContactIdRoute
   '/_authenticated/settings/ai': typeof AuthenticatedSettingsAiRoute
@@ -358,6 +367,7 @@ export interface FileRouteTypes {
     | '/today-plan'
     | '/todos'
     | '/todos-list'
+    | '/work'
     | '/'
     | '/contacts/$contactId'
     | '/settings/ai'
@@ -390,6 +400,7 @@ export interface FileRouteTypes {
     | '/summaries'
     | '/today-plan'
     | '/todos-list'
+    | '/work'
     | '/'
     | '/contacts/$contactId'
     | '/settings/ai'
@@ -427,6 +438,7 @@ export interface FileRouteTypes {
     | '/_authenticated/today-plan'
     | '/_authenticated/todos'
     | '/_authenticated/todos-list'
+    | '/_authenticated/work'
     | '/_authenticated/'
     | '/_authenticated/contacts/$contactId'
     | '/_authenticated/settings/ai'
@@ -493,6 +505,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof AuthenticatedIndexRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/work': {
+      id: '/_authenticated/work'
+      path: '/work'
+      fullPath: '/work'
+      preLoaderRoute: typeof AuthenticatedWorkRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/todos-list': {
@@ -816,6 +835,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedTodayPlanRoute: typeof AuthenticatedTodayPlanRoute
   AuthenticatedTodosRoute: typeof AuthenticatedTodosRouteWithChildren
   AuthenticatedTodosListRoute: typeof AuthenticatedTodosListRoute
+  AuthenticatedWorkRoute: typeof AuthenticatedWorkRoute
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
 }
 
@@ -829,6 +849,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedTodayPlanRoute: AuthenticatedTodayPlanRoute,
   AuthenticatedTodosRoute: AuthenticatedTodosRouteWithChildren,
   AuthenticatedTodosListRoute: AuthenticatedTodosListRoute,
+  AuthenticatedWorkRoute: AuthenticatedWorkRoute,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
 }
 

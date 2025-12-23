@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { useMutation, useAction, useQuery as useConvexQuery } from 'convex/react'
+import { useMutation, useQuery as useConvexQuery } from 'convex/react'
 import { api } from '../../../convex/_generated/api'
 import type { Id } from '../../../convex/_generated/dataModel'
 import { useState, useEffect, useCallback, useMemo } from 'react'
@@ -21,7 +21,6 @@ import {
   Clock,
   CheckCircle2,
   ListTodo,
-  Zap,
   Plus,
   X,
   Coffee,
@@ -42,11 +41,8 @@ import {
   Briefcase,
 } from 'lucide-react'
 import { cn } from '~/lib/utils'
-
-// Note: @ilamy/calendar integration is pending - the package API differs from expected
-// TODO: Implement calendar view using IlamyCalendar component from @ilamy/calendar
-import type { CalendarEvent as CalendarEventType } from '@ilamy/calendar'
-type CalendarEventData = CalendarEventType
+import { IlamyCalendar, type CalendarEvent } from '@ilamy/calendar'
+import dayjs from 'dayjs'
 
 export const Route = createFileRoute('/_authenticated/today-plan')({
   component: TodayPlanPage,
@@ -118,13 +114,8 @@ interface WorkItem {
   projectName?: string
 }
 
-// Calendar event types for ilamy Calendar
-interface CalendarEventData {
-  id: string
-  title: string
-  start: Date
-  end: Date
-  color?: 'blue' | 'green' | 'red' | 'yellow' | 'purple' | 'pink' | 'indigo' | 'teal'
+// Extended calendar event data stored in the CalendarEvent.data field
+interface EventCustomData {
   type: 'google' | 'work-block' | 'planned-task'
   taskType?: 'todo' | 'linear' | 'adhoc'
   taskId?: string
@@ -652,9 +643,12 @@ function MomentumBar({ momentum }: MomentumBarProps) {
 // Custom Calendar Event Renderer
 // ==========================================
 
-function CustomEventCard({ event }: { event: CalendarEventData }) {
+function CustomEventCard({ event }: { event: CalendarEvent }) {
+  const customData = event.data as EventCustomData | undefined
+  const eventType = customData?.type ?? 'google'
+  
   const getEventStyles = () => {
-    switch (event.type) {
+    switch (eventType) {
       case 'google':
         return 'bg-red-100 border-red-300 text-red-800 dark:bg-red-900/30 dark:border-red-700 dark:text-red-200'
       case 'work-block':
@@ -667,7 +661,7 @@ function CustomEventCard({ event }: { event: CalendarEventData }) {
   }
 
   const getIcon = () => {
-    switch (event.type) {
+    switch (eventType) {
       case 'google':
         return <CalendarIcon className="w-3 h-3" />
       case 'work-block':
@@ -688,12 +682,12 @@ function CustomEventCard({ event }: { event: CalendarEventData }) {
         {getIcon()}
         <span className="truncate">{event.title}</span>
       </div>
-      {event.projectName && (
+      {customData?.projectName && (
         <p className="text-[10px] opacity-70 truncate mt-0.5">
-          {event.projectName}
+          {customData.projectName}
         </p>
       )}
-      {event.type === 'work-block' && (
+      {eventType === 'work-block' && (
         <p className="text-[10px] opacity-70 mt-0.5">
           Work block • Tasks hidden
         </p>
@@ -756,8 +750,8 @@ function TodayPlanPage() {
   }, [plan, planLoading, getOrCreatePlan])
 
   // Convert data to ilamy Calendar events
-  const calendarDisplayEvents: CalendarEventData[] = useMemo(() => {
-    const events: CalendarEventData[] = []
+  const calendarDisplayEvents: CalendarEvent[] = useMemo(() => {
+    const events: CalendarEvent[] = []
 
     // Google Calendar events (scheduled commitments)
     if (calendarEvents) {
@@ -765,10 +759,11 @@ function TodayPlanPage() {
         events.push({
           id: `google-${event._id}`,
           title: event.summary,
-          start: new Date(event.startTime),
-          end: new Date(event.endTime),
-          color: 'red',
-          type: 'google',
+          start: dayjs(event.startTime),
+          end: dayjs(event.endTime),
+          backgroundColor: '#fca5a5',
+          color: '#991b1b',
+          data: { type: 'google' } as EventCustomData,
         })
       })
     }
@@ -779,27 +774,31 @@ function TodayPlanPage() {
         events.push({
           id: `work-block-${block.id}`,
           title: 'Work Block',
-          start: new Date(block.startTime),
-          end: new Date(block.endTime),
-          color: 'indigo',
-          type: 'work-block',
+          start: dayjs(block.startTime),
+          end: dayjs(block.endTime),
+          backgroundColor: '#a5b4fc',
+          color: '#3730a3',
+          data: { type: 'work-block' } as EventCustomData,
         })
       })
     }
 
     // Planned tasks (explicit user-scheduled tasks)
     if (plannedTasks) {
-      plannedTasks.forEach((task) => {
+      plannedTasks.forEach((task: { _id: string; taskTitle: string; startTime: number; endTime: number; taskType: 'todo' | 'linear' | 'adhoc'; taskId: string; projectName?: string }) => {
         events.push({
           id: `planned-${task._id}`,
           title: task.taskTitle,
-          start: new Date(task.startTime),
-          end: new Date(task.endTime),
-          color: 'green',
-          type: 'planned-task',
-          taskType: task.taskType,
-          taskId: task.taskId,
-          projectName: task.projectName,
+          start: dayjs(task.startTime),
+          end: dayjs(task.endTime),
+          backgroundColor: '#86efac',
+          color: '#166534',
+          data: {
+            type: 'planned-task',
+            taskType: task.taskType,
+            taskId: task.taskId,
+            projectName: task.projectName,
+          } as EventCustomData,
         })
       })
     }
@@ -994,85 +993,31 @@ function TodayPlanPage() {
                   }
                 }}
               >
-                <Calendar
-                  value={currentDate}
-                  onChange={setCurrentDate}
+                <IlamyCalendar
                   events={calendarDisplayEvents}
-                >
-                  {/* Calendar Navigation Header */}
-                  <div className="flex items-center justify-between px-4 py-2 border-b bg-muted/30">
-                    <div className="flex items-center gap-2">
-                      <CalendarPrevTrigger>
-                        <Button variant="outline" size="icon" className="h-8 w-8">
-                          ←
-                        </Button>
-                      </CalendarPrevTrigger>
-                      <CalendarTodayTrigger>
-                        <Button variant="outline" size="sm" className="h-8">
-                          Today
-                        </Button>
-                      </CalendarTodayTrigger>
-                      <CalendarNextTrigger>
-                        <Button variant="outline" size="icon" className="h-8 w-8">
-                          →
-                        </Button>
-                      </CalendarNextTrigger>
-                    </div>
-                    
-                    <CalendarCurrentDate className="text-sm font-semibold" />
-                    
-                    <div className="flex items-center gap-1">
-                      <CalendarViewTrigger view="day">
-                        <Button variant="outline" size="sm" className="h-8">
-                          Day
-                        </Button>
-                      </CalendarViewTrigger>
-                      <CalendarViewTrigger view="week">
-                        <Button variant="outline" size="sm" className="h-8">
-                          Week
-                        </Button>
-                      </CalendarViewTrigger>
-                    </div>
-                  </div>
-
-                  {/* Day View (default) */}
-                  <CalendarDayView
-                    className="h-[calc(100vh-220px)]"
-                    startHour={7}
-                    endHour={22}
-                    renderEvent={({ event }) => (
-                      <CalendarEvent
-                        event={event}
-                        onEventClick={() => {
-                          // Handle event click - could open details
-                          console.log('Clicked event:', event)
-                        }}
-                        onEventDrop={({ event, start, end }) => {
-                          handleEventDrop(event.id, start, end)
-                        }}
-                      >
-                        <CustomEventCard event={event as unknown as CalendarEventData} />
-                      </CalendarEvent>
-                    )}
-                  />
-
-                  {/* Week View (when selected) */}
-                  <CalendarWeekView
-                    className="h-[calc(100vh-220px)]"
-                    startHour={7}
-                    endHour={22}
-                    renderEvent={({ event }) => (
-                      <CalendarEvent
-                        event={event}
-                        onEventClick={() => {
-                          console.log('Clicked event:', event)
-                        }}
-                      >
-                        <CustomEventCard event={event as unknown as CalendarEventData} />
-                      </CalendarEvent>
-                    )}
-                  />
-                </Calendar>
+                  initialView="day"
+                  initialDate={currentDate}
+                  firstDayOfWeek="monday"
+                  timeFormat="12-hour"
+                  onDateChange={(date) => setCurrentDate(date.toDate())}
+                  onEventClick={(event) => {
+                    console.log('Clicked event:', event)
+                  }}
+                  onCellClick={(info) => {
+                    console.log('Cell clicked:', info.start, info.end)
+                  }}
+                  onEventUpdate={(event) => {
+                    // Handle event drag/resize
+                    const customData = event.data as EventCustomData | undefined
+                    if (customData?.type === 'planned-task') {
+                      const id = String(event.id).replace('planned-', '')
+                      handleEventDrop(id, event.start.toDate(), event.end.toDate())
+                    }
+                  }}
+                  renderEvent={(event) => (
+                    <CustomEventCard event={event} />
+                  )}
+                />
               </div>
             )}
           </div>

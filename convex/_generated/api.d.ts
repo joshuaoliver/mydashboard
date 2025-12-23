@@ -52,6 +52,7 @@ import type * as messageHelpers from "../messageHelpers.js";
 import type * as messageStats from "../messageStats.js";
 import type * as myFunctions from "../myFunctions.js";
 import type * as operatorAI from "../operatorAI.js";
+import type * as plannedTasks from "../plannedTasks.js";
 import type * as projectsStore from "../projectsStore.js";
 import type * as prompts from "../prompts.js";
 import type * as settingsStore from "../settingsStore.js";
@@ -114,6 +115,7 @@ declare const fullApi: ApiFromModules<{
   messageStats: typeof messageStats;
   myFunctions: typeof myFunctions;
   operatorAI: typeof operatorAI;
+  plannedTasks: typeof plannedTasks;
   projectsStore: typeof projectsStore;
   prompts: typeof prompts;
   settingsStore: typeof settingsStore;
