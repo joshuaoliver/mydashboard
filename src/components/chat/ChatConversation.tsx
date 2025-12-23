@@ -18,7 +18,25 @@ import {
 import { VoiceRecorder } from "./VoiceRecorder";
 import { ModelSelector } from "./ModelSelector";
 import { AttachmentButton, type AttachmentInfo } from "./AttachmentButton";
-import { Bot, User, Loader2, AlertCircle, Wrench } from "lucide-react";
+import {
+  Bot,
+  User,
+  Loader2,
+  AlertCircle,
+  Wrench,
+  UserSearch,
+  CheckSquare,
+  Calendar,
+  FolderKanban,
+  FileText,
+  MessageSquare,
+  Clock,
+  ListTodo,
+  ChevronDown,
+  ChevronUp,
+  CheckCircle2,
+  XCircle
+} from "lucide-react";
 import { cn } from "~/lib/utils";
 import { Button } from "@/components/ui/button";
 import type { Id } from "../../../convex/_generated/dataModel";
@@ -352,6 +370,83 @@ function StreamingMessage({ message }: { message: UIMessage }) {
   );
 }
 
+// Tool icon mapping
+const TOOL_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
+  lookupContact: UserSearch,
+  searchContactMessages: MessageSquare,
+  createTodo: CheckSquare,
+  createPendingAction: Clock,
+  listPendingActions: ListTodo,
+  getCurrentContext: Clock,
+  getCalendarEvents: Calendar,
+  getTodayPlan: Calendar,
+  addAdhocTask: CheckSquare,
+  listProjects: FolderKanban,
+  listNotes: FileText,
+};
+
+// Get a friendly display name and summary for tool results
+function getToolSummary(toolName: string, args?: Record<string, unknown>, result?: unknown): string | null {
+  if (!result) return null;
+
+  try {
+    const r = result as Record<string, unknown>;
+
+    switch (toolName) {
+      case "lookupContact":
+        if (r.found && Array.isArray(r.contacts)) {
+          return `Found ${r.contacts.length} contact(s)`;
+        }
+        return r.message as string || "No contacts found";
+
+      case "createTodo":
+        return r.message as string || "Todo created";
+
+      case "createPendingAction":
+        return r.message as string || "Action pending approval";
+
+      case "searchContactMessages":
+        if (r.found && Array.isArray(r.messages)) {
+          return `Found ${r.messages.length} message(s)`;
+        }
+        return r.message as string || "No messages found";
+
+      case "getCalendarEvents":
+        if (Array.isArray(result)) {
+          return result.length > 0 ? `${result.length} event(s) today` : "No events today";
+        }
+        return null;
+
+      case "getTodayPlan":
+        if (r.hasPlan) {
+          const adhocCount = Array.isArray(r.adhocItems) ? r.adhocItems.length : 0;
+          return `Plan active, ${adhocCount} adhoc item(s)`;
+        }
+        return "No plan for today";
+
+      case "addAdhocTask":
+        return r.message as string || "Task added to today's plan";
+
+      case "listProjects":
+        if (Array.isArray(result)) {
+          return `${result.length} active project(s)`;
+        }
+        return null;
+
+      case "listNotes":
+        if (Array.isArray(result)) {
+          return `${result.length} note document(s)`;
+        }
+        return null;
+
+      default:
+        return null;
+    }
+  } catch {
+    return null;
+  }
+}
+
 // Component to display tool calls
 function ToolCallDisplay({
   toolName,
@@ -366,44 +461,81 @@ function ToolCallDisplay({
 }) {
   const [isExpanded, setIsExpanded] = useState(false);
 
+  // Get icon for this tool
+  const IconComponent = TOOL_ICONS[toolName] || Wrench;
+
   // Format tool name for display
   const displayName = toolName
     .replace(/([A-Z])/g, " $1")
     .replace(/^./, (str) => str.toUpperCase())
     .trim();
 
+  // Get a summary of the result
+  const summary = getToolSummary(toolName, args, result);
+
+  // Determine status
+  const hasError = result && typeof result === "object" && "error" in (result as object);
+  const isComplete = result && !isExecuting;
+
   return (
-    <div className="rounded-lg border bg-muted/30 p-3 text-sm">
+    <div className={cn(
+      "rounded-lg border p-2.5 text-sm transition-colors",
+      isExecuting && "bg-blue-50/50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800",
+      isComplete && !hasError && "bg-green-50/50 dark:bg-green-950/20 border-green-200 dark:border-green-800",
+      hasError && "bg-red-50/50 dark:bg-red-950/20 border-red-200 dark:border-red-800",
+      !isExecuting && !isComplete && "bg-muted/30"
+    )}>
       <div
-        className="flex items-center gap-2 cursor-pointer"
+        className="flex items-center gap-2 cursor-pointer select-none"
         onClick={() => setIsExpanded(!isExpanded)}
       >
-        <Wrench className="h-3.5 w-3.5 text-muted-foreground" />
-        <span className="font-medium">{displayName}</span>
+        <IconComponent className={cn(
+          "h-3.5 w-3.5",
+          isExecuting && "text-blue-600 dark:text-blue-400",
+          isComplete && !hasError && "text-green-600 dark:text-green-400",
+          hasError && "text-red-600 dark:text-red-400",
+          !isExecuting && !isComplete && "text-muted-foreground"
+        )} />
+        <span className="font-medium flex-1">{displayName}</span>
+
         {isExecuting && (
-          <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
+          <Loader2 className="h-3.5 w-3.5 animate-spin text-blue-600 dark:text-blue-400" />
         )}
-        {result && !isExecuting && (
-          <span className="text-xs text-green-600 dark:text-green-400">
-            Completed
-          </span>
+        {isComplete && !hasError && (
+          <CheckCircle2 className="h-3.5 w-3.5 text-green-600 dark:text-green-400" />
+        )}
+        {hasError && (
+          <XCircle className="h-3.5 w-3.5 text-red-600 dark:text-red-400" />
+        )}
+
+        {isExpanded ? (
+          <ChevronUp className="h-3.5 w-3.5 text-muted-foreground" />
+        ) : (
+          <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
         )}
       </div>
 
+      {/* Summary line (if available) */}
+      {summary && !isExpanded && (
+        <div className="mt-1 text-xs text-muted-foreground pl-5.5 ml-0.5">
+          {summary}
+        </div>
+      )}
+
       {isExpanded && (
-        <div className="mt-2 space-y-2">
+        <div className="mt-2 space-y-2 pl-5.5 ml-0.5">
           {args && Object.keys(args).length > 0 && (
             <div>
-              <div className="text-xs text-muted-foreground mb-1">Arguments:</div>
-              <pre className="text-xs bg-muted rounded p-2 overflow-auto max-h-24">
+              <div className="text-xs font-medium text-muted-foreground mb-1">Input:</div>
+              <pre className="text-xs bg-background/50 rounded p-2 overflow-auto max-h-24 border">
                 {JSON.stringify(args, null, 2)}
               </pre>
             </div>
           )}
           {result !== undefined && result !== null && (
             <div>
-              <div className="text-xs text-muted-foreground mb-1">Result:</div>
-              <pre className="text-xs bg-muted rounded p-2 overflow-auto max-h-24">
+              <div className="text-xs font-medium text-muted-foreground mb-1">Output:</div>
+              <pre className="text-xs bg-background/50 rounded p-2 overflow-auto max-h-32 border">
                 {JSON.stringify(result, null, 2)}
               </pre>
             </div>

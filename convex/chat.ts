@@ -323,8 +323,14 @@ export const generateResponseWithAttachment = internalAction({
       modelId = setting?.modelId || getDefaultModelId();
     }
 
-    // Create agent with the appropriate model and stream response
-    const agent = createAgentWithModel(modelId);
+    // Get the chat-agent system prompt from the prompts database
+    const promptDoc = await ctx.runQuery(internal.prompts.getPromptByName, {
+      name: "chat-agent",
+    });
+    const customInstructions = promptDoc?.description;
+
+    // Create agent with the appropriate model, custom instructions, and stream response
+    const agent = createAgentWithModel(modelId, customInstructions);
     await agent.streamText(
       ctx,
       { threadId: args.threadId },
@@ -386,8 +392,14 @@ export const generateResponseAsync = internalAction({
       modelId = setting?.modelId || getDefaultModelId();
     }
 
-    // Create agent with the appropriate model and stream response
-    const agent = createAgentWithModel(modelId);
+    // Get the chat-agent system prompt from the prompts database
+    const promptDoc = await ctx.runQuery(internal.prompts.getPromptByName, {
+      name: "chat-agent",
+    });
+    const customInstructions = promptDoc?.description;
+
+    // Create agent with the appropriate model and custom instructions
+    const agent = createAgentWithModel(modelId, customInstructions);
     await agent.streamText(
       ctx,
       { threadId: args.threadId },

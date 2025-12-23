@@ -363,15 +363,15 @@ export const chatAgent = new Agent(components.agent, {
 });
 
 /**
- * Create an agent with a specific model
+ * Create an agent with a specific model and optional custom instructions
  * Use this when you need to use a different model than the default
  */
-export function createAgentWithModel(modelId: string) {
+export function createAgentWithModel(modelId: string, customInstructions?: string) {
   return new Agent(components.agent, {
     name: "PersonalAssistant",
     chat: createModelFromId(modelId),
     textEmbedding: openai.embedding("text-embedding-3-small"),
-    instructions: agentInstructions,
+    instructions: customInstructions || agentInstructions,
     tools: {
       lookupContact,
       createPendingAction,
