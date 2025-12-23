@@ -498,12 +498,10 @@ export const getActiveSession = query({
       }
     } else if (session.taskType === "todo") {
       // fetch todo to get project/doc info
-      // We know taskId is an ID, but we need to cast or just use it.
-      // In valid usage it overlaps, but safer to try/catch or just use generic get if possible.
-      // However, we know it's an ID from how we inserted it.
       try {
-        // We cast to any to allow generic get, or assume it's valid Id string
-        const todo = await ctx.db.get(session.taskId as any);
+        // Cast to todoItems ID and fetch with proper typing
+        const todoId = session.taskId as Id<"todoItems">;
+        const todo = await ctx.db.get(todoId);
         if (todo) {
           if (todo.projectId) {
             const proj = await ctx.db.get(todo.projectId);
@@ -513,7 +511,7 @@ export const getActiveSession = query({
             if (doc) projectName = doc.title; // Use doc title as project fallback
           }
         }
-      } catch (e) {
+      } catch {
         // Ignore invalid ID errors
       }
     }
