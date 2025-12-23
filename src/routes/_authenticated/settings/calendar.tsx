@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
+import { Switch } from '@/components/ui/switch'
 import {
   Calendar,
   CheckCircle2,
@@ -14,6 +15,7 @@ import {
   Copy,
   RefreshCw,
   AlertCircle,
+  ListChecks,
 } from 'lucide-react'
 import { useState, useCallback, useEffect } from 'react'
 
@@ -42,15 +44,22 @@ function CalendarSettingsPage() {
     api.googleCalendar.getTodayEvents,
     calendarSettings?.isConfigured ? {} : "skip"
   )
+  const calendars = useConvexQuery(
+    api.googleCalendar.getCalendars,
+    calendarSettings?.isConfigured ? {} : "skip"
+  )
 
   const setSetting = useMutation(api.settingsStore.setSetting)
   const triggerSync = useAction(api.googleCalendar.triggerSync)
   const disconnect = useMutation(api.googleCalendar.disconnect)
+  const toggleCalendar = useMutation(api.googleCalendar.toggleCalendar)
+  const refreshCalendarList = useAction(api.googleCalendar.refreshCalendarList)
 
   const [clientId, setClientId] = useState(appSettings?.clientId ?? '')
   const [clientSecret, setClientSecret] = useState(appSettings?.clientSecret ?? '')
   const [isSaving, setIsSaving] = useState(false)
   const [isSyncing, setIsSyncing] = useState(false)
+  const [isRefreshingCalendars, setIsRefreshingCalendars] = useState(false)
   const [syncResult, setSyncResult] = useState<{
     success: boolean
     message: string
@@ -66,9 +75,20 @@ function CalendarSettingsPage() {
     if (searchParams.oauth_success === 'true') {
       setOauthMessage({
         type: 'success',
-        message: 'Google Calendar connected successfully!',
+        message: 'Google Calendar connected successfully! Loading your calendars...',
       })
       window.history.replaceState({}, '', '/settings/calendar')
+      // Auto-fetch calendar list after successful OAuth
+      refreshCalendarList({}).then((result) => {
+        if (result.success) {
+          setOauthMessage({
+            type: 'success',
+            message: `Connected! Found ${result.count ?? 0} calendars. Select which ones to sync.`,
+          })
+        }
+      }).catch(() => {
+        // Silently fail - user can manually refresh
+      })
     } else if (searchParams.oauth_error) {
       setOauthMessage({
         type: 'error',
@@ -76,7 +96,7 @@ function CalendarSettingsPage() {
       })
       window.history.replaceState({}, '', '/settings/calendar')
     }
-  }, [searchParams])
+  }, [searchParams, refreshCalendarList])
 
   // Update local state when settings load
   useEffect(() => {
@@ -187,6 +207,38 @@ function CalendarSettingsPage() {
       })
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : 'Failed to disconnect'
+      alert(message)
+    }
+  }
+
+  const handleRefreshCalendars = async () => {
+    setIsRefreshingCalendars(true)
+    try {
+      const result = await refreshCalendarList({})
+      if (result.success) {
+        setOauthMessage({
+          type: 'success',
+          message: `Found ${result.count ?? 0} calendars`,
+        })
+      } else {
+        setOauthMessage({
+          type: 'error',
+          message: result.error || 'Failed to fetch calendars',
+        })
+      }
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : 'Failed to refresh calendars'
+      setOauthMessage({ type: 'error', message })
+    } finally {
+      setIsRefreshingCalendars(false)
+    }
+  }
+
+  const handleToggleCalendar = async (calendarId: string, isEnabled: boolean) => {
+    try {
+      await toggleCalendar({ calendarId, isEnabled })
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : 'Failed to toggle calendar'
       alert(message)
     }
   }
@@ -334,9 +386,90 @@ function CalendarSettingsPage() {
                   </div>
                 )}
               </div>
-            </CardContent>
+              </CardContent>
           )}
         </Card>
+
+        {/* Calendar Selection */}
+        {isConfigured && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <ListChecks className="w-5 h-5" />
+                  <span>Calendars</span>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleRefreshCalendars}
+                  disabled={isRefreshingCalendars}
+                >
+                  <RefreshCw className={`w-4 h-4 mr-2 ${isRefreshingCalendars ? 'animate-spin' : ''}`} />
+                  Refresh List
+                </Button>
+              </CardTitle>
+              <CardDescription>
+                Select which calendars to sync events from. Only enabled calendars will be used in the app.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {calendars && calendars.length > 0 ? (
+                <div className="space-y-3">
+                  {calendars.map((calendar) => (
+                    <div
+                      key={calendar._id}
+                      className="flex items-center justify-between p-3 rounded-lg border bg-card hover:bg-muted/50 transition-colors"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div
+                          className="w-4 h-4 rounded-full flex-shrink-0"
+                          style={{ backgroundColor: calendar.backgroundColor ?? '#4285f4' }}
+                        />
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium truncate">{calendar.summary}</span>
+                            {calendar.primary && (
+                              <Badge variant="secondary" className="text-xs">Primary</Badge>
+                            )}
+                          </div>
+                          {calendar.description && (
+                            <p className="text-xs text-muted-foreground truncate">
+                              {calendar.description}
+                            </p>
+                          )}
+                          <p className="text-xs text-muted-foreground opacity-60">
+                            {calendar.accessRole}
+                          </p>
+                        </div>
+                      </div>
+                      <Switch
+                        checked={calendar.isEnabled}
+                        onCheckedChange={(checked) => handleToggleCalendar(calendar.calendarId, checked)}
+                      />
+                    </div>
+                  ))}
+                  <p className="text-xs text-muted-foreground mt-4">
+                    ℹ️ Events from disabled calendars will be removed from the app. 
+                    Click "Sync Now" after changing calendars to update events.
+                  </p>
+                </div>
+              ) : (
+                <div className="text-center py-6 text-muted-foreground">
+                  <p className="mb-3">No calendars loaded yet.</p>
+                  <Button
+                    variant="outline"
+                    onClick={handleRefreshCalendars}
+                    disabled={isRefreshingCalendars}
+                  >
+                    <RefreshCw className={`w-4 h-4 mr-2 ${isRefreshingCalendars ? 'animate-spin' : ''}`} />
+                    Load Calendars
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         {/* Setup Instructions */}
         <Card>

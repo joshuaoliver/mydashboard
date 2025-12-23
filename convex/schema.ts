@@ -559,14 +559,30 @@ export default defineSchema({
     accessToken: v.string(),
     refreshToken: v.string(),
     tokenExpiresAt: v.number(),
-    calendarId: v.string(),                   // Usually "primary"
+    calendarId: v.string(),                   // Primary calendar ID (legacy, kept for compatibility)
     isConfigured: v.boolean(),
     lastSyncedAt: v.optional(v.number()),
   }),
 
+  // Available calendars from Google (cached after fetching)
+  googleCalendars: defineTable({
+    calendarId: v.string(),                   // Google Calendar ID (e.g., "primary", email, etc.)
+    summary: v.string(),                      // Calendar name/title
+    description: v.optional(v.string()),      // Calendar description
+    backgroundColor: v.optional(v.string()),  // Calendar color from Google
+    foregroundColor: v.optional(v.string()),
+    accessRole: v.string(),                   // "owner", "writer", "reader", "freeBusyReader"
+    primary: v.optional(v.boolean()),         // Is this the user's primary calendar?
+    isEnabled: v.boolean(),                   // Whether to sync events from this calendar
+    lastFetchedAt: v.number(),                // When we last fetched calendar list
+  })
+    .index("by_calendar_id", ["calendarId"])
+    .index("by_enabled", ["isEnabled"]),
+
   // Calendar events (fetched from Google Calendar)
   calendarEvents: defineTable({
     eventId: v.string(),                      // Google Calendar event ID
+    calendarId: v.optional(v.string()),       // Which calendar this event belongs to
     summary: v.string(),                      // Event title
     description: v.optional(v.string()),
     startTime: v.number(),                    // Unix timestamp
@@ -579,7 +595,8 @@ export default defineSchema({
     syncedAt: v.number(),
   })
     .index("by_start_time", ["startTime"])
-    .index("by_event_id", ["eventId"]),
+    .index("by_event_id", ["eventId"])
+    .index("by_calendar", ["calendarId"]),
 
   // Today Plan - main document for each day
   todayPlans: defineTable({

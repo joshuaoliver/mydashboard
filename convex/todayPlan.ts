@@ -470,10 +470,74 @@ export const getWorkPool = query({
 export const getActiveSession = query({
   args: {},
   handler: async (ctx) => {
-    return await ctx.db
+    const session = await ctx.db
       .query("timerSessions")
       .withIndex("by_active", (q) => q.eq("isActive", true))
       .first();
+
+    if (!session) return null;
+
+    let projectName = undefined;
+    let taskUrl = undefined;
+
+    if (session.taskType === "linear") {
+      // fetch linear issue to get project/team info
+      const issue = await ctx.db
+        .query("linearIssues")
+        .withIndex("by_linear_id", q => q.eq("linearId", session.taskId))
+        .first();
+
+      if (issue) {
+        taskUrl = issue.url;
+        if (issue.projectId) {
+          const proj = await ctx.db.get(issue.projectId);
+          if (proj) projectName = proj.name;
+        } else {
+          projectName = issue.teamName; // Fallback to team name
+        }
+      }
+    } else if (session.taskType === "todo") {
+      // fetch todo to get project/doc info
+      // We know taskId is an ID, but we need to cast or just use it.
+      // In valid usage it overlaps, but safer to try/catch or just use generic get if possible.
+      // However, we know it's an ID from how we inserted it.
+      try {
+        // We cast to any to allow generic get, or assume it's valid Id string
+        const todo = await ctx.db.get(session.taskId as any);
+        if (todo) {
+          if (todo.projectId) {
+            const proj = await ctx.db.get(todo.projectId);
+            if (proj) projectName = proj.name;
+          } else if (todo.documentId) {
+            const doc = await ctx.db.get(todo.documentId);
+            if (doc) projectName = doc.title; // Use doc title as project fallback
+          }
+        }
+      } catch (e) {
+        // Ignore invalid ID errors
+      }
+    }
+
+    return {
+      ...session,
+      projectName,
+      taskUrl
+    };
+  },
+});
+
+/**
+ * Update the session note (live save)
+ */
+export const updateSessionNote = mutation({
+  args: {
+    sessionId: v.id("timerSessions"),
+    note: v.string(),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.sessionId, {
+      resultNote: args.note,
+    });
   },
 });
 
@@ -610,7 +674,7 @@ export const endTimerSession = mutation({
     // Update assignment status if linked
     if (session.assignmentId) {
       const newStatus = args.result === "completed" ? "completed" :
-                       args.result === "skipped" ? "skipped" : "assigned";
+        args.result === "skipped" ? "skipped" : "assigned";
       await ctx.db.patch(session.assignmentId, {
         status: newStatus,
         updatedAt: now,
