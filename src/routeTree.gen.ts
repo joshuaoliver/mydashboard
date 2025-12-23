@@ -17,6 +17,7 @@ import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/
 import { Route as AuthenticatedTodosListRouteImport } from './routes/_authenticated/todos-list'
 import { Route as AuthenticatedTodosRouteImport } from './routes/_authenticated/todos'
 import { Route as AuthenticatedTodayPlanRouteImport } from './routes/_authenticated/today-plan'
+import { Route as AuthenticatedSummariesRouteImport } from './routes/_authenticated/summaries'
 import { Route as AuthenticatedStatsRouteImport } from './routes/_authenticated/stats'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
 import { Route as AuthenticatedSalesRouteImport } from './routes/_authenticated/sales'
@@ -81,6 +82,11 @@ const AuthenticatedTodosRoute = AuthenticatedTodosRouteImport.update({
 const AuthenticatedTodayPlanRoute = AuthenticatedTodayPlanRouteImport.update({
   id: '/today-plan',
   path: '/today-plan',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedSummariesRoute = AuthenticatedSummariesRouteImport.update({
+  id: '/summaries',
+  path: '/summaries',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedStatsRoute = AuthenticatedStatsRouteImport.update({
@@ -240,6 +246,7 @@ export interface FileRoutesByFullPath {
   '/sales': typeof AuthenticatedSalesRoute
   '/settings': typeof AuthenticatedSettingsRouteWithChildren
   '/stats': typeof AuthenticatedStatsRouteWithChildren
+  '/summaries': typeof AuthenticatedSummariesRoute
   '/today-plan': typeof AuthenticatedTodayPlanRoute
   '/todos': typeof AuthenticatedTodosRouteWithChildren
   '/todos-list': typeof AuthenticatedTodosListRoute
@@ -272,6 +279,7 @@ export interface FileRoutesByTo {
   '/sign-up': typeof SignUpRoute
   '/messages': typeof AuthenticatedMessagesRoute
   '/sales': typeof AuthenticatedSalesRoute
+  '/summaries': typeof AuthenticatedSummariesRoute
   '/today-plan': typeof AuthenticatedTodayPlanRoute
   '/todos-list': typeof AuthenticatedTodosListRoute
   '/': typeof AuthenticatedIndexRoute
@@ -308,6 +316,7 @@ export interface FileRoutesById {
   '/_authenticated/sales': typeof AuthenticatedSalesRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRouteWithChildren
   '/_authenticated/stats': typeof AuthenticatedStatsRouteWithChildren
+  '/_authenticated/summaries': typeof AuthenticatedSummariesRoute
   '/_authenticated/today-plan': typeof AuthenticatedTodayPlanRoute
   '/_authenticated/todos': typeof AuthenticatedTodosRouteWithChildren
   '/_authenticated/todos-list': typeof AuthenticatedTodosListRoute
@@ -345,6 +354,7 @@ export interface FileRouteTypes {
     | '/sales'
     | '/settings'
     | '/stats'
+    | '/summaries'
     | '/today-plan'
     | '/todos'
     | '/todos-list'
@@ -377,6 +387,7 @@ export interface FileRouteTypes {
     | '/sign-up'
     | '/messages'
     | '/sales'
+    | '/summaries'
     | '/today-plan'
     | '/todos-list'
     | '/'
@@ -412,6 +423,7 @@ export interface FileRouteTypes {
     | '/_authenticated/sales'
     | '/_authenticated/settings'
     | '/_authenticated/stats'
+    | '/_authenticated/summaries'
     | '/_authenticated/today-plan'
     | '/_authenticated/todos'
     | '/_authenticated/todos-list'
@@ -502,6 +514,13 @@ declare module '@tanstack/react-router' {
       path: '/today-plan'
       fullPath: '/today-plan'
       preLoaderRoute: typeof AuthenticatedTodayPlanRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/summaries': {
+      id: '/_authenticated/summaries'
+      path: '/summaries'
+      fullPath: '/summaries'
+      preLoaderRoute: typeof AuthenticatedSummariesRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/stats': {
@@ -793,6 +812,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedSalesRoute: typeof AuthenticatedSalesRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRouteWithChildren
   AuthenticatedStatsRoute: typeof AuthenticatedStatsRouteWithChildren
+  AuthenticatedSummariesRoute: typeof AuthenticatedSummariesRoute
   AuthenticatedTodayPlanRoute: typeof AuthenticatedTodayPlanRoute
   AuthenticatedTodosRoute: typeof AuthenticatedTodosRouteWithChildren
   AuthenticatedTodosListRoute: typeof AuthenticatedTodosListRoute
@@ -805,6 +825,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedSalesRoute: AuthenticatedSalesRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRouteWithChildren,
   AuthenticatedStatsRoute: AuthenticatedStatsRouteWithChildren,
+  AuthenticatedSummariesRoute: AuthenticatedSummariesRoute,
   AuthenticatedTodayPlanRoute: AuthenticatedTodayPlanRoute,
   AuthenticatedTodosRoute: AuthenticatedTodosRouteWithChildren,
   AuthenticatedTodosListRoute: AuthenticatedTodosListRoute,

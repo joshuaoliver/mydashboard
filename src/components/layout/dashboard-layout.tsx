@@ -37,6 +37,7 @@ import {
   MapPin,
   CheckSquare,
   CalendarClock,
+  BookOpen,
 } from "lucide-react"
 import { ModeToggle } from "@/components/ui/mode-toggle"
 import { Link, useNavigate } from '@tanstack/react-router'
@@ -59,6 +60,7 @@ const KEYBOARD_SHORTCUTS: Record<string, { to: string; search?: Record<string, u
   'c': { to: '/contacts' },
   's': { to: '/sales' },
   'a': { to: '/stats' },  // 'a' for analytics/stats since 's' is taken
+  'r': { to: '/summaries' },  // 'r' for reflections/summaries
 }
 
 export function DashboardLayout({ children }: DashboardLayoutProps) {
@@ -221,7 +223,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                   <HeartHandshake className="h-5 w-5" />
                   Sales
                 </Link>
-                <Link 
+                <Link
                   to="/stats"
                   onClick={() => setMobileMenuOpen(false)}
                   className={cn(
@@ -234,6 +236,20 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                 >
                   <BarChart3 className="h-5 w-5" />
                   Stats
+                </Link>
+                <Link
+                  to="/summaries"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={cn(
+                    "flex items-center gap-3 px-4 py-3 rounded-md",
+                    "text-base font-medium transition-all",
+                    "text-slate-300 hover:text-white hover:bg-slate-800/80",
+                    "[&.active]:bg-slate-800 [&.active]:text-white"
+                  )}
+                  activeProps={{ className: "active" }}
+                >
+                  <BookOpen className="h-5 w-5" />
+                  Summaries
                 </Link>
                 <div className="border-t border-slate-700 pt-4 mt-2">
                   <div className="px-4 py-2 text-xs font-semibold text-slate-400 uppercase tracking-wide">
@@ -437,7 +453,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                   </Link>
                 </NavigationMenuItem>
                 <NavigationMenuItem>
-                  <Link 
+                  <Link
                     to="/stats"
                     className={cn(
                       "inline-flex items-center gap-2 px-4 py-2 rounded-md",
@@ -451,6 +467,23 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                   >
                     <BarChart3 className="h-4 w-4" />
                     <span>St<span className="underline decoration-slate-500">a</span>ts</span>
+                  </Link>
+                </NavigationMenuItem>
+                <NavigationMenuItem>
+                  <Link
+                    to="/summaries"
+                    className={cn(
+                      "inline-flex items-center gap-2 px-4 py-2 rounded-md",
+                      "text-sm font-medium transition-all",
+                      "text-slate-300 hover:text-white hover:bg-slate-800/80",
+                      "[&.active]:bg-slate-800 [&.active]:text-white"
+                    )}
+                    activeProps={{
+                      className: "active"
+                    }}
+                  >
+                    <BookOpen className="h-4 w-4" />
+                    <span><span className="underline decoration-slate-500">R</span>eflections</span>
                   </Link>
                 </NavigationMenuItem>
                 <NavigationMenuItem>
