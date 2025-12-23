@@ -66,6 +66,14 @@ export const DEFAULT_SETTINGS = {
     temperature: 1,
     isEnabled: true,
   },
+  "thread-title-generation": {
+    displayName: "Thread Title Generation",
+    description: "Auto-generate conversation titles from first message",
+    modelId: "google/gemini-3-flash",
+    promptName: undefined,
+    temperature: 0.7,
+    isEnabled: true,
+  },
 } as const;
 
 /**

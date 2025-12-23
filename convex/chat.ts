@@ -1,10 +1,15 @@
-import { query, mutation, internalAction, internalQuery } from "./_generated/server";
+import { query, mutation, internalAction, internalQuery, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
 import { paginationOptsValidator } from "convex/server";
 import { listUIMessages, syncStreams, vStreamArgs } from "@convex-dev/agent";
 import { components, internal } from "./_generated/api";
 import { chatAgent } from "./agentChat";
 import { getAuthUserId } from "@convex-dev/auth/server";
+import { generateText } from "ai";
+import { createGoogleGenerativeAI } from "@ai-sdk/google";
+import { createOpenAI } from "@ai-sdk/openai";
+import { createAnthropic } from "@ai-sdk/anthropic";
+import { DEFAULT_SETTINGS } from "./aiSettings";
 
 // =============================================================================
 // Thread Management
@@ -307,9 +312,119 @@ export const startConversation = mutation({
       prompt: args.prompt,
     });
 
+    // Schedule title generation after response
+    await ctx.scheduler.runAfter(3000, internal.chat.generateThreadTitle, {
+      threadId: agentThreadId,
+      firstMessage: args.prompt,
+    });
+
     return {
       threadId: threadId.toString(),
       agentThreadId,
     };
+  },
+});
+
+// =============================================================================
+// Thread Title Generation
+// =============================================================================
+
+/**
+ * Internal mutation to update thread title
+ */
+export const updateThreadTitleInternal = internalMutation({
+  args: {
+    threadId: v.string(),
+    title: v.string(),
+  },
+  handler: async (ctx, args) => {
+    // Find the thread by string ID
+    const threads = await ctx.db.query("agentThreads").collect();
+    const thread = threads.find((t) => t._id.toString() === args.threadId);
+
+    if (thread) {
+      await ctx.db.patch(thread._id, {
+        title: args.title,
+        updatedAt: Date.now(),
+      });
+    }
+  },
+});
+
+/**
+ * Helper to create a model instance from a model ID string
+ */
+function createModelFromId(modelId: string) {
+  const [provider, modelName] = modelId.split("/");
+
+  switch (provider) {
+    case "google":
+      const google = createGoogleGenerativeAI({
+        apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY,
+      });
+      return google(modelName);
+    case "openai":
+      const openai = createOpenAI({
+        apiKey: process.env.OPENAI_API_KEY,
+      });
+      return openai(modelName);
+    case "anthropic":
+      const anthropic = createAnthropic({
+        apiKey: process.env.ANTHROPIC_API_KEY,
+      });
+      return anthropic(modelName);
+    default:
+      // Default to Google for unknown providers
+      const defaultGoogle = createGoogleGenerativeAI({
+        apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY,
+      });
+      return defaultGoogle("gemini-2.0-flash");
+  }
+}
+
+/**
+ * Generate a title for a thread based on the first message
+ */
+export const generateThreadTitle = internalAction({
+  args: {
+    threadId: v.string(),
+    firstMessage: v.string(),
+  },
+  handler: async (ctx, args) => {
+    // Get the AI setting for title generation
+    const setting = await ctx.runQuery(internal.aiSettings.getSettingInternal, {
+      key: "thread-title-generation",
+    });
+
+    // Check if enabled
+    const isEnabled = setting?.isEnabled ?? DEFAULT_SETTINGS["thread-title-generation"].isEnabled;
+    if (!isEnabled) return;
+
+    // Get model ID from setting or default
+    const modelId = setting?.modelId ?? DEFAULT_SETTINGS["thread-title-generation"].modelId;
+    const temperature = setting?.temperature ?? DEFAULT_SETTINGS["thread-title-generation"].temperature;
+
+    try {
+      const model = createModelFromId(modelId);
+
+      const { text } = await generateText({
+        model,
+        prompt: `Generate a very short (3-5 word) title for this conversation. Just respond with the title, nothing else. No quotes, no punctuation at the end.
+
+First message: "${args.firstMessage.slice(0, 500)}"`,
+        maxTokens: 30,
+        temperature,
+      });
+
+      const title = text.trim().replace(/^["']|["']$/g, ""); // Remove quotes if present
+
+      await ctx.runMutation(internal.chat.updateThreadTitleInternal, {
+        threadId: args.threadId,
+        title,
+      });
+    } catch (error) {
+      console.error("Failed to generate thread title:", error);
+      // Silently fail - the thread will keep its default title
+    }
   },
 });
