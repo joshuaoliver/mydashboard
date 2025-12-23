@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Textarea } from '@/components/ui/textarea'
 import {
   Dialog,
   DialogContent,
@@ -41,6 +42,10 @@ import {
   Mail,
   ExternalLink,
   RefreshCw,
+  Brain,
+  Sparkles,
+  TrendingUp,
+  MessageSquare,
 } from 'lucide-react'
 import { cn } from '~/lib/utils'
 
@@ -663,6 +668,297 @@ function TimerDialog({ isOpen, session, onPause, onResume, onComplete, onSwap }:
 }
 
 // ==========================================
+// Energy Context Component
+// ==========================================
+
+interface EnergyContextBarProps {
+  context: {
+    morningContext?: string
+    contextNotes: Array<{ text: string; timestamp: number }>
+    inferredEnergy?: 'low' | 'medium' | 'high'
+    inferredFocus?: 'scattered' | 'moderate' | 'deep'
+  } | null
+  onSetMorningContext: (text: string) => void
+  onAddNote: (text: string) => void
+}
+
+function EnergyContextBar({ context, onSetMorningContext, onAddNote }: EnergyContextBarProps) {
+  const [morningInput, setMorningInput] = useState(context?.morningContext ?? '')
+  const [noteInput, setNoteInput] = useState('')
+  const [isEditing, setIsEditing] = useState(!context?.morningContext)
+
+  const handleSaveMorning = () => {
+    if (morningInput.trim()) {
+      onSetMorningContext(morningInput.trim())
+      setIsEditing(false)
+    }
+  }
+
+  const handleAddNote = () => {
+    if (noteInput.trim()) {
+      onAddNote(noteInput.trim())
+      setNoteInput('')
+    }
+  }
+
+  const getEnergyBadge = () => {
+    if (!context?.inferredEnergy) return null
+    const colors = {
+      low: 'bg-orange-100 text-orange-700 border-orange-200',
+      medium: 'bg-yellow-100 text-yellow-700 border-yellow-200',
+      high: 'bg-green-100 text-green-700 border-green-200',
+    }
+    return (
+      <Badge variant="outline" className={cn("capitalize", colors[context.inferredEnergy])}>
+        {context.inferredEnergy} energy
+      </Badge>
+    )
+  }
+
+  const getFocusBadge = () => {
+    if (!context?.inferredFocus) return null
+    const colors = {
+      scattered: 'bg-red-100 text-red-700 border-red-200',
+      moderate: 'bg-blue-100 text-blue-700 border-blue-200',
+      deep: 'bg-purple-100 text-purple-700 border-purple-200',
+    }
+    return (
+      <Badge variant="outline" className={cn("capitalize", colors[context.inferredFocus])}>
+        {context.inferredFocus} focus
+      </Badge>
+    )
+  }
+
+  return (
+    <Card className="border-dashed border-primary/30 bg-gradient-to-r from-primary/5 via-transparent to-transparent">
+      <CardContent className="p-4">
+        <div className="flex items-start gap-3">
+          <Brain className="w-5 h-5 text-primary mt-0.5" />
+          <div className="flex-1 space-y-2">
+            {isEditing || !context?.morningContext ? (
+              <div className="space-y-2">
+                <Textarea
+                  placeholder="How are you feeling today? What's your energy like? (e.g., 'Slept poorly, feeling scattered but have a big deadline')"
+                  value={morningInput}
+                  onChange={(e) => setMorningInput(e.target.value)}
+                  className="min-h-[60px] text-sm resize-none"
+                />
+                <Button size="sm" onClick={handleSaveMorning} disabled={!morningInput.trim()}>
+                  <Sparkles className="w-3 h-3 mr-1" />
+                  Set Context
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="text-sm text-muted-foreground">{context.morningContext}</p>
+                    <div className="flex gap-2 mt-2">
+                      {getEnergyBadge()}
+                      {getFocusBadge()}
+                    </div>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setIsEditing(true)}
+                    className="text-xs"
+                  >
+                    Edit
+                  </Button>
+                </div>
+                {/* Recent notes */}
+                {context.contextNotes.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mt-2">
+                    {context.contextNotes.slice(-3).map((note, i) => (
+                      <Badge key={i} variant="secondary" className="text-xs font-normal">
+                        <MessageSquare className="w-2 h-2 mr-1" />
+                        {note.text}
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+            {/* Quick note input */}
+            {context?.morningContext && !isEditing && (
+              <div className="flex gap-2 mt-2">
+                <Input
+                  placeholder="Add a note... (e.g., 'just had coffee', 'energy dropping')"
+                  value={noteInput}
+                  onChange={(e) => setNoteInput(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleAddNote()}
+                  className="h-8 text-xs"
+                />
+                <Button size="icon" variant="outline" className="h-8 w-8" onClick={handleAddNote}>
+                  <Plus className="w-3 h-3" />
+                </Button>
+              </div>
+            )}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+// ==========================================
+// Momentum Bar Component
+// ==========================================
+
+interface MomentumBarProps {
+  momentum: {
+    blocksStarted: number
+    blocksCompleted: number
+    blocksPartial: number
+    blocksSkipped: number
+    frogAttempts: number
+    frogCompletions: number
+    totalMinutesWorked: number
+  } | null
+}
+
+function MomentumBar({ momentum }: MomentumBarProps) {
+  if (!momentum) return null
+
+  const total = momentum.blocksCompleted + momentum.blocksPartial + momentum.blocksSkipped
+  const completionRate = total > 0 ? Math.round((momentum.blocksCompleted / total) * 100) : 0
+
+  return (
+    <div className="flex items-center gap-4 px-4 py-2 bg-muted/50 rounded-lg">
+      <div className="flex items-center gap-2">
+        <TrendingUp className="w-4 h-4 text-primary" />
+        <span className="text-xs font-medium">Today's Momentum</span>
+      </div>
+      <div className="flex items-center gap-3 text-xs">
+        <div className="flex items-center gap-1">
+          <div className="w-2 h-2 rounded-full bg-green-500" />
+          <span>{momentum.blocksCompleted} done</span>
+        </div>
+        <div className="flex items-center gap-1">
+          <div className="w-2 h-2 rounded-full bg-yellow-500" />
+          <span>{momentum.blocksPartial} partial</span>
+        </div>
+        <div className="flex items-center gap-1">
+          <div className="w-2 h-2 rounded-full bg-red-500" />
+          <span>{momentum.blocksSkipped} skipped</span>
+        </div>
+        {momentum.frogAttempts > 0 && (
+          <div className="flex items-center gap-1">
+            <span>🐸</span>
+            <span>{momentum.frogCompletions}/{momentum.frogAttempts}</span>
+          </div>
+        )}
+        <div className="ml-2 px-2 py-0.5 bg-primary/10 rounded">
+          <span className="font-medium">{completionRate}%</span>
+        </div>
+        <div className="text-muted-foreground">
+          {Math.round(momentum.totalMinutesWorked)}m worked
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ==========================================
+// Floating Execution Header
+// ==========================================
+
+interface ExecutionHeaderProps {
+  session: {
+    taskTitle: string
+    taskType: string
+    mode: 'normal' | 'frog'
+    startedAt: number
+    targetDuration: number
+    pausedAt?: number
+  } | null
+  onPause: () => void
+  onResume: () => void
+  onEnd: () => void
+}
+
+function ExecutionHeader({ session, onPause, onResume, onEnd }: ExecutionHeaderProps) {
+  const [elapsed, setElapsed] = useState(0)
+
+  useEffect(() => {
+    if (!session || session.pausedAt) return
+
+    const interval = setInterval(() => {
+      setElapsed(Math.floor((Date.now() - session.startedAt) / 1000))
+    }, 1000)
+
+    return () => clearInterval(interval)
+  }, [session, session?.pausedAt])
+
+  if (!session) return null
+
+  const remaining = Math.max(0, session.targetDuration * 60 - elapsed)
+  const progress = Math.min(100, (elapsed / (session.targetDuration * 60)) * 100)
+
+  return (
+    <div className={cn(
+      "fixed top-0 left-0 right-0 z-50",
+      "bg-background/95 backdrop-blur border-b shadow-lg",
+      session.mode === 'frog' && "bg-amber-50/95 dark:bg-amber-950/95"
+    )}>
+      <div className="max-w-screen-2xl mx-auto px-6 py-3">
+        <div className="flex items-center gap-4">
+          {/* Timer display */}
+          <div className={cn(
+            "text-2xl font-mono font-bold",
+            session.mode === 'frog' ? "text-amber-600" : "text-primary"
+          )}>
+            {formatTimerDisplay(remaining)}
+          </div>
+
+          {/* Progress bar */}
+          <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
+            <div
+              className={cn(
+                "h-full transition-all duration-1000",
+                session.mode === 'frog' ? "bg-amber-500" : "bg-primary"
+              )}
+              style={{ width: `${progress}%` }}
+            />
+          </div>
+
+          {/* Task info */}
+          <div className="flex items-center gap-2">
+            {session.mode === 'frog' && <span className="text-lg">🐸</span>}
+            <div>
+              <Badge variant="outline" className="text-xs capitalize mr-2">
+                {session.taskType}
+              </Badge>
+              <span className="text-sm font-medium">{session.taskTitle}</span>
+            </div>
+          </div>
+
+          {/* Controls */}
+          <div className="flex gap-2">
+            {session.pausedAt ? (
+              <Button size="sm" onClick={onResume}>
+                <Play className="w-4 h-4 mr-1" />
+                Resume
+              </Button>
+            ) : (
+              <Button size="sm" variant="outline" onClick={onPause}>
+                <Pause className="w-4 h-4 mr-1" />
+                Pause
+              </Button>
+            )}
+            <Button size="sm" variant="default" onClick={onEnd}>
+              <Square className="w-4 h-4 mr-1" />
+              End
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ==========================================
 // Main Page Component
 // ==========================================
 
@@ -704,6 +1000,15 @@ function TodayPlanPage() {
     convexQuery(api.googleCalendar.getTodayEvents, {})
   )
 
+  // Energy context & momentum queries
+  const { data: energyContext } = useQuery(
+    convexQuery(api.operatorAI.getTodayContext, {})
+  )
+
+  const { data: momentum } = useQuery(
+    convexQuery(api.operatorAI.getTodayMomentum, {})
+  )
+
   // Mutations
   const getOrCreatePlan = useMutation(api.todayPlan.getOrCreateTodayPlan)
   const refreshFreeBlocks = useMutation(api.todayPlan.refreshFreeBlocks)
@@ -716,11 +1021,15 @@ function TodayPlanPage() {
   const resumeTimerSession = useMutation(api.todayPlan.resumeTimerSession)
   const endTimerSession = useMutation(api.todayPlan.endTimerSession)
   const createSampleEvents = useMutation(api.googleCalendar.createSampleEvents)
+  const setMorningContext = useMutation(api.operatorAI.setMorningContext)
+  const addContextNote = useMutation(api.operatorAI.addContextNote)
+  const incrementMomentum = useMutation(api.operatorAI.incrementMomentum)
 
   // Actions
   const generateSuggestions = useAction(api.todayPlanAI.generateBlockSuggestions)
   const getShuffled = useAction(api.todayPlanAI.getShuffledTask)
   const getFrog = useAction(api.todayPlanAI.getFrogSuggestion)
+  const getWeightedSuggestion = useAction(api.operatorAI.getWeightedSuggestion)
 
   // Initialize plan on mount
   useEffect(() => {
@@ -772,6 +1081,9 @@ function TodayPlanPage() {
       targetDuration: suggestion.suggestedDuration,
     })
 
+    // Track momentum
+    await incrementMomentum({ field: 'blocksStarted' })
+
     setActiveSession({
       id: sessionId,
       taskTitle: suggestion.taskTitle,
@@ -781,7 +1093,7 @@ function TodayPlanPage() {
       targetDuration: suggestion.suggestedDuration,
       startedAt: Date.now(),
     })
-  }, [plan, startTimerSession])
+  }, [plan, startTimerSession, incrementMomentum])
 
   const handleShuffle = useCallback(async (blockId: string) => {
     if (!plan) return
@@ -825,6 +1137,10 @@ function TodayPlanPage() {
         targetDuration: frogSuggestion.suggestedDuration,
       })
 
+      // Track frog attempt and block start
+      await incrementMomentum({ field: 'blocksStarted' })
+      await incrementMomentum({ field: 'frogAttempts' })
+
       setActiveSession({
         id: sessionId,
         taskTitle: frogSuggestion.taskTitle,
@@ -835,7 +1151,7 @@ function TodayPlanPage() {
         startedAt: Date.now(),
       })
     }
-  }, [plan, getFrog, startTimerSession])
+  }, [plan, getFrog, startTimerSession, incrementMomentum])
 
   const handlePause = useCallback(async () => {
     if (!activeSession?.id) return
@@ -855,8 +1171,21 @@ function TodayPlanPage() {
   ) => {
     if (!activeSession?.id) return
     await endTimerSession({ id: activeSession.id, result, resultNote: note })
+
+    // Track momentum based on result
+    if (result === 'completed') {
+      await incrementMomentum({ field: 'blocksCompleted' })
+      if (activeSession.mode === 'frog') {
+        await incrementMomentum({ field: 'frogCompletions' })
+      }
+    } else if (result === 'partial') {
+      await incrementMomentum({ field: 'blocksPartial' })
+    } else if (result === 'skipped') {
+      await incrementMomentum({ field: 'blocksSkipped' })
+    }
+
     setActiveSession(null)
-  }, [activeSession, endTimerSession])
+  }, [activeSession, endTimerSession, incrementMomentum])
 
   const handleAddAdhoc = useCallback(async (text: string) => {
     if (!plan) return
@@ -886,6 +1215,46 @@ function TodayPlanPage() {
     setSuggestions({})
   }, [plan, refreshFreeBlocks])
 
+  // Energy context handlers
+  const handleSetMorningContext = useCallback(async (text: string) => {
+    await setMorningContext({ context: text })
+  }, [setMorningContext])
+
+  const handleAddContextNote = useCallback(async (text: string) => {
+    await addContextNote({ note: text })
+  }, [addContextNote])
+
+  // Weighted suggestion shuffle (using the new AI system)
+  const handleSmartShuffle = useCallback(async (blockId: string) => {
+    if (!plan) return
+
+    const block = plan.freeBlocks.find(b => b.id === blockId)
+    if (!block) return
+
+    const currentSuggestions = suggestions[blockId] || []
+    const excludeIds = currentSuggestions.map(s => s.taskId)
+
+    const result = await getWeightedSuggestion({
+      blockDuration: block.duration,
+      excludeTaskIds: excludeIds,
+    })
+
+    if (result.task) {
+      const newSuggestion: BlockSuggestion = {
+        taskType: result.task.taskType,
+        taskId: result.task.taskId,
+        taskTitle: result.task.taskTitle,
+        suggestedDuration: result.task.duration,
+        confidence: result.task.weight / 100,
+        reason: result.task.reason,
+      }
+      setSuggestions(prev => ({
+        ...prev,
+        [blockId]: [newSuggestion, ...currentSuggestions.slice(0, 2)],
+      }))
+    }
+  }, [plan, suggestions, getWeightedSuggestion])
+
   // Loading state
   if (planLoading) {
     return (
@@ -896,7 +1265,20 @@ function TodayPlanPage() {
   }
 
   return (
-    <div className="h-full flex">
+    <div className={cn("h-full flex", activeSession && "pt-16")}>
+      {/* Floating Execution Header */}
+      <ExecutionHeader
+        session={activeSession}
+        onPause={handlePause}
+        onResume={handleResume}
+        onEnd={() => {
+          if (activeSession?.id) {
+            endTimerSession({ id: activeSession.id, result: 'skipped' })
+            setActiveSession(null)
+          }
+        }}
+      />
+
       {/* Main content */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Header */}
@@ -931,7 +1313,17 @@ function TodayPlanPage() {
 
         {/* Calendar events & free blocks */}
         <ScrollArea className="flex-1">
-          <div className="p-6">
+          <div className="p-6 space-y-6">
+            {/* Energy Context */}
+            <EnergyContextBar
+              context={energyContext ?? null}
+              onSetMorningContext={handleSetMorningContext}
+              onAddNote={handleAddContextNote}
+            />
+
+            {/* Momentum Bar */}
+            <MomentumBar momentum={momentum ?? null} />
+
             {/* Today's calendar events */}
             {calendarEvents && calendarEvents.length > 0 && (
               <div className="mb-6">
