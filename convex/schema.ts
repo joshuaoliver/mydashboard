@@ -805,6 +805,40 @@ export default defineSchema({
   })
     .index("by_date", ["date"]),
 
+  // Planned tasks - explicit user-scheduled tasks on the calendar
+  // These are tasks the user deliberately dragged from Work Pool onto the calendar
+  plannedTasks: defineTable({
+    date: v.string(),                         // YYYY-MM-DD format
+    // Task reference
+    taskType: v.union(
+      v.literal("todo"),                      // From todoItems
+      v.literal("linear"),                    // From linearIssues
+      v.literal("adhoc")                      // From adhocItems
+    ),
+    taskId: v.string(),                       // ID reference
+    // Scheduled time
+    startTime: v.number(),                    // Unix timestamp
+    endTime: v.number(),                      // Unix timestamp
+    duration: v.number(),                     // Duration in minutes
+    // Snapshot of task info (for display even if original is deleted)
+    taskTitle: v.string(),
+    taskPriority: v.optional(v.number()),
+    projectName: v.optional(v.string()),
+    // Status
+    status: v.union(
+      v.literal("scheduled"),                 // Planned on calendar
+      v.literal("in_progress"),               // Currently working
+      v.literal("completed"),                 // Finished
+      v.literal("cancelled")                  // Removed from plan
+    ),
+    completedAt: v.optional(v.number()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_date", ["date"])
+    .index("by_date_start", ["date", "startTime"])
+    .index("by_task", ["taskType", "taskId"]),
+
   // Active execution state (singleton for current session)
   executionState: defineTable({
     // Current session info

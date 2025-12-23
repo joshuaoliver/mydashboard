@@ -1,6 +1,5 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { convexQuery, useConvexAction, useConvexMutation } from '@convex-dev/react-query'
+import { useQuery as useConvexQuery, useAction, useMutation } from 'convex/react'
 import { api } from '../../../../convex/_generated/api'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -31,26 +30,18 @@ export const Route = createFileRoute('/_authenticated/stats/messages')({
 })
 
 function MessageStatsPage() {
-  const queryClient = useQueryClient()
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [refreshResult, setRefreshResult] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
   const [deletingId, setDeletingId] = useState<Id<"messageSnapshots"> | null>(null)
 
-  const triggerCapture = useConvexAction(api.messageStats.triggerManualCapture)
-  const { mutateAsync: deleteSnapshot } = useConvexMutation(api.messageStats.deleteSnapshot)
+  const triggerCapture = useAction(api.messageStats.triggerManualCapture)
+  const deleteSnapshot = useMutation(api.messageStats.deleteSnapshot)
 
-  const { data: latestSnapshot } = useQuery(
-    convexQuery(api.messageStats.getLatestSnapshot, {})
-  )
-  const { data: dailySummary } = useQuery(
-    convexQuery(api.messageStats.getDailySummary, { days: 30 })
-  )
-  const { data: recentSnapshots } = useQuery(
-    convexQuery(api.messageStats.getSnapshots, { limit: 20 })
-  )
-  const { data: stats } = useQuery(
-    convexQuery(api.messageStats.getStats, {})
-  )
+  // Use Convex native useQuery - data is reactive and auto-updates
+  const latestSnapshot = useConvexQuery(api.messageStats.getLatestSnapshot, {})
+  const dailySummary = useConvexQuery(api.messageStats.getDailySummary, { days: 30 })
+  const recentSnapshots = useConvexQuery(api.messageStats.getSnapshots, { limit: 20 })
+  const stats = useConvexQuery(api.messageStats.getStats, {})
 
   // Calculate trend (comparing latest to earliest in recent snapshots)
   const trend =
@@ -80,7 +71,7 @@ function MessageStatsPage() {
     setDeletingId(id)
     try {
       await deleteSnapshot({ id })
-      queryClient.invalidateQueries()
+      // Convex queries are reactive - they auto-update when backend data changes
     } catch (e) {
       console.error('Failed to delete snapshot:', e)
     } finally {

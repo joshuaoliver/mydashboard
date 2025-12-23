@@ -266,7 +266,7 @@ export const listAllTodos = query({
       return {
         ...item,
         documentTitle: docInfo?.title ?? "Unknown",
-        projectName: item.projectId ? projectMap.get(item.projectId) : null,
+        projectName: item.projectId ? (projectMap.get(item.projectId) ?? null) : null,
         hashtags: extractHashtags(item.text),
       };
     });

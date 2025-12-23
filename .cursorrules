@@ -83,13 +83,18 @@ Current tables:
 
 ### Data Fetching Pattern
 ```tsx
-// Use Convex queries with React Query
-import { useSuspenseQuery } from '@tanstack/react-query'
-import { convexQuery } from '@convex-dev/react-query'
+// Use Convex native useQuery (NOT @convex-dev/react-query)
+import { useQuery } from 'convex/react'
 import { api } from '../../convex/_generated/api'
 
-const { data } = useSuspenseQuery(
-  convexQuery(api.myFunctions.listNumbers, { count: 10 })
+// Basic query - returns data directly (undefined while loading)
+const data = useQuery(api.myFunctions.listNumbers, { count: 10 })
+const isLoading = data === undefined
+
+// Conditional query - use "skip" instead of enabled option
+const conditionalData = useQuery(
+  api.myFunctions.getData,
+  someCondition ? { id: someId } : "skip"
 )
 ```
 
@@ -100,7 +105,29 @@ import { useMutation } from 'convex/react'
 import { api } from '../../convex/_generated/api'
 
 const addItem = useMutation(api.myFunctions.addNumber)
-addItem({ value: 42 })
+await addItem({ value: 42 })
+```
+
+### Actions Pattern
+```tsx
+// Use Convex actions for external API calls
+import { useAction } from 'convex/react'
+import { api } from '../../convex/_generated/api'
+
+const callExternalApi = useAction(api.myFunctions.callExternalApi)
+const result = await callExternalApi({ query: "search" })
+```
+
+### IMPORTANT: Do NOT use @convex-dev/react-query with enabled option
+The pattern below causes errors with TanStack Query v5:
+```tsx
+// ❌ WRONG - causes "client.defaultQueryOptions is not a function"
+import { useQuery } from '@tanstack/react-query'
+import { convexQuery } from '@convex-dev/react-query'
+const { data } = useQuery({
+  ...convexQuery(api.myFunctions.getData, {}),
+  enabled: !!condition,  // This breaks with TanStack Query v5
+})
 ```
 
 ## Package Manager

@@ -1,6 +1,9 @@
 @import 'tailwindcss';
 @import "tw-animate-css";
 
+/* Include ilamy Calendar in Tailwind source for proper class detection */
+@source "../../node_modules/@ilamy/calendar";
+
 @custom-variant dark (&:is(.dark *));
 
 @layer base {

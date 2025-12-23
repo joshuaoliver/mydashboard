@@ -6,7 +6,6 @@
  */
 
 const HUBSTAFF_API_BASE = "https://api.hubstaff.com/v2";
-const HUBSTAFF_TOKEN_URL = "https://account.hubstaff.com/access_tokens";
 
 export interface HubstaffUser {
   id: number;

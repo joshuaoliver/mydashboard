@@ -30,7 +30,7 @@ interface MessageInputPanelProps {
 }
 
 export function MessageInputPanel({
-  selectedChat,
+  selectedChat: _selectedChat,
   onSubmit,
   onGenerateAI,
   onOpenInBeeper,

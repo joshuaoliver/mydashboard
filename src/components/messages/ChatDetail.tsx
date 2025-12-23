@@ -8,7 +8,7 @@ import {
 import { Message as AIMessage, MessageContent } from '@/components/ai-elements/message'
 import { ProxiedImage } from './ProxiedImage'
 import { RefreshCw } from 'lucide-react'
-import { useRef, useEffect, memo } from 'react'
+import { memo } from 'react'
 
 interface Attachment {
   type: string
@@ -39,47 +39,9 @@ interface ChatDetailProps {
   onLoadMore?: (numItems: number) => void
 }
 
-export const ChatDetail = memo(function ChatDetail({ messages, isSingleChat = true, messagesStatus, onLoadMore }: ChatDetailProps) {
-  const conversationRef = useRef<HTMLDivElement>(null)
-  const prevScrollHeightRef = useRef<number>(0)
-
-  // Handle scroll to top - load more messages
-  // Note: Conversation uses StickToBottom which manages its own scroll container
-  useEffect(() => {
-    const container = conversationRef.current
-    if (!container || !onLoadMore || messagesStatus !== "CanLoadMore") return
-
-    const handleScroll = () => {
-      const { scrollTop } = container
-      
-      // Load more when scrolled near the top (within 200px from top)
-      if (scrollTop < 200) {
-        console.log('📜 Loading older messages...')
-        // Store current scroll height before loading
-        prevScrollHeightRef.current = container.scrollHeight
-        onLoadMore(50) // Load 50 more messages
-      }
-    }
-
-    container.addEventListener('scroll', handleScroll)
-    return () => container.removeEventListener('scroll', handleScroll)
-  }, [messagesStatus, onLoadMore])
-
-  // Maintain scroll position when new messages are prepended
-  // StickToBottom handles this automatically, but we enhance it here
-  useEffect(() => {
-    const container = conversationRef.current
-    if (!container || messagesStatus !== "LoadingMore") return
-
-    // After new messages load, adjust scroll to maintain visual position
-    const prevScrollHeight = prevScrollHeightRef.current
-    if (prevScrollHeight > 0) {
-      const newScrollHeight = container.scrollHeight
-      const heightDifference = newScrollHeight - prevScrollHeight
-      container.scrollTop = container.scrollTop + heightDifference
-      prevScrollHeightRef.current = 0
-    }
-  }, [messages.length, messagesStatus])
+export const ChatDetail = memo(function ChatDetail({ messages, isSingleChat = true, messagesStatus, onLoadMore: _onLoadMore }: ChatDetailProps) {
+  // Note: StickToBottom manages its own scroll container
+  // Load more functionality would need to use StickToBottom's API if needed
   
   // Format timestamp for messages
   const formatMessageTime = (timestamp: number) => {
@@ -103,7 +65,6 @@ export const ChatDetail = memo(function ChatDetail({ messages, isSingleChat = tr
         // Firefox scrollbar styling
         "scrollbar-thin scrollbar-track-transparent scrollbar-thumb-gray-300"
       )}
-      ref={conversationRef}
     >
       <ConversationContent>
           {messages.length === 0 ? (

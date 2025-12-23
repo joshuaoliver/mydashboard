@@ -24,7 +24,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Plus, Trash2, FolderKanban, Clock, LayoutList, Pencil, RefreshCw, ChevronRight, Calendar, Play, Settings } from 'lucide-react'
+import { Plus, Trash2, FolderKanban, Clock, LayoutList, Pencil, RefreshCw, ChevronRight, Play, Settings } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import type { Id } from '../../../../convex/_generated/dataModel'
 

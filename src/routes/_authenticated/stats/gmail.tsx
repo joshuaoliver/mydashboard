@@ -221,7 +221,7 @@ function GmailStatsPage() {
           </CardHeader>
           <CardContent>
             <div className="h-64 flex items-end justify-between gap-1">
-              {dailySummary.map((day, idx) => {
+              {dailySummary.map((day) => {
                 const maxInbox = Math.max(...dailySummary.map((d) => d.totalInbox))
                 const height = maxInbox > 0 ? (day.totalInbox / maxInbox) * 100 : 0
                 return (

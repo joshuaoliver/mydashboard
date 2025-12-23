@@ -16,7 +16,7 @@ export function ConversationPanel() {
 
   // Local state
   const [isLoadingFullConversation, setIsLoadingFullConversation] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [_error, setError] = useState<string | null>(null)
   const [showDebugPanel, setShowDebugPanel] = useState(false)
 
   // Query the selected chat directly by ID (not from paginated list!)
@@ -140,7 +140,7 @@ export function ConversationPanel() {
   }, [selectedChatId, selectedChat, sendMessageAction, pageLoadSync])
 
   // Handle generating AI suggestions
-  const handleGenerateAI = useCallback(async (customContext?: string) => {
+  const handleGenerateAI = useCallback(async (_customContext?: string) => {
     // This is handled by ReplySuggestionsPanel
     // Just a placeholder for the interface
   }, [])
@@ -247,7 +247,7 @@ export function ConversationPanel() {
   }, [selectedChatId, selectedChat, markChatAsRead, markChatAsUnread])
 
   // Handle suggestion selection - pass text to input
-  const handleSuggestionSelect = useCallback((text: string) => {
+  const handleSuggestionSelect = useCallback((_text: string) => {
     // This would ideally update the MessageInputPanel's value
     // For now, the MessageInputPanel manages its own state
     // This is a known limitation - could be improved with a shared ref or callback

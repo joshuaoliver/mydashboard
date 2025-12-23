@@ -1,6 +1,6 @@
 import { v } from "convex/values";
-import { query, mutation, internalQuery, internalMutation } from "./_generated/server";
-import { Id } from "./_generated/dataModel";
+import { query, mutation, internalQuery } from "./_generated/server";
+import type { Id } from "./_generated/dataModel";
 
 /**
  * Today Plan - Main functions for the daily planning feature
@@ -824,7 +824,6 @@ export const refreshFreeBlocks = mutation({
 
     // For now, create sample free blocks if calendar isn't set up
     // In a real implementation, this would call calculateFreeBlocks
-    const now = new Date();
     const today = getTodayDate();
     const [year, month, day] = today.split('-').map(Number);
 

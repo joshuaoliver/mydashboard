@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -38,12 +39,106 @@ import {
   CheckSquare,
   CalendarClock,
   BookOpen,
+  Target,
+  Clock,
+  Play,
+  Pause,
 } from "lucide-react"
 import { ModeToggle } from "@/components/ui/mode-toggle"
 import { Link, useNavigate } from '@tanstack/react-router'
 import { useAuthActions } from '@convex-dev/auth/react'
+import { useQuery as useConvexQuery } from 'convex/react'
+import { api } from '../../../convex/_generated/api'
 import { cn } from "~/lib/utils"
 import * as React from 'react'
+
+// ==========================================
+// Active Session Timer Component
+// ==========================================
+
+function formatTimerDisplay(seconds: number): string {
+  const mins = Math.floor(seconds / 60)
+  const secs = seconds % 60
+  return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
+}
+
+function ActiveSessionTimer() {
+  const navigate = useNavigate()
+  const plan = useConvexQuery(api.todayPlan.getTodayPlan, {})
+  const dbSession = useConvexQuery(
+    api.todayPlan.getActiveSession,
+    plan?._id ? { planId: plan._id } : "skip"
+  )
+  
+  const [elapsedSeconds, setElapsedSeconds] = React.useState(0)
+
+  // Timer effect
+  React.useEffect(() => {
+    if (!dbSession || !dbSession.isActive || dbSession.pausedAt) return
+
+    // Calculate initial elapsed
+    setElapsedSeconds(Math.floor((Date.now() - dbSession.startedAt) / 1000))
+
+    const interval = setInterval(() => {
+      setElapsedSeconds(Math.floor((Date.now() - dbSession.startedAt) / 1000))
+    }, 1000)
+
+    return () => clearInterval(interval)
+  }, [dbSession])
+
+  // Don't render if no active session
+  if (!dbSession || !dbSession.isActive) return null
+
+  const progress = Math.min(100, (elapsedSeconds / (dbSession.targetDuration * 60)) * 100)
+  const isPaused = !!dbSession.pausedAt
+
+  return (
+    <button
+      onClick={() => navigate({ to: '/work' })}
+      className={cn(
+        "flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all",
+        "bg-primary/20 hover:bg-primary/30 border border-primary/30",
+        dbSession.mode === 'frog' && "bg-amber-500/20 hover:bg-amber-500/30 border-amber-500/30"
+      )}
+    >
+      {/* Status icon */}
+      {isPaused ? (
+        <Pause className="w-3.5 h-3.5 text-amber-400" />
+      ) : (
+        <Play className="w-3.5 h-3.5 text-green-400 animate-pulse" />
+      )}
+      
+      {/* Timer display */}
+      <span className={cn(
+        "font-mono text-sm font-semibold tabular-nums",
+        "text-white"
+      )}>
+        {formatTimerDisplay(elapsedSeconds)}
+      </span>
+      
+      {/* Progress bar (tiny) */}
+      <div className="w-12 h-1.5 bg-slate-700 rounded-full overflow-hidden">
+        <div
+          className={cn(
+            "h-full transition-all duration-1000",
+            dbSession.mode === 'frog' ? "bg-amber-400" : "bg-primary"
+          )}
+          style={{ width: `${progress}%` }}
+        />
+      </div>
+      
+      {/* Frog indicator */}
+      {dbSession.mode === 'frog' && (
+        <span className="text-sm">🐸</span>
+      )}
+      
+      {/* Task title (truncated) */}
+      <span className="text-xs text-slate-300 max-w-[100px] truncate hidden xl:inline">
+        {dbSession.taskTitle}
+      </span>
+    </button>
+  )
+}
 
 interface DashboardLayoutProps {
   children: React.ReactNode
@@ -56,6 +151,7 @@ const KEYBOARD_SHORTCUTS: Record<string, { to: string; search?: Record<string, u
   'n': { to: '/todos' },
   't': { to: '/todos-list' },
   'p': { to: '/today-plan' },  // 'p' for plan
+  'w': { to: '/work' },        // 'w' for work session
   'm': { to: '/messages', search: { chatId: undefined } },
   'c': { to: '/contacts' },
   's': { to: '/sales' },
@@ -179,6 +275,20 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                 >
                   <CalendarClock className="h-5 w-5" />
                   Today Plan
+                </Link>
+                <Link
+                  to="/work"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={cn(
+                    "flex items-center gap-3 px-4 py-3 rounded-md",
+                    "text-base font-medium transition-all",
+                    "text-slate-300 hover:text-white hover:bg-slate-800/80",
+                    "[&.active]:bg-slate-800 [&.active]:text-white"
+                  )}
+                  activeProps={{ className: "active" }}
+                >
+                  <Target className="h-5 w-5" />
+                  Work
                 </Link>
                 <Link
                   to="/messages"
@@ -402,6 +512,23 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                 </NavigationMenuItem>
                 <NavigationMenuItem>
                   <Link
+                    to="/work"
+                    className={cn(
+                      "inline-flex items-center gap-2 px-4 py-2 rounded-md",
+                      "text-sm font-medium transition-all",
+                      "text-slate-300 hover:text-white hover:bg-slate-800/80",
+                      "[&.active]:bg-slate-800 [&.active]:text-white"
+                    )}
+                    activeProps={{
+                      className: "active"
+                    }}
+                  >
+                    <Target className="h-4 w-4" />
+                    <span><span className="underline decoration-slate-500">W</span>ork</span>
+                  </Link>
+                </NavigationMenuItem>
+                <NavigationMenuItem>
+                  <Link
                     to="/messages"
                     search={{ chatId: undefined }}
                     className={cn(
@@ -587,8 +714,9 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
             <h1 className="text-lg font-semibold text-white">Dashboard</h1>
           </div>
 
-          {/* Right side - Theme toggle + User menu */}
-          <div className="flex items-center gap-1">
+          {/* Right side - Active session timer + Theme toggle + User menu */}
+          <div className="flex items-center gap-2">
+            <ActiveSessionTimer />
             <ModeToggle />
             <DropdownMenu>
               <DropdownMenuTrigger asChild>

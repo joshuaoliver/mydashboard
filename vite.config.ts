@@ -14,10 +14,6 @@ export default defineConfig({
     TanStackRouterVite({
       target: 'react',
       autoCodeSplitting: true,
-      // Enable experimental HMR support for code splitting
-      experimental: {
-        enableCodeSplittingCache: true,
-      },
     }),
     tailwindcss(),
     react(),

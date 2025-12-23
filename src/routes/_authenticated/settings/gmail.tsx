@@ -35,18 +35,16 @@ export const Route = createFileRoute('/_authenticated/settings/gmail')({
 
 function GmailSettingsPage() {
   const searchParams = useSearch({ from: '/_authenticated/settings/gmail' })
-  const queryClient = useQueryClient()
   
-  const { data: settings } = useQuery(
-    convexQuery(api.settingsStore.getGmailSettings, {})
+  // Use Convex native useQuery with "skip" for conditional queries
+  const settings = useConvexQuery(api.settingsStore.getGmailSettings, {})
+  const stats = useConvexQuery(
+    api.gmailSync.getStats,
+    settings?.isConfigured ? {} : "skip"
   )
-  const { data: stats } = useQuery({
-    ...convexQuery(api.gmailSync.getStats, {}),
-    enabled: !!settings?.isConfigured,
-  })
 
-  const setSetting = useConvexMutation(api.settingsStore.setSetting)
-  const testConnection = useConvexAction(api.gmailActions.testConnection)
+  const setSetting = useMutation(api.settingsStore.setSetting)
+  const testConnection = useAction(api.gmailActions.testConnection)
 
   const [clientId, setClientId] = useState(settings?.clientId ?? '')
   const [clientSecret, setClientSecret] = useState(settings?.clientSecret ?? '')
@@ -62,14 +60,13 @@ function GmailSettingsPage() {
   } | null>(null)
 
   // Handle OAuth callback results from query params
+  // Note: Convex queries are reactive - they auto-update when backend data changes
   useEffect(() => {
     if (searchParams.oauth_success === 'true') {
       setOauthMessage({
         type: 'success',
         message: 'Gmail connected successfully!',
       })
-      // Invalidate queries to refresh the settings
-      queryClient.invalidateQueries()
       // Clean up URL
       window.history.replaceState({}, '', '/settings/gmail')
     } else if (searchParams.oauth_error) {
@@ -80,7 +77,7 @@ function GmailSettingsPage() {
       // Clean up URL
       window.history.replaceState({}, '', '/settings/gmail')
     }
-  }, [searchParams, queryClient])
+  }, [searchParams])
 
   const isConfigured = settings?.isConfigured ?? false
   const hasCredentials = !!(settings?.clientId && settings?.clientSecret)

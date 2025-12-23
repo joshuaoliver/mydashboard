@@ -6,9 +6,7 @@ import {
   getWorkspace,
   getTeams,
   getMyUncompletedIssues,
-  type LinearUser,
   type LinearTeam,
-  type LinearWorkspace,
 } from "./linearClient";
 
 /**
@@ -88,7 +86,7 @@ export const addWorkspace = action({
       }
 
       // Save workspace
-      const id = await ctx.runMutation(internal.linearActions.insertWorkspace, {
+      await ctx.runMutation(internal.linearActions.insertWorkspace, {
         workspaceId: workspace.id,
         workspaceName: workspace.name,
         apiKey: args.apiKey,

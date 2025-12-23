@@ -1,7 +1,6 @@
 import { v } from "convex/values";
 import { action, internalMutation, internalQuery } from "./_generated/server";
 import { internal, api } from "./_generated/api";
-import { Id } from "./_generated/dataModel";
 
 /**
  * Today Plan AI - AI-powered suggestion engine for time blocks

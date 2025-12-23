@@ -1,5 +1,5 @@
 import { action, internalAction, internalMutation, internalQuery, query } from "./_generated/server";
-import { internal, api } from "./_generated/api";
+import { internal } from "./_generated/api";
 import { v } from "convex/values";
 import { createBeeperClient } from "./beeperClient";
 import { extractMessageText, compareSortKeys } from "./messageHelpers";
@@ -486,7 +486,7 @@ export const loadOlderChats = action({
   args: {
     limit: v.optional(v.number()), // How many to load (default: 50)
   },
-  handler: async (ctx, args) => {
+  handler: async (ctx, _args) => {
     try {
       const client = createBeeperClient();
       
@@ -1084,7 +1084,7 @@ export const loadOlderChatsInternal = internalAction({
   args: {
     limit: v.optional(v.number()),
   },
-  handler: async (ctx, args): Promise<LoadChatsResult> => {
+  handler: async (ctx, _args): Promise<LoadChatsResult> => {
     try {
       const client = createBeeperClient();
       

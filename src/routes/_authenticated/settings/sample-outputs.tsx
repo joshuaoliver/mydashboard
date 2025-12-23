@@ -23,15 +23,6 @@ function SampleOutputsPage() {
   const [copied, setCopied] = useState(false)
   const [copiedTable, setCopiedTable] = useState(false)
 
-  // Generate a plain text version of messages (one per line)
-  const plainTextMessages = useMemo(() => {
-    if (!data?.messages) return ''
-    return data.messages
-      .map((m) => m.text)
-      .filter((text) => text && text.trim().length > 0)
-      .join('\n\n---\n\n')
-  }, [data?.messages])
-
   // Generate a markdown table version
   const tableMessages = useMemo(() => {
     if (!data?.messages) return ''

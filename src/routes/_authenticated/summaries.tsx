@@ -4,7 +4,7 @@ import { api } from '../../../convex/_generated/api'
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import {
   Loader2,
@@ -12,7 +12,6 @@ import {
   FileText,
   Sparkles,
   ChevronRight,
-  ChevronLeft,
   Clock,
   TrendingUp,
   RefreshCw,

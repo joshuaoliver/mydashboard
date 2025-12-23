@@ -849,14 +849,12 @@ export const syncBeeperChatsInternal = internalAction({
         let lastMessage: string | undefined;
         let lastMessageFrom: "user" | "them" | undefined;
         let needsReply: boolean | undefined;
-        let previewTimestamp: number | undefined;
         let newestMessageSortKey: string | undefined;
 
         if (preview) {
           lastMessage = preview.text || undefined;
           lastMessageFrom = preview.isSender ? "user" : "them";
             needsReply = !preview.isSender;
-          previewTimestamp = new Date(preview.timestamp).getTime();
             newestMessageSortKey = preview.sortKey;
         }
 
@@ -1217,7 +1215,6 @@ export const fullResync = action({
     timestamp: number;
     error?: string;
   }> => {
-    const messageLimit = args.messageLimit ?? 50;
     const clearFirst = args.clearFirst ?? false;
     
     try {

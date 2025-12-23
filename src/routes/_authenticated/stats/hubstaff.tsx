@@ -30,31 +30,30 @@ function HubstaffStatsPage() {
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [refreshResult, setRefreshResult] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
 
-  const triggerSync = useConvexAction(api.hubstaffSync.triggerManualSync)
+  const triggerSync = useAction(api.hubstaffSync.triggerManualSync)
 
-  const { data: settings } = useQuery(
-    convexQuery(api.settingsStore.getHubstaffSettings, {})
+  // Use Convex native useQuery with "skip" for conditional queries
+  const settings = useConvexQuery(api.settingsStore.getHubstaffSettings, {})
+  const todayStats = useConvexQuery(
+    api.hubstaffSync.getTodayStats,
+    settings?.isConfigured ? {} : "skip"
   )
-  const { data: todayStats } = useQuery({
-    ...convexQuery(api.hubstaffSync.getTodayStats, {}),
-    enabled: !!settings?.isConfigured,
-  })
-  const { data: weekStats } = useQuery({
-    ...convexQuery(api.hubstaffSync.getWeekStats, {}),
-    enabled: !!settings?.isConfigured,
-  })
-  const { data: dailySummaries } = useQuery({
-    ...convexQuery(api.hubstaffSync.getDailySummaries, { days: 30 }),
-    enabled: !!settings?.isConfigured,
-  })
-  const { data: recentEntries } = useQuery({
-    ...convexQuery(api.hubstaffSync.getTimeEntries, { limit: 20 }),
-    enabled: !!settings?.isConfigured,
-  })
-  const { data: stats } = useQuery({
-    ...convexQuery(api.hubstaffSync.getStats, {}),
-    enabled: !!settings?.isConfigured,
-  })
+  const weekStats = useConvexQuery(
+    api.hubstaffSync.getWeekStats,
+    settings?.isConfigured ? {} : "skip"
+  )
+  const dailySummaries = useConvexQuery(
+    api.hubstaffSync.getDailySummaries,
+    settings?.isConfigured ? { days: 30 } : "skip"
+  )
+  const recentEntries = useConvexQuery(
+    api.hubstaffSync.getTimeEntries,
+    settings?.isConfigured ? { limit: 20 } : "skip"
+  )
+  const stats = useConvexQuery(
+    api.hubstaffSync.getStats,
+    settings?.isConfigured ? {} : "skip"
+  )
 
   const isConfigured = settings?.isConfigured ?? false
 

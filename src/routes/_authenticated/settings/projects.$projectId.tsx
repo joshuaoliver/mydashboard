@@ -21,26 +21,28 @@ export const Route = createFileRoute('/_authenticated/settings/projects/$project
 function ProjectDetailPage() {
   const { projectId } = Route.useParams()
   
-  const { data: project, isLoading } = useQuery(
-    convexQuery(api.projectsStore.getProject, { id: projectId as Id<'projects'> })
+  // Use Convex native useQuery with "skip" for conditional queries
+  const project = useConvexQuery(
+    api.projectsStore.getProject, 
+    { id: projectId as Id<'projects'> }
   )
+  const isLoading = project === undefined
 
   // Fetch time entries for this project
-  const { data: timeEntries } = useQuery({
-    ...convexQuery(api.projectsStore.getProjectTimeEntries, { 
-      projectId: projectId as Id<'projects'>,
-      limit: 50
-    }),
-    enabled: !!project?.hubstaffProjectId,
-  })
+  const timeEntries = useConvexQuery(
+    api.projectsStore.getProjectTimeEntries,
+    project?.hubstaffProjectId 
+      ? { projectId: projectId as Id<'projects'>, limit: 50 }
+      : "skip"
+  )
 
   // Fetch Linear issues for this project
-  const { data: linearIssues } = useQuery({
-    ...convexQuery(api.projectsStore.getProjectLinearIssues, { 
-      projectId: projectId as Id<'projects'>
-    }),
-    enabled: !!project?.linearTeamId,
-  })
+  const linearIssues = useConvexQuery(
+    api.projectsStore.getProjectLinearIssues,
+    project?.linearTeamId 
+      ? { projectId: projectId as Id<'projects'> }
+      : "skip"
+  )
 
   // Format seconds to hours:minutes
   const formatTime = (seconds: number) => {

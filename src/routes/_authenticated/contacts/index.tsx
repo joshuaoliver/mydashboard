@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { useQuery } from '@tanstack/react-query'
 import { convexQuery } from '@convex-dev/react-query'
 import { api } from '../../../../convex/_generated/api'
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useCallback } from 'react'
 import { Search, User, Mail, Instagram, Calendar, Plus, Phone, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react'
 
 export const Route = createFileRoute('/_authenticated/contacts/')({
