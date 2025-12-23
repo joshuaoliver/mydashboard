@@ -20,9 +20,9 @@ import {
   SheetContent,
   SheetTrigger,
 } from "@/components/ui/sheet"
-import { 
-  Settings, 
-  User, 
+import {
+  Settings,
+  User,
   MessageSquare,
   LayoutDashboard,
   Users,
@@ -36,6 +36,7 @@ import {
   FileText,
   MapPin,
   CheckSquare,
+  CalendarClock,
 } from "lucide-react"
 import { ModeToggle } from "@/components/ui/mode-toggle"
 import { Link, useNavigate } from '@tanstack/react-router'
@@ -53,6 +54,7 @@ const KEYBOARD_SHORTCUTS: Record<string, { to: string; search?: Record<string, u
   'h': { to: '/' },
   'n': { to: '/todos' },
   't': { to: '/todos-list' },
+  'p': { to: '/today-plan' },  // 'p' for plan
   'm': { to: '/messages', search: { chatId: undefined } },
   'c': { to: '/contacts' },
   's': { to: '/sales' },
@@ -148,7 +150,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                   <FileText className="h-5 w-5" />
                   Notes
                 </Link>
-                <Link 
+                <Link
                   to="/todos-list"
                   onClick={() => setMobileMenuOpen(false)}
                   className={cn(
@@ -162,7 +164,21 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                   <CheckSquare className="h-5 w-5" />
                   Todos
                 </Link>
-                <Link 
+                <Link
+                  to="/today-plan"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={cn(
+                    "flex items-center gap-3 px-4 py-3 rounded-md",
+                    "text-base font-medium transition-all",
+                    "text-slate-300 hover:text-white hover:bg-slate-800/80",
+                    "[&.active]:bg-slate-800 [&.active]:text-white"
+                  )}
+                  activeProps={{ className: "active" }}
+                >
+                  <CalendarClock className="h-5 w-5" />
+                  Today Plan
+                </Link>
+                <Link
                   to="/messages"
                   search={{ chatId: undefined }}
                   onClick={() => setMobileMenuOpen(false)}
@@ -335,8 +351,8 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                   </Link>
                 </NavigationMenuItem>
                 <NavigationMenuItem>
-                  <Link 
-                    to="/todos-list" 
+                  <Link
+                    to="/todos-list"
                     className={cn(
                       "inline-flex items-center gap-2 px-4 py-2 rounded-md",
                       "text-sm font-medium transition-all",
@@ -352,7 +368,24 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                   </Link>
                 </NavigationMenuItem>
                 <NavigationMenuItem>
-                  <Link 
+                  <Link
+                    to="/today-plan"
+                    className={cn(
+                      "inline-flex items-center gap-2 px-4 py-2 rounded-md",
+                      "text-sm font-medium transition-all",
+                      "text-slate-300 hover:text-white hover:bg-slate-800/80",
+                      "[&.active]:bg-slate-800 [&.active]:text-white"
+                    )}
+                    activeProps={{
+                      className: "active"
+                    }}
+                  >
+                    <CalendarClock className="h-4 w-4" />
+                    <span><span className="underline decoration-slate-500">P</span>lan</span>
+                  </Link>
+                </NavigationMenuItem>
+                <NavigationMenuItem>
+                  <Link
                     to="/messages"
                     search={{ chatId: undefined }}
                     className={cn(

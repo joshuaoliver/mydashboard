@@ -16,6 +16,7 @@ import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
 import { Route as AuthenticatedTodosListRouteImport } from './routes/_authenticated/todos-list'
 import { Route as AuthenticatedTodosRouteImport } from './routes/_authenticated/todos'
+import { Route as AuthenticatedTodayPlanRouteImport } from './routes/_authenticated/today-plan'
 import { Route as AuthenticatedStatsRouteImport } from './routes/_authenticated/stats'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
 import { Route as AuthenticatedSalesRouteImport } from './routes/_authenticated/sales'
@@ -74,6 +75,11 @@ const AuthenticatedTodosListRoute = AuthenticatedTodosListRouteImport.update({
 const AuthenticatedTodosRoute = AuthenticatedTodosRouteImport.update({
   id: '/todos',
   path: '/todos',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedTodayPlanRoute = AuthenticatedTodayPlanRouteImport.update({
+  id: '/today-plan',
+  path: '/today-plan',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedStatsRoute = AuthenticatedStatsRouteImport.update({
@@ -227,6 +233,7 @@ export interface FileRoutesByFullPath {
   '/sales': typeof AuthenticatedSalesRoute
   '/settings': typeof AuthenticatedSettingsRouteWithChildren
   '/stats': typeof AuthenticatedStatsRouteWithChildren
+  '/today-plan': typeof AuthenticatedTodayPlanRoute
   '/todos': typeof AuthenticatedTodosRouteWithChildren
   '/todos-list': typeof AuthenticatedTodosListRoute
   '/': typeof AuthenticatedIndexRoute
@@ -257,6 +264,7 @@ export interface FileRoutesByTo {
   '/sign-up': typeof SignUpRoute
   '/messages': typeof AuthenticatedMessagesRoute
   '/sales': typeof AuthenticatedSalesRoute
+  '/today-plan': typeof AuthenticatedTodayPlanRoute
   '/todos-list': typeof AuthenticatedTodosListRoute
   '/': typeof AuthenticatedIndexRoute
   '/contacts/$contactId': typeof AuthenticatedContactsContactIdRoute
@@ -291,6 +299,7 @@ export interface FileRoutesById {
   '/_authenticated/sales': typeof AuthenticatedSalesRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRouteWithChildren
   '/_authenticated/stats': typeof AuthenticatedStatsRouteWithChildren
+  '/_authenticated/today-plan': typeof AuthenticatedTodayPlanRoute
   '/_authenticated/todos': typeof AuthenticatedTodosRouteWithChildren
   '/_authenticated/todos-list': typeof AuthenticatedTodosListRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
@@ -326,6 +335,7 @@ export interface FileRouteTypes {
     | '/sales'
     | '/settings'
     | '/stats'
+    | '/today-plan'
     | '/todos'
     | '/todos-list'
     | '/'
@@ -356,6 +366,7 @@ export interface FileRouteTypes {
     | '/sign-up'
     | '/messages'
     | '/sales'
+    | '/today-plan'
     | '/todos-list'
     | '/'
     | '/contacts/$contactId'
@@ -389,6 +400,7 @@ export interface FileRouteTypes {
     | '/_authenticated/sales'
     | '/_authenticated/settings'
     | '/_authenticated/stats'
+    | '/_authenticated/today-plan'
     | '/_authenticated/todos'
     | '/_authenticated/todos-list'
     | '/_authenticated/'
@@ -470,6 +482,13 @@ declare module '@tanstack/react-router' {
       path: '/todos'
       fullPath: '/todos'
       preLoaderRoute: typeof AuthenticatedTodosRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/today-plan': {
+      id: '/_authenticated/today-plan'
+      path: '/today-plan'
+      fullPath: '/today-plan'
+      preLoaderRoute: typeof AuthenticatedTodayPlanRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/stats': {
@@ -752,6 +771,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedSalesRoute: typeof AuthenticatedSalesRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRouteWithChildren
   AuthenticatedStatsRoute: typeof AuthenticatedStatsRouteWithChildren
+  AuthenticatedTodayPlanRoute: typeof AuthenticatedTodayPlanRoute
   AuthenticatedTodosRoute: typeof AuthenticatedTodosRouteWithChildren
   AuthenticatedTodosListRoute: typeof AuthenticatedTodosListRoute
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
@@ -763,6 +783,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedSalesRoute: AuthenticatedSalesRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRouteWithChildren,
   AuthenticatedStatsRoute: AuthenticatedStatsRouteWithChildren,
+  AuthenticatedTodayPlanRoute: AuthenticatedTodayPlanRoute,
   AuthenticatedTodosRoute: AuthenticatedTodosRouteWithChildren,
   AuthenticatedTodosListRoute: AuthenticatedTodosListRoute,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
