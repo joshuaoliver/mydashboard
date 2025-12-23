@@ -872,16 +872,7 @@ function TodayPlanPage() {
     }
   }, [updatePlannedTask])
 
-  // Loading state
-  if (planLoading) {
-    return (
-      <div className="h-full flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
-      </div>
-    )
-  }
-
-  // Enrich work items with project names
+  // Enrich work items with project names (must be before conditional returns)
   const enrichedWorkItems = useMemo(() => {
     if (!workPool) return []
     return workPool.map((item) => ({
@@ -891,6 +882,15 @@ function TodayPlanPage() {
         : undefined,
     }))
   }, [workPool])
+
+  // Loading state
+  if (planLoading) {
+    return (
+      <div className="h-full flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
 
   return (
     <FullWidthContent>
