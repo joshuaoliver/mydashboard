@@ -377,7 +377,7 @@ export const triggerSync = action({
   args: {
     date: v.optional(v.string()),
   },
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<{ success: boolean; count?: number; error?: string }> => {
     return await ctx.runAction(internal.googleCalendar.syncCalendarEvents, {
       date: args.date,
     });

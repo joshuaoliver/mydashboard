@@ -481,7 +481,7 @@ export const getWeightedSuggestion = action({
     // Get skip history
     const skipHistory = await ctx.runQuery(internal.operatorAI.toolGetSkippedHistory, {});
     const skipMap = new Map<string, number>();
-    skipHistory.recentlySkipped.forEach(s => {
+    skipHistory.recentlySkipped.forEach((s: { taskType: string; taskTitle: string; skipCount: number }) => {
       skipMap.set(`${s.taskType}:${s.taskTitle}`, s.skipCount);
     });
 
@@ -490,11 +490,18 @@ export const getWeightedSuggestion = action({
     const plan = await ctx.runQuery(api.todayPlan.getTodayPlan, { date });
     const frogTaskId = plan?.frogTaskId;
 
-    // Combine all tasks
+    // Combine all tasks - include all necessary properties
+    type TaskWithDetails = { 
+      id: string | number; 
+      estimatedDuration: number; 
+      priority?: number;
+      title?: string;
+      dueDate?: string;
+    };
     const allTasks = [
-      ...workPool.todos.map(t => ({ ...t, type: "todo" as const })),
-      ...workPool.linear.map(t => ({ ...t, type: "linear" as const })),
-      ...workPool.adhoc.map(t => ({ ...t, type: "adhoc" as const })),
+      ...workPool.todos.map((t: TaskWithDetails) => ({ ...t, type: "todo" as const })),
+      ...workPool.linear.map((t: TaskWithDetails) => ({ ...t, type: "linear" as const })),
+      ...workPool.adhoc.map((t: TaskWithDetails) => ({ ...t, type: "adhoc" as const })),
     ];
 
     // Filter by duration and exclusions
@@ -513,8 +520,8 @@ export const getWeightedSuggestion = action({
       const { weight, factors } = calculateTaskWeight(
         {
           type: task.type,
-          priority: task.priority,
-          dueDate: 'dueDate' in task ? task.dueDate : undefined,
+          priority: task.priority ?? 3, // Default to medium priority
+          dueDate: task.dueDate,
           estimatedDuration: task.estimatedDuration,
           isFrog: frogTaskId === task.id.toString(),
         },
@@ -528,7 +535,7 @@ export const getWeightedSuggestion = action({
       return {
         taskType: task.type,
         taskId: task.id.toString(),
-        taskTitle: task.title,
+        taskTitle: task.title ?? "Untitled",
         weight,
         factors,
         duration: task.estimatedDuration,

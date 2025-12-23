@@ -260,7 +260,7 @@ export const getFrogSuggestion = action({
       confidence: 0.9,
       reason: frog.priority <= 2
         ? "High priority task"
-        : frog.dueDate
+        : ('dueDate' in frog && frog.dueDate)
         ? "Overdue task"
         : "Designated frog",
     };

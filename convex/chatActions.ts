@@ -100,6 +100,7 @@ export const unblockChat = action({
   },
 });
 
+/**
  * Sets the unread count to 0
  */
 export const markChatAsRead = action({

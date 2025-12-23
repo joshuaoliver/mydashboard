@@ -169,7 +169,7 @@ export const gatherSummaryData = internalQuery({
 /**
  * Generate daily summary using AI
  */
-export const generateSummary = action({
+export const generateSummary = internalAction({
   args: {
     date: v.string(),
   },
@@ -223,7 +223,7 @@ export const generateSummary = action({
       model: gateway(modelId),
       prompt,
       temperature: 0.7,
-      maxTokens: 2000,
+      maxOutputTokens: 2000,
     });
 
     // Parse AI response
@@ -305,7 +305,7 @@ export const triggerSummaryGeneration = action({
   args: {
     date: v.optional(v.string()),
   },
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<{ success: boolean; sections?: any; empty?: boolean }> => {
     const date = args.date ?? getYesterdayDate();
     return await ctx.runAction(internal.dailySummary.generateSummary, { date });
   },
@@ -321,7 +321,7 @@ export const triggerSummaryGeneration = action({
  */
 export const scheduledSummaryGeneration = internalAction({
   args: {},
-  handler: async (ctx) => {
+  handler: async (ctx): Promise<{ skipped?: boolean; success?: boolean; date: string; result?: any }> => {
     const yesterday = getYesterdayDate();
 
     // Check if summary already exists
@@ -335,10 +335,10 @@ export const scheduledSummaryGeneration = internalAction({
     await ctx.runMutation(internal.operatorAI.computeDailyMomentum, { date: yesterday });
 
     // Generate summary
-    const result = await ctx.runAction(internal.dailySummary.generateSummary, { date: yesterday });
+    const summaryResult = await ctx.runAction(internal.dailySummary.generateSummary, { date: yesterday });
 
     console.log(`Generated summary for ${yesterday}`);
-    return { success: true, date: yesterday, result };
+    return { success: true, date: yesterday, result: summaryResult };
   },
 });
 
