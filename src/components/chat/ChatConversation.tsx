@@ -1,6 +1,6 @@
 import { useMutation, useQuery } from "convex/react";
 import { useUIMessages, useSmoothText } from "@convex-dev/agent/react";
-import { api } from "~/convex/_generated/api";
+import { api } from "../../../convex/_generated/api";
 import { useState, useRef, useEffect } from "react";
 import {
   Conversation,
@@ -17,10 +17,11 @@ import {
 } from "@/components/ai-elements/prompt-input";
 import { VoiceRecorder } from "./VoiceRecorder";
 import { ModelSelector } from "./ModelSelector";
+import { AttachmentButton, type AttachmentInfo } from "./AttachmentButton";
 import { Bot, User, Loader2, AlertCircle, Wrench } from "lucide-react";
 import { cn } from "~/lib/utils";
 import { Button } from "@/components/ui/button";
-import type { Id } from "~/convex/_generated/dataModel";
+import type { Id } from "../../../convex/_generated/dataModel";
 
 interface ChatConversationProps {
   threadId: string | null;
@@ -34,6 +35,7 @@ export function ChatConversation({ threadId, onThreadCreated }: ChatConversation
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [selectedModel, setSelectedModel] = useState<string>(DEFAULT_MODEL);
+  const [attachment, setAttachment] = useState<AttachmentInfo | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Query the current thread to get its model
@@ -51,6 +53,7 @@ export function ChatConversation({ threadId, onThreadCreated }: ChatConversation
 
   // Mutations
   const sendMessage = useMutation(api.chat.sendMessage);
+  const sendMessageWithAttachment = useMutation(api.chat.sendMessageWithAttachment);
   const startConversation = useMutation(api.chat.startConversation);
   const createThread = useMutation(api.chat.createThread);
   const updateThreadModel = useMutation(api.chat.updateThreadModel);
@@ -86,12 +89,25 @@ export function ChatConversation({ threadId, onThreadCreated }: ChatConversation
 
     setInput("");
     setIsLoading(true);
+    const currentAttachment = attachment;
+    setAttachment(null); // Clear attachment after sending
 
     try {
       if (threadId) {
-        await sendMessage({ threadId, prompt: text });
+        if (currentAttachment) {
+          // Send with attachment
+          await sendMessageWithAttachment({
+            threadId,
+            prompt: text,
+            storageId: currentAttachment.storageId as any,
+            mimeType: currentAttachment.mimeType,
+            fileName: currentAttachment.fileName,
+          });
+        } else {
+          await sendMessage({ threadId, prompt: text });
+        }
       } else {
-        // Create new thread with first message
+        // Create new thread with first message (attachments not supported for new threads yet)
         const result = await startConversation({ prompt: text });
         onThreadCreated?.(result.agentThreadId);
       }
@@ -191,6 +207,12 @@ export function ChatConversation({ threadId, onThreadCreated }: ChatConversation
             <ModelSelector
               value={selectedModel}
               onChange={handleModelChange}
+              disabled={isLoading || isStreamingAny}
+            />
+            <AttachmentButton
+              threadId={threadId}
+              onAttachmentReady={setAttachment}
+              onAttachmentRemove={() => setAttachment(null)}
               disabled={isLoading || isStreamingAny}
             />
             <VoiceRecorder threadId={threadId} />

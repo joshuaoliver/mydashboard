@@ -227,6 +227,112 @@ export const sendMessage = mutation({
   },
 });
 
+// =============================================================================
+// Attachment Support
+// =============================================================================
+
+/**
+ * Generate upload URL for chat attachments
+ */
+export const generateAttachmentUploadUrl = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+    return await ctx.storage.generateUploadUrl();
+  },
+});
+
+/**
+ * Send a message with an attachment
+ */
+export const sendMessageWithAttachment = mutation({
+  args: {
+    threadId: v.string(),
+    prompt: v.string(),
+    storageId: v.id("_storage"),
+    mimeType: v.string(),
+    fileName: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+
+    // Schedule async response generation with attachment info
+    await ctx.scheduler.runAfter(0, internal.chat.generateResponseWithAttachment, {
+      threadId: args.threadId,
+      prompt: args.prompt,
+      storageId: args.storageId,
+      mimeType: args.mimeType,
+      fileName: args.fileName,
+    });
+
+    // Update thread record
+    const threads = await ctx.db
+      .query("agentThreads")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .collect();
+
+    const thread = threads.find((t) => t._id.toString() === args.threadId);
+
+    if (thread) {
+      await ctx.db.patch(thread._id, {
+        lastMessageAt: Date.now(),
+        messageCount: (thread.messageCount || 0) + 1,
+        updatedAt: Date.now(),
+      });
+    }
+
+    return { success: true };
+  },
+});
+
+/**
+ * Generate AI response for message with attachment
+ */
+export const generateResponseWithAttachment = internalAction({
+  args: {
+    threadId: v.string(),
+    prompt: v.string(),
+    storageId: v.id("_storage"),
+    mimeType: v.string(),
+    fileName: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    // Get the file URL from storage
+    const fileUrl = await ctx.storage.getUrl(args.storageId);
+    if (!fileUrl) {
+      throw new Error("Attachment not found in storage");
+    }
+
+    // Determine if it's an image for special handling
+    const isImage = args.mimeType.startsWith("image/");
+
+    // Build the prompt with attachment context
+    let promptWithAttachment = args.prompt;
+    if (isImage) {
+      promptWithAttachment = `[Image attached: ${args.fileName || "image"}]\n\n${args.prompt}`;
+    } else {
+      promptWithAttachment = `[File attached: ${args.fileName || "file"} (${args.mimeType})]\n\n${args.prompt}`;
+    }
+
+    // Stream the AI response
+    // Note: For full multimodal support, the agent would need to be configured
+    // to handle image inputs directly. For now, we describe the attachment.
+    await chatAgent.streamText(
+      ctx,
+      { threadId: args.threadId },
+      { prompt: promptWithAttachment },
+      {
+        saveStreamDeltas: {
+          chunking: "word",
+          throttleMs: 100,
+        },
+      }
+    );
+  },
+});
+
 /**
  * Internal query to get thread model
  */

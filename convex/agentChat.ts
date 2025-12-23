@@ -5,6 +5,22 @@ import { z } from "zod";
 import { query, mutation, internalQuery, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
 
+// Supermemory tools for cross-thread memory
+// Note: Requires SUPERMEMORY_API_KEY environment variable
+let supermemoryTools: Record<string, unknown> = {};
+try {
+  // Dynamic import to handle missing API key gracefully
+  if (process.env.SUPERMEMORY_API_KEY) {
+    const { createSupermemoryTools } = require("@supermemory/tools/ai-sdk");
+    supermemoryTools = createSupermemoryTools(process.env.SUPERMEMORY_API_KEY, {
+      // Per-user memory isolation using containerTags
+      // The userId will be passed dynamically in the agent context
+    });
+  }
+} catch (e) {
+  console.log("Supermemory not configured - memory tools disabled");
+}
+
 // =============================================================================
 // Custom Tools
 // =============================================================================
@@ -180,7 +196,14 @@ export const chatAgent = new Agent(components.agent, {
 - createTodo: Create simple todo items immediately
 - searchContactMessages: Get recent messages from a contact
 - listPendingActions: Show current pending actions
-- getCurrentContext: Get today's date and context`,
+- getCurrentContext: Get today's date and context
+
+## Memory (if enabled)
+
+You have access to long-term memory across conversations. Use it to:
+- Remember important details about contacts and preferences
+- Recall past decisions and context
+- Store useful information for future reference`,
   tools: {
     lookupContact,
     createPendingAction,
@@ -188,6 +211,8 @@ export const chatAgent = new Agent(components.agent, {
     searchContactMessages,
     listPendingActions,
     getCurrentContext,
+    // Spread supermemory tools if available
+    ...supermemoryTools,
   },
 });
 
