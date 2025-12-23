@@ -512,7 +512,7 @@ Format as JSON:
       });
       
       const modelId = aiSettings?.modelId ?? DEFAULT_AI_MODEL;
-      const temperature = aiSettings?.temperature ?? 0.8;
+      const temperature = aiSettings?.temperature ?? 1;
       
       console.log(`[generateReplySuggestions] Using model: ${modelId} (temp: ${temperature})`);
 

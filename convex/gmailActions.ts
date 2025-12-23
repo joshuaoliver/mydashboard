@@ -263,6 +263,47 @@ export const getInboxStats = internalAction({
 });
 
 /**
+ * Get sent email stats - total sent threads and threads sent since a timestamp.
+ * 
+ * Uses the "in:sent" query to count threads the user has participated in as sender.
+ * For counting since a timestamp, we use Gmail's after: query with epoch seconds.
+ */
+export const getSentStats = internalAction({
+  args: {
+    sinceTimestamp: v.optional(v.number()), // Timestamp to count emails sent since (epoch ms)
+  },
+  handler: async (ctx, args): Promise<{
+    totalSentThreads: number;
+    sentSinceTimestamp: number;
+  }> => {
+    // Get fresh access token
+    const accessToken = await ctx.runAction(internal.gmailActions.refreshAccessToken, {}) as string;
+
+    // Count total sent threads
+    const totalSentThreads = await countThreads(accessToken, "in:sent");
+
+    // Count sent threads since timestamp (if provided)
+    let sentSinceTimestamp = 0;
+    if (args.sinceTimestamp) {
+      // Convert milliseconds to seconds for Gmail's after: query
+      const afterSeconds = Math.floor(args.sinceTimestamp / 1000);
+      sentSinceTimestamp = await countThreads(accessToken, `in:sent after:${afterSeconds}`);
+    }
+
+    console.log("Gmail sent stats fetched:", {
+      totalSentThreads,
+      sentSinceTimestamp,
+      sinceTimestamp: args.sinceTimestamp,
+    });
+
+    return {
+      totalSentThreads,
+      sentSinceTimestamp,
+    };
+  },
+});
+
+/**
  * Test Gmail connection
  */
 export const testConnection = action({

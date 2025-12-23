@@ -47,7 +47,7 @@ export const DEFAULT_SETTINGS = {
     description: "AI-powered reply suggestions for messages",
     modelId: "google/gemini-3-flash",
     promptName: "reply-suggestions",
-    temperature: 0.8,
+    temperature: 1,
     isEnabled: true,
   },
   "contact-summary": {
@@ -55,7 +55,7 @@ export const DEFAULT_SETTINGS = {
     description: "Generate summaries of conversation history with contacts",
     modelId: "google/gemini-3-flash",
     promptName: "contact-summary",
-    temperature: 0.5,
+    temperature: 1,
     isEnabled: true,
   },
   "message-compose": {
@@ -63,7 +63,7 @@ export const DEFAULT_SETTINGS = {
     description: "AI assistance for composing new messages",
     modelId: "google/gemini-3-flash",
     promptName: "message-compose",
-    temperature: 0.7,
+    temperature: 1,
     isEnabled: true,
   },
 } as const;
@@ -200,7 +200,7 @@ export const updateSetting = mutation({
         description: args.description ?? defaultConfig?.description,
         modelId: args.modelId ?? defaultConfig?.modelId ?? "google/gemini-3-flash",
         promptName: args.promptName ?? defaultConfig?.promptName,
-        temperature: args.temperature ?? defaultConfig?.temperature ?? 0.7,
+        temperature: args.temperature ?? defaultConfig?.temperature ?? 1,
         maxTokens: args.maxTokens,
         isEnabled: args.isEnabled ?? defaultConfig?.isEnabled ?? true,
         createdAt: now,

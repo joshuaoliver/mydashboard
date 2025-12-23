@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { action, internalAction, internalMutation, mutation, query } from "./_generated/server";
+import { action, internalAction, internalMutation, internalQuery, mutation, query } from "./_generated/server";
 import { internal } from "./_generated/api";
 
 /**
@@ -14,13 +14,13 @@ import { internal } from "./_generated/api";
 // ==========================================
 
 /**
- * Main sync action - called by cron every 15 minutes
+ * Main sync action - called by cron every 30 minutes
  */
 export const syncInbox = internalAction({
   args: {},
   handler: async (ctx): Promise<
     | { skipped: true; reason: string }
-    | { success: true; stats: { totalInbox: number; unread: number } }
+    | { success: true; stats: { totalInbox: number; unread: number; sentSinceLastSnapshot?: number } }
     | { success: false; error: string }
   > => {
     console.log("Starting Gmail inbox sync...");
@@ -34,6 +34,10 @@ export const syncInbox = internalAction({
     }
 
     try {
+      // Get the last snapshot timestamp to count sent emails since then
+      const lastSnapshot = await ctx.runQuery(internal.gmailSync.getLatestSnapshotInternal, {});
+      const lastSnapshotTimestamp = lastSnapshot?.timestamp;
+
       // Get inbox stats from Gmail API
       const stats = await ctx.runAction(internal.gmailActions.getInboxStats, {}) as {
         totalInbox: number;
@@ -45,6 +49,14 @@ export const syncInbox = internalAction({
         forums?: number;
       };
 
+      // Get sent email stats
+      const sentStats = await ctx.runAction(internal.gmailActions.getSentStats, {
+        sinceTimestamp: lastSnapshotTimestamp,
+      }) as {
+        totalSentThreads: number;
+        sentSinceTimestamp: number;
+      };
+
       // Store snapshot
       await ctx.runMutation(internal.gmailSync.storeSnapshot, {
         totalInbox: stats.totalInbox,
@@ -54,10 +66,18 @@ export const syncInbox = internalAction({
         promotions: stats.promotions,
         updates: stats.updates,
         forums: stats.forums,
+        sentSinceLastSnapshot: sentStats.sentSinceTimestamp,
+        totalSentThreads: sentStats.totalSentThreads,
       });
 
-      console.log(`Gmail sync complete: ${stats.totalInbox} total threads, ${stats.unread} unread threads`);
-      return { success: true, stats };
+      console.log(`Gmail sync complete: ${stats.totalInbox} total threads, ${stats.unread} unread, ${sentStats.sentSinceTimestamp} sent since last snapshot`);
+      return { 
+        success: true, 
+        stats: {
+          ...stats,
+          sentSinceLastSnapshot: sentStats.sentSinceTimestamp,
+        }
+      };
     } catch (error) {
       console.error("Gmail sync failed:", error);
       return { 
@@ -84,6 +104,8 @@ export const storeSnapshot = internalMutation({
     promotions: v.optional(v.number()),
     updates: v.optional(v.number()),
     forums: v.optional(v.number()),
+    sentSinceLastSnapshot: v.optional(v.number()),
+    totalSentThreads: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const id = await ctx.db.insert("gmailSnapshots", {
@@ -95,6 +117,8 @@ export const storeSnapshot = internalMutation({
       promotions: args.promotions,
       updates: args.updates,
       forums: args.forums,
+      sentSinceLastSnapshot: args.sentSinceLastSnapshot,
+      totalSentThreads: args.totalSentThreads,
     });
     return id;
   },
@@ -142,9 +166,24 @@ export const clearAllSnapshots = internalMutation({
 // ==========================================
 
 /**
- * Get the latest Gmail snapshot
+ * Get the latest Gmail snapshot (public)
  */
 export const getLatestSnapshot = query({
+  args: {},
+  handler: async (ctx) => {
+    const snapshot = await ctx.db
+      .query("gmailSnapshots")
+      .withIndex("by_timestamp")
+      .order("desc")
+      .first();
+    return snapshot;
+  },
+});
+
+/**
+ * Get the latest Gmail snapshot (internal - for sync actions)
+ */
+export const getLatestSnapshotInternal = internalQuery({
   args: {},
   handler: async (ctx) => {
     const snapshot = await ctx.db

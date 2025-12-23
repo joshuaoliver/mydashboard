@@ -1,6 +1,7 @@
 import { useCallback, useRef, useEffect, useState, useMemo } from 'react'
 import { useNavigate } from '@tanstack/react-router'
-import { usePaginatedQuery, useQuery, useAction, useConvex } from 'convex/react'
+import { useAction, useConvex } from 'convex/react'
+import { useCachedQuery, useCachedPaginatedQuery } from '@/lib/convex-cache'
 import { api } from '../../../convex/_generated/api'
 import { useChatStore } from '@/stores/useChatStore'
 import { ChatListItem } from './ChatListItem'
@@ -27,13 +28,13 @@ export function ChatListPanel() {
   // Track which chats we've preloaded to avoid duplicate requests
   const preloadedChats = useRef<Set<string>>(new Set())
 
-  // Queries
-  const { results: allLoadedChats, status, loadMore } = usePaginatedQuery(
+  // Queries (with caching to keep subscriptions alive during navigation)
+  const { results: allLoadedChats, status, loadMore } = useCachedPaginatedQuery(
     api.beeperQueries.listCachedChats,
     { filter: tabFilter },
     { initialNumItems: 100 }
   )
-  const syncInfo = useQuery(api.beeperQueries.getChatInfo)
+  const syncInfo = useCachedQuery(api.beeperQueries.getChatInfo)
 
   // Actions
   const pageLoadSync = useAction(api.beeperSync.pageLoadSync)

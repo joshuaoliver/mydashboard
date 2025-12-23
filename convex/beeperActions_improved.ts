@@ -343,7 +343,7 @@ Format your response as JSON with this structure:
       const result = await generateText({
         model: gatewayClient("google/gemini-3-flash"), // Frontier intelligence at Flash speed
         prompt: prompt,
-        temperature: 0.8, // Slightly higher for creative variety
+        temperature: 1,
       });
 
       // Parse the AI response

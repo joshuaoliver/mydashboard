@@ -4,7 +4,10 @@ import tailwindcss from '@tailwindcss/vite'
 import tsConfigPaths from 'vite-tsconfig-paths'
 import { TanStackRouterVite } from '@tanstack/router-plugin/vite'
 
-// Pure SPA configuration - no SSR
+// Tauri dev host for mobile/external device development
+const host = process.env.TAURI_DEV_HOST
+
+// Pure SPA configuration - no SSR, with Tauri support
 export default defineConfig({
   plugins: [
     // TanStack Router plugin for automatic route generation
@@ -20,12 +23,21 @@ export default defineConfig({
     react(),
     tsConfigPaths(),
   ],
+  // Clear screen disabled for better Tauri CLI output
+  clearScreen: false,
   server: {
     port: 5174,
-    // Reduce HMR sensitivity for generated files
-    hmr: {
-      overlay: true,
-    },
+    host: host || false,
+    strictPort: true,
+    hmr: host
+      ? {
+          protocol: 'ws',
+          host: host,
+          port: 5175,
+        }
+      : {
+          overlay: true,
+        },
     watch: {
       // Ignore the generated route tree from triggering additional rebuilds
       // The router plugin handles this file specially

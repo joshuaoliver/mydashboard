@@ -124,6 +124,13 @@ export const listCachedChats = query({
         }
       }
       
+      // DEBUG: Log name resolution for chats where contact lookup might be failing
+      if (chat.contactId && !contact) {
+        console.log(
+          `[listCachedChats] WARNING: Chat "${chat.title}" has contactId=${chat.contactId} but contact not found in map`
+        );
+      }
+      
       // Profile image priority:
       // 1. Cached image from cachedImages table (file:// URLs cached to Convex)
       // 2. Dex contact image (synced from CRM)

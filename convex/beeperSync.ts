@@ -122,74 +122,142 @@ export const upsertChat = internalMutation({
 
       // OPTIMIZATION: Skip write if nothing meaningful has changed
       // Compare key fields that would affect the UI or require syncing
-      // NOTE: We DON'T check titleChanged because the query uses contactName || participantFullName || title
-      // So title changes don't affect what the user sees if we have better name sources
+      
+      // Helper to detect if a string looks like a raw identifier (phone, email, matrix ID)
+      const isRawId = (s?: string) => {
+        if (!s) return true; // undefined/empty is considered "raw" (not a good name)
+        if (s.includes('@') || s.includes(':')) return true;
+        const digits = s.replace(/\D/g, '');
+        if (digits.length >= 6 && /^[0-9+\s\-()]+$/.test(s)) return true;
+        return false;
+      };
+      
       const hasNewActivity = args.chatData.lastActivity > (existingChat.lastActivity || 0);
       const contactChanged = contactId !== undefined && contactId !== existingChat.contactId;
-      const usernameChanged = args.chatData.username !== existingChat.username;
-      const phoneChanged = args.chatData.phoneNumber !== existingChat.phoneNumber;
+      // Only count as changed if we have a NEW value (avoid triggering on undefined -> undefined)
+      const usernameChanged = args.chatData.username !== undefined && 
+                              args.chatData.username !== existingChat.username;
+      const phoneChanged = args.chatData.phoneNumber !== undefined && 
+                           args.chatData.phoneNumber !== existingChat.phoneNumber;
       const unreadChanged = args.chatData.unreadCount !== existingChat.unreadCount;
       const archivedChanged = args.chatData.isArchived !== existingChat.isArchived;
       const mutedChanged = args.chatData.isMuted !== existingChat.isMuted;
       const pinnedChanged = args.chatData.isPinned !== existingChat.isPinned;
-      const participantNameChanged = args.chatData.participantFullName !== existingChat.participantFullName;
+      
+      // Only consider name changes meaningful if they would actually be applied
+      // (i.e., if we're upgrading from raw to good, or changing a raw value)
+      const existingTitleIsRaw = isRawId(existingChat.title);
+      const newTitleIsRaw = isRawId(args.chatData.title);
+      const titleWouldChange = args.chatData.title !== existingChat.title && 
+                               (existingTitleIsRaw || !newTitleIsRaw);
+      
+      const existingNameIsRaw = isRawId(existingChat.participantFullName);
+      const newNameIsRaw = isRawId(args.chatData.participantFullName);
+      const participantNameWouldChange = args.chatData.participantFullName !== existingChat.participantFullName &&
+                                         (existingNameIsRaw || !newNameIsRaw);
       
       const hasChanges = hasNewActivity || contactChanged || usernameChanged || 
                          phoneChanged || unreadChanged || archivedChanged || 
-                         mutedChanged || pinnedChanged || participantNameChanged;
+                         mutedChanged || pinnedChanged || titleWouldChange || participantNameWouldChange;
       
       if (!hasChanges) {
         // Nothing meaningful changed in chat metadata - skip the write.
         // Note: We still return shouldSyncMessages which may be true if lastActivity > lastMessagesSyncedAt.
         // This is intentional - the caller will sync messages and syncChatMessages() will update lastMessagesSyncedAt.
         // This handles the case where chat metadata is unchanged but messages haven't been synced yet.
-        console.log(
-          `[upsertChat] Chat ${args.chatData.chatId}: SKIPPED (no metadata changes), ` +
-          `shouldSyncMessages=${shouldSyncMessages}`
-        );
         return { chatDocId, shouldSyncMessages };
       }
+      
+      // DEBUG: Log what triggered the update so we can identify unnecessary writes
+      const triggers = [];
+      if (hasNewActivity) triggers.push(`newActivity(${args.chatData.lastActivity} > ${existingChat.lastActivity})`);
+      if (contactChanged) triggers.push(`contact(${existingChat.contactId} -> ${contactId})`);
+      if (usernameChanged) triggers.push(`username(${existingChat.username} -> ${args.chatData.username})`);
+      if (phoneChanged) triggers.push(`phone(${existingChat.phoneNumber} -> ${args.chatData.phoneNumber})`);
+      if (unreadChanged) triggers.push(`unread(${existingChat.unreadCount} -> ${args.chatData.unreadCount})`);
+      if (archivedChanged) triggers.push('archived');
+      if (mutedChanged) triggers.push('muted');
+      if (pinnedChanged) triggers.push('pinned');
+      if (titleWouldChange) triggers.push(`title("${existingChat.title}" -> "${args.chatData.title}")`);
+      if (participantNameWouldChange) triggers.push(`participantName("${existingChat.participantFullName}" -> "${args.chatData.participantFullName}")`);
+      console.log(`[upsertChat] Chat ${args.chatData.chatId}: UPDATING because: ${triggers.join(', ')}`);
+      
 
-      // Build selective update - only include fields that are provided
-      // NOTE: We always update title - the QUERY handles name priority (contact > participant > title)
-      // So it doesn't matter what's in the title field as long as we have contactId or participantFullName
+      // Build SELECTIVE update - only include fields that actually changed
+      // This minimizes unnecessary reactive updates
       const updates: any = {
-        localChatID: args.chatData.localChatID,
-        title: args.chatData.title,
-        network: args.chatData.network,
-        accountID: args.chatData.accountID,
-        type: args.chatData.type,
-        lastActivity: args.chatData.lastActivity,
-        unreadCount: args.chatData.unreadCount,
-        isArchived: args.chatData.isArchived,
-        isMuted: args.chatData.isMuted,
-        isPinned: args.chatData.isPinned,
+        // Always update sync metadata when we do write
         lastSyncedAt: args.chatData.lastSyncedAt,
         syncSource: args.chatData.syncSource,
       };
       
-      // Only update optional fields if they're provided
-      if (args.chatData.description !== undefined) updates.description = args.chatData.description;
-      if (args.chatData.username !== undefined) updates.username = args.chatData.username;
-      if (args.chatData.phoneNumber !== undefined) updates.phoneNumber = args.chatData.phoneNumber;
-      if (args.chatData.email !== undefined) updates.email = args.chatData.email;
-      if (args.chatData.participantId !== undefined) updates.participantId = args.chatData.participantId;
-      if (args.chatData.participantFullName !== undefined) updates.participantFullName = args.chatData.participantFullName;
-      if (args.chatData.participantImgURL !== undefined) updates.participantImgURL = args.chatData.participantImgURL;
-      if (args.chatData.cannotMessage !== undefined) updates.cannotMessage = args.chatData.cannotMessage;
-      if (args.chatData.participantCount !== undefined) updates.participantCount = args.chatData.participantCount;
-      if (args.chatData.lastReadMessageSortKey !== undefined) updates.lastReadMessageSortKey = args.chatData.lastReadMessageSortKey;
-      if (args.chatData.newestMessageSortKey !== undefined) updates.newestMessageSortKey = args.chatData.newestMessageSortKey;
+      // Only include changed fields
+      if (hasNewActivity) {
+        updates.lastActivity = args.chatData.lastActivity;
+      }
+      if (unreadChanged) {
+        updates.unreadCount = args.chatData.unreadCount;
+      }
+      if (archivedChanged) {
+        updates.isArchived = args.chatData.isArchived;
+      }
+      if (mutedChanged) {
+        updates.isMuted = args.chatData.isMuted;
+      }
+      if (pinnedChanged) {
+        updates.isPinned = args.chatData.isPinned;
+      }
+      if (usernameChanged) {
+        updates.username = args.chatData.username;
+      }
+      if (phoneChanged) {
+        updates.phoneNumber = args.chatData.phoneNumber;
+      }
       
-      // Update contact matching if we found a match (or if username/phone changed, re-match)
-      if (contactId !== undefined) {
+      // NAME PROTECTION: Don't overwrite good names with raw identifiers
+      // The query uses: contactName || participantFullName || title
+      // We want to preserve "better" names and avoid flashing loops.
+      
+      // Update title: only if it would actually change AND the new title is "better" or existing is raw
+      if (titleWouldChange) {
+        updates.title = args.chatData.title;
+      }
+      
+      // Update participantFullName: same logic - don't replace a good name with a raw one
+      if (participantNameWouldChange) {
+        updates.participantFullName = args.chatData.participantFullName;
+      }
+      
+      // Update contact matching if we found a NEW match
+      if (contactChanged) {
         updates.contactId = contactId;
         updates.contactMatchedAt = now;
-      } else if (args.chatData.username !== existingChat.username || 
-                 args.chatData.phoneNumber !== existingChat.phoneNumber) {
-        // Username or phone changed but no match found - clear old contactId
-        updates.contactId = undefined;
-        updates.contactMatchedAt = now;
+      }
+      
+      // Update optional fields only if they changed (not just provided)
+      if (args.chatData.description !== undefined && args.chatData.description !== existingChat.description) {
+        updates.description = args.chatData.description;
+      }
+      if (args.chatData.email !== undefined && args.chatData.email !== existingChat.email) {
+        updates.email = args.chatData.email;
+      }
+      if (args.chatData.participantId !== undefined && args.chatData.participantId !== existingChat.participantId) {
+        updates.participantId = args.chatData.participantId;
+      }
+      if (args.chatData.participantImgURL !== undefined && args.chatData.participantImgURL !== existingChat.participantImgURL) {
+        updates.participantImgURL = args.chatData.participantImgURL;
+      }
+      if (args.chatData.cannotMessage !== undefined && args.chatData.cannotMessage !== existingChat.cannotMessage) {
+        updates.cannotMessage = args.chatData.cannotMessage;
+      }
+      if (args.chatData.participantCount !== undefined && args.chatData.participantCount !== existingChat.participantCount) {
+        updates.participantCount = args.chatData.participantCount;
+      }
+      if (args.chatData.lastReadMessageSortKey !== undefined && args.chatData.lastReadMessageSortKey !== existingChat.lastReadMessageSortKey) {
+        updates.lastReadMessageSortKey = args.chatData.lastReadMessageSortKey;
+      }
+      if (args.chatData.newestMessageSortKey !== undefined && args.chatData.newestMessageSortKey !== existingChat.newestMessageSortKey) {
+        updates.newestMessageSortKey = args.chatData.newestMessageSortKey;
       }
       
       // Only update message metadata if provided AND it's newer
@@ -211,12 +279,6 @@ export const upsertChat = internalMutation({
       }
       
       await ctx.db.patch(existingChat._id, updates);
-      
-      console.log(
-        `[upsertChat] Chat ${args.chatData.chatId}: UPDATED, ` +
-        `shouldSyncMessages=${shouldSyncMessages}, ` +
-        `contactId=${contactId || 'none'}`
-      );
     } else {
       // New chat - include contactId in initial insert
       const insertData = {
@@ -264,11 +326,14 @@ export const upsertParticipants = internalMutation({
 
     // Track the "other person" participant for single chats
     // Used to backfill chat phoneNumber if missing
+    // IMPORTANT: We only capture the FIRST non-self, non-Meta-AI participant's data
+    // This matches the behavior of syncBeeperChatsInternal to avoid inconsistencies
     let otherPersonPhoneNumber: string | undefined = undefined;
     let otherPersonUsername: string | undefined = undefined;
     let otherPersonFullName: string | undefined = undefined;
     let otherPersonImgURL: string | undefined = undefined;
     let otherPersonContactId: string | undefined = undefined;
+    let foundOtherPerson = false; // Flag to only capture first participant
 
     // Helper to check if a participant is Meta AI (bot injected by Instagram)
     const isMetaAI = (p: typeof args.participants[0]) => {
@@ -283,11 +348,12 @@ export const upsertParticipants = internalMutation({
 
       // Only try to match non-self participants to contacts
       if (!participant.isSelf) {
-        // Track "other person" data for backfill
+        // Track "other person" data for backfill - ONLY the FIRST real participant
         // Skip Meta AI bot when determining the "real" conversation partner
-        const shouldTrackAsOtherPerson = !isMetaAI(participant);
+        const shouldTrackAsOtherPerson = !foundOtherPerson && !isMetaAI(participant);
         
         if (shouldTrackAsOtherPerson) {
+          foundOtherPerson = true; // Mark that we found our person - don't overwrite
           if (participant.phoneNumber) {
             otherPersonPhoneNumber = participant.phoneNumber;
           }
@@ -416,6 +482,15 @@ export const upsertParticipants = internalMutation({
     if (chat && chat.type === "single") {
       const updates: Record<string, any> = {};
       
+      // Helper to detect raw identifiers (same logic as upsertChat)
+      const isRawId = (s?: string) => {
+        if (!s) return true;
+        if (s.includes('@') || s.includes(':')) return true;
+        const digits = s.replace(/\D/g, '');
+        if (digits.length >= 6 && /^[0-9+\s\-()]+$/.test(s)) return true;
+        return false;
+      };
+      
       // Backfill phoneNumber if missing but we have it from participant
       if (!chat.phoneNumber && otherPersonPhoneNumber) {
         updates.phoneNumber = otherPersonPhoneNumber;
@@ -427,8 +502,11 @@ export const upsertParticipants = internalMutation({
         updates.username = otherPersonUsername;
       }
       
-      // Backfill participantFullName if missing
-      if (!chat.participantFullName && otherPersonFullName) {
+      // Backfill participantFullName: only if missing OR current is raw and new is good
+      // This uses the same protection as upsertChat to prevent oscillation
+      const currentNameIsRaw = isRawId(chat.participantFullName);
+      const newNameIsRaw = isRawId(otherPersonFullName);
+      if ((!chat.participantFullName || (currentNameIsRaw && !newNameIsRaw)) && otherPersonFullName) {
         updates.participantFullName = otherPersonFullName;
       }
       
@@ -602,23 +680,32 @@ export const syncChatMessages = internalMutation({
       }
     }
 
-    // Update chat with lastMessagesSyncedAt and reply tracking
-    // CRITICAL: Only include fields that have values to avoid overwriting with undefined
-    const chatUpdate: any = {
-      lastMessagesSyncedAt: args.lastMessagesSyncedAt,
-    };
+    // Get current chat to check if anything actually changed
+    const currentChat = await ctx.db.get(args.chatDocId);
     
-    if (lastMessageFrom !== undefined) {
+    // Build update object only with fields that actually changed
+    const chatUpdate: any = {};
+    
+    // Only update lastMessagesSyncedAt if we actually synced messages
+    if (insertedCount > 0) {
+      chatUpdate.lastMessagesSyncedAt = args.lastMessagesSyncedAt;
+    }
+    
+    // Only update reply tracking if the values differ from current
+    if (lastMessageFrom !== undefined && lastMessageFrom !== currentChat?.lastMessageFrom) {
       chatUpdate.lastMessageFrom = lastMessageFrom;
     }
-    if (needsReply !== undefined) {
+    if (needsReply !== undefined && needsReply !== currentChat?.needsReply) {
       chatUpdate.needsReply = needsReply;
     }
-    if (lastMessageText !== undefined) {
+    if (lastMessageText !== undefined && lastMessageText !== currentChat?.lastMessage) {
       chatUpdate.lastMessage = lastMessageText;
     }
     
-    await ctx.db.patch(args.chatDocId, chatUpdate);
+    // Only patch if there are actual changes
+    if (Object.keys(chatUpdate).length > 0) {
+      await ctx.db.patch(args.chatDocId, chatUpdate);
+    }
 
     return insertedCount;
   },
@@ -832,7 +919,10 @@ export const syncBeeperChatsInternal = internalAction({
 
         syncedChatsCount++;
 
-          if (shouldSyncMessages) {
+        // Only sync messages if this is NOT a page load sync
+        // Page loads should be lightweight and avoid race conditions with loadNewerMessages
+        // The actual conversation messages will be loaded when the user opens the chat
+        if (shouldSyncMessages && args.syncSource !== "page_load") {
           try {
             const RECENT_MESSAGE_LIMIT = 15;
               const messageQueryParams: any = { limit: RECENT_MESSAGE_LIMIT };

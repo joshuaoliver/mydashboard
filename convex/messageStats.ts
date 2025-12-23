@@ -14,13 +14,21 @@ import { internal } from "./_generated/api";
 // ==========================================
 
 /**
- * Main sync action - called by cron every 15 minutes
+ * Main sync action - called by cron every 30 minutes
  * Calculates current stats from beeperChats table and stores snapshot
  */
 export const captureStats = internalMutation({
   args: {},
   handler: async (ctx) => {
     console.log("[messageStats] Starting message stats capture...");
+
+    // Get the last snapshot timestamp to count messages sent since then
+    const lastSnapshot = await ctx.db
+      .query("messageSnapshots")
+      .withIndex("by_timestamp")
+      .order("desc")
+      .first();
+    const lastSnapshotTimestamp = lastSnapshot?.timestamp;
 
     // Get all chats
     const allChats = await ctx.db.query("beeperChats").collect();
@@ -87,6 +95,22 @@ export const captureStats = internalMutation({
       }
     }
 
+    // Count messages sent by user since last snapshot
+    let messagesSentSinceLastSnapshot = 0;
+    if (lastSnapshotTimestamp) {
+      // Query all messages sent by user since the last snapshot
+      const allUserMessages = await ctx.db
+        .query("beeperMessages")
+        .filter((q) =>
+          q.and(
+            q.eq(q.field("isFromUser"), true),
+            q.gt(q.field("timestamp"), lastSnapshotTimestamp)
+          )
+        )
+        .collect();
+      messagesSentSinceLastSnapshot = allUserMessages.length;
+    }
+
     // Store snapshot
     const snapshotId = await ctx.db.insert("messageSnapshots", {
       timestamp: Date.now(),
@@ -110,12 +134,15 @@ export const captureStats = internalMutation({
       needsReplyFacebook: needsReplyByNetwork.facebook,
       needsReplyTelegram: needsReplyByNetwork.telegram,
       needsReplyOther: needsReplyByNetwork.other,
+      // Sent message tracking
+      messagesSentSinceLastSnapshot,
     });
 
     console.log(
       `[messageStats] Snapshot captured: ${totalChats} total, ` +
       `${activeChats} active, ${archivedChats} archived, ` +
-      `${needsReplyChats} awaiting reply`
+      `${needsReplyChats} awaiting reply, ` +
+      `${messagesSentSinceLastSnapshot} sent since last snapshot`
     );
 
     return {
@@ -124,6 +151,7 @@ export const captureStats = internalMutation({
       activeChats,
       archivedChats,
       needsReplyChats,
+      messagesSentSinceLastSnapshot,
     };
   },
 });
@@ -360,6 +388,7 @@ export const triggerManualCapture = action({
       activeChats: number;
       archivedChats: number;
       needsReplyChats: number;
+      messagesSentSinceLastSnapshot: number;
     };
     error?: string;
   }> => {
@@ -368,12 +397,13 @@ export const triggerManualCapture = action({
 
       return {
         success: true,
-        message: `Captured: ${result.totalChats} total, ${result.activeChats} active, ${result.needsReplyChats} awaiting reply`,
+        message: `Captured: ${result.totalChats} total, ${result.activeChats} active, ${result.needsReplyChats} awaiting reply, ${result.messagesSentSinceLastSnapshot} sent`,
         stats: {
           totalChats: result.totalChats,
           activeChats: result.activeChats,
           archivedChats: result.archivedChats,
           needsReplyChats: result.needsReplyChats,
+          messagesSentSinceLastSnapshot: result.messagesSentSinceLastSnapshot,
         },
       };
     } catch (error) {

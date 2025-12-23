@@ -1,6 +1,5 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { useQuery } from '@tanstack/react-query'
-import { convexQuery } from '@convex-dev/react-query'
+import { useCachedQuery } from '@/lib/convex-cache'
 import { api } from '../../../../convex/_generated/api'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -22,31 +21,32 @@ export const Route = createFileRoute('/_authenticated/stats/')({
 })
 
 function StatsOverviewPage() {
-  // Gmail stats
-  const { data: gmailSettings } = useQuery(convexQuery(api.settingsStore.getGmailSettings, {}))
-  const { data: gmailSnapshot } = useQuery({
-    ...convexQuery(api.gmailSync.getLatestSnapshot, {}),
-    enabled: !!gmailSettings?.isConfigured,
-  })
-
-  // Hubstaff stats
-  const { data: hubstaffSettings } = useQuery(convexQuery(api.settingsStore.getHubstaffSettings, {}))
-  const { data: hubstaffToday } = useQuery({
-    ...convexQuery(api.hubstaffSync.getTodayStats, {}),
-    enabled: !!hubstaffSettings?.isConfigured,
-  })
-  const { data: hubstaffWeek } = useQuery({
-    ...convexQuery(api.hubstaffSync.getWeekStats, {}),
-    enabled: !!hubstaffSettings?.isConfigured,
-  })
-
-  // Linear stats
-  const { data: linearStats } = useQuery(convexQuery(api.linearSync.getStats, {}))
-
-  // Message stats (always available - uses Beeper data)
-  const { data: messageSnapshot } = useQuery(
-    convexQuery(api.messageStats.getLatestSnapshot, {})
+  // Gmail stats (with caching)
+  const gmailSettings = useCachedQuery(api.settingsStore.getGmailSettings, {})
+  const gmailSnapshot = useCachedQuery(
+    api.gmailSync.getLatestSnapshot, 
+    {},
+    { enabled: !!gmailSettings?.isConfigured }
   )
+
+  // Hubstaff stats (with caching)
+  const hubstaffSettings = useCachedQuery(api.settingsStore.getHubstaffSettings, {})
+  const hubstaffToday = useCachedQuery(
+    api.hubstaffSync.getTodayStats,
+    {},
+    { enabled: !!hubstaffSettings?.isConfigured }
+  )
+  const hubstaffWeek = useCachedQuery(
+    api.hubstaffSync.getWeekStats,
+    {},
+    { enabled: !!hubstaffSettings?.isConfigured }
+  )
+
+  // Linear stats (with caching)
+  const linearStats = useCachedQuery(api.linearSync.getStats, {})
+
+  // Message stats (always available - uses Beeper data, with caching)
+  const messageSnapshot = useCachedQuery(api.messageStats.getLatestSnapshot, {})
 
   const gmailConfigured = gmailSettings?.isConfigured ?? false
   const hubstaffConfigured = hubstaffSettings?.isConfigured ?? false

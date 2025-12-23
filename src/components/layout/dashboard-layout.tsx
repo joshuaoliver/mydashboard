@@ -47,10 +47,54 @@ interface DashboardLayoutProps {
   children: React.ReactNode
 }
 
+// Keyboard shortcuts for navigation
+// Only active when no input/textarea is focused
+const KEYBOARD_SHORTCUTS: Record<string, { to: string; search?: Record<string, unknown> }> = {
+  'h': { to: '/' },
+  'n': { to: '/todos' },
+  't': { to: '/todos-list' },
+  'm': { to: '/messages', search: { chatId: undefined } },
+  'c': { to: '/contacts' },
+  's': { to: '/sales' },
+  'a': { to: '/stats' },  // 'a' for analytics/stats since 's' is taken
+}
+
 export function DashboardLayout({ children }: DashboardLayoutProps) {
   const { signOut } = useAuthActions()
   const navigate = useNavigate()
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false)
+
+  // Global keyboard shortcuts for navigation
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't trigger if user is typing in an input, textarea, or contenteditable
+      const target = e.target as HTMLElement
+      if (
+        target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.isContentEditable ||
+        target.closest('[contenteditable="true"]')
+      ) {
+        return
+      }
+
+      // Don't trigger if modifier keys are held (except shift for uppercase)
+      if (e.ctrlKey || e.metaKey || e.altKey) {
+        return
+      }
+
+      const key = e.key.toLowerCase()
+      const shortcut = KEYBOARD_SHORTCUTS[key]
+      
+      if (shortcut) {
+        e.preventDefault()
+        navigate({ to: shortcut.to, search: shortcut.search as never })
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [navigate])
 
   const handleSignOut = async () => {
     await signOut()
@@ -270,7 +314,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                     }}
                   >
                     <LayoutDashboard className="h-4 w-4" />
-                    Home
+                    <span><span className="underline decoration-slate-500">H</span>ome</span>
                   </Link>
                 </NavigationMenuItem>
                 <NavigationMenuItem>
@@ -287,7 +331,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                     }}
                   >
                     <FileText className="h-4 w-4" />
-                    Notes
+                    <span><span className="underline decoration-slate-500">N</span>otes</span>
                   </Link>
                 </NavigationMenuItem>
                 <NavigationMenuItem>
@@ -304,7 +348,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                     }}
                   >
                     <CheckSquare className="h-4 w-4" />
-                    Todos
+                    <span><span className="underline decoration-slate-500">T</span>odos</span>
                   </Link>
                 </NavigationMenuItem>
                 <NavigationMenuItem>
@@ -322,7 +366,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                     }}
                   >
                     <MessageSquare className="h-4 w-4" />
-                    Messages
+                    <span><span className="underline decoration-slate-500">M</span>essages</span>
                   </Link>
                 </NavigationMenuItem>
                 <NavigationMenuItem>
@@ -339,7 +383,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                     }}
                   >
                     <Users className="h-4 w-4" />
-                    Contacts
+                    <span><span className="underline decoration-slate-500">C</span>ontacts</span>
                   </Link>
                 </NavigationMenuItem>
                 <NavigationMenuItem>
@@ -356,7 +400,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                     }}
                   >
                     <HeartHandshake className="h-4 w-4" />
-                    Sales
+                    <span><span className="underline decoration-slate-500">S</span>ales</span>
                   </Link>
                 </NavigationMenuItem>
                 <NavigationMenuItem>
@@ -373,7 +417,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                     }}
                   >
                     <BarChart3 className="h-4 w-4" />
-                    Stats
+                    <span>St<span className="underline decoration-slate-500">a</span>ts</span>
                   </Link>
                 </NavigationMenuItem>
                 <NavigationMenuItem>

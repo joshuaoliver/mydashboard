@@ -112,6 +112,88 @@ export const getSummaryStats = query({
   },
 });
 
+// Get completed todos history (permanent records)
+export const listCompletedHistory = query({
+  args: {
+    limit: v.optional(v.number()),
+    projectId: v.optional(v.id("projects")),
+  },
+  handler: async (ctx, args) => {
+    const limit = args.limit ?? 50;
+
+    let items;
+    if (args.projectId) {
+      items = await ctx.db
+        .query("completedTodos")
+        .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+        .order("desc")
+        .take(limit);
+    } else {
+      items = await ctx.db
+        .query("completedTodos")
+        .withIndex("by_completed")
+        .order("desc")
+        .take(limit);
+    }
+
+    return items;
+  },
+});
+
+// Get completed todos stats by date range
+export const getCompletedStats = query({
+  args: {
+    startDate: v.optional(v.number()),
+    endDate: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const now = Date.now();
+    const endDate = args.endDate ?? now;
+    const startDate = args.startDate ?? (now - 30 * 24 * 60 * 60 * 1000); // Default: last 30 days
+
+    const items = await ctx.db
+      .query("completedTodos")
+      .withIndex("by_completed")
+      .filter((q) =>
+        q.and(
+          q.gte(q.field("completedAt"), startDate),
+          q.lte(q.field("completedAt"), endDate)
+        )
+      )
+      .collect();
+
+    // Group by date
+    const byDate = new Map<string, number>();
+    items.forEach((item) => {
+      const date = new Date(item.completedAt).toISOString().split("T")[0];
+      byDate.set(date, (byDate.get(date) || 0) + 1);
+    });
+
+    // Group by project
+    const byProject = new Map<string, { count: number; name: string }>();
+    items.forEach((item) => {
+      const projectKey = item.projectId ?? "none";
+      const projectName = item.projectName ?? "No project";
+      const existing = byProject.get(projectKey);
+      if (existing) {
+        existing.count++;
+      } else {
+        byProject.set(projectKey, { count: 1, name: projectName });
+      }
+    });
+
+    return {
+      total: items.length,
+      byDate: Array.from(byDate.entries())
+        .map(([date, count]) => ({ date, count }))
+        .sort((a, b) => a.date.localeCompare(b.date)),
+      byProject: Array.from(byProject.entries())
+        .map(([projectId, { count, name }]) => ({ projectId, projectName: name, count }))
+        .sort((a, b) => b.count - a.count),
+    };
+  },
+});
+
 // Get all todos with enriched data (project names, hashtags, document info)
 export const listAllTodos = query({
   args: {
@@ -267,6 +349,28 @@ export const toggleTodoCompletion = mutation({
         // If we can't parse/update the content, just continue
         // The counts are still updated correctly
       }
+    }
+
+    // Create permanent record when completing a todo
+    if (newIsCompleted) {
+      // Get project name if there's a project
+      let projectName: string | undefined;
+      if (item.projectId) {
+        const project = await ctx.db.get(item.projectId);
+        projectName = project?.name;
+      }
+
+      await ctx.db.insert("completedTodos", {
+        originalTodoId: args.id,
+        originalDocumentId: item.documentId,
+        originalNodeId: item.nodeId,
+        text: item.text,
+        projectId: item.projectId,
+        projectName,
+        documentTitle: document?.title,
+        todoCreatedAt: item.createdAt,
+        completedAt: now,
+      });
     }
 
     return { isCompleted: newIsCompleted };

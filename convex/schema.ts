@@ -74,6 +74,7 @@ export default defineSchema({
     isArchived: v.boolean(),
     isMuted: v.boolean(),
     isPinned: v.boolean(),
+    isBlocked: v.optional(v.boolean()),
     
     // Sync metadata
     lastSyncedAt: v.number(),              // When we last fetched chat list from Beeper
@@ -345,6 +346,9 @@ export default defineSchema({
     promotions: v.optional(v.number()),
     updates: v.optional(v.number()),
     forums: v.optional(v.number()),
+    // Sent email tracking
+    sentSinceLastSnapshot: v.optional(v.number()), // Emails sent since previous snapshot
+    totalSentThreads: v.optional(v.number()),      // Total threads in sent folder (for reference)
   })
     .index("by_timestamp", ["timestamp"]),
 
@@ -373,6 +377,8 @@ export default defineSchema({
     needsReplyFacebook: v.optional(v.number()),
     needsReplyTelegram: v.optional(v.number()),
     needsReplyOther: v.optional(v.number()),
+    // Sent message tracking
+    messagesSentSinceLastSnapshot: v.optional(v.number()), // Messages sent by user since previous snapshot
   })
     .index("by_timestamp", ["timestamp"]),
 
@@ -522,4 +528,25 @@ export default defineSchema({
     .index("by_completed", ["isCompleted"])
     .index("by_document_order", ["documentId", "order"])
     .index("by_project", ["projectId"]),
+
+  // Permanent record of completed todos (immutable historical record)
+  completedTodos: defineTable({
+    // Original reference (may no longer exist)
+    originalTodoId: v.optional(v.id("todoItems")),
+    originalDocumentId: v.optional(v.id("todoDocuments")),
+    originalNodeId: v.optional(v.string()),
+    
+    // Snapshot of the todo at completion time
+    text: v.string(),
+    projectId: v.optional(v.id("projects")),
+    projectName: v.optional(v.string()),      // Snapshot in case project is deleted
+    documentTitle: v.optional(v.string()),    // Snapshot in case document is deleted
+    
+    // Timestamps
+    todoCreatedAt: v.number(),                // When the original todo was created
+    completedAt: v.number(),                  // When it was completed
+  })
+    .index("by_completed", ["completedAt"])
+    .index("by_project", ["projectId"])
+    .index("by_original_todo", ["originalTodoId"]),
 });

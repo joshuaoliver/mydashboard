@@ -1,7 +1,6 @@
 import { createFileRoute, Outlet, useNavigate, useParams } from '@tanstack/react-router'
-import { useQuery } from '@tanstack/react-query'
-import { convexQuery } from '@convex-dev/react-query'
 import { useMutation } from 'convex/react'
+import { useCachedQuery } from '@/lib/convex-cache'
 import { api } from '../../../convex/_generated/api'
 import { DocumentList } from '@/components/todos/DocumentList'
 
@@ -15,9 +14,7 @@ function TodosLayout() {
   const params = useParams({ strict: false }) as { documentId?: string }
   const documentId = params.documentId
 
-  const { data: documents, isLoading } = useQuery(
-    convexQuery(api.todoDocuments.listDocuments, {})
-  )
+  const documents = useCachedQuery(api.todoDocuments.listDocuments, {})
 
   const createDocument = useMutation(api.todoDocuments.createDocument)
 
@@ -30,7 +27,7 @@ function TodosLayout() {
     <div className="h-full flex">
       <DocumentList 
         documents={documents ?? []} 
-        isLoading={isLoading}
+        isLoading={documents === undefined}
         selectedId={documentId}
         onCreateDocument={handleCreateDocument}
       />

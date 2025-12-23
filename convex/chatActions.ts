@@ -66,7 +66,40 @@ export const unarchiveChat = action({
 });
 
 /**
- * Mark a chat as read (public action)
+ * Block a chat (public action)
+ * Only blocks in local database (hides from lists)
+ */
+export const blockChat = action({
+  args: {
+    chatId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    await ctx.runMutation(internal.beeperMutations.toggleBlockChat, {
+      chatId: args.chatId,
+      isBlocked: true,
+    });
+    
+    return { success: true };
+  },
+});
+
+/**
+ * Unblock a chat (public action)
+ */
+export const unblockChat = action({
+  args: {
+    chatId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    await ctx.runMutation(internal.beeperMutations.toggleBlockChat, {
+      chatId: args.chatId,
+      isBlocked: false,
+    });
+    
+    return { success: true };
+  },
+});
+
  * Sets the unread count to 0
  */
 export const markChatAsRead = action({

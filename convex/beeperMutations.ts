@@ -77,6 +77,32 @@ export const toggleArchiveChat = internalMutation({
 });
 
 /**
+ * Block or unblock a chat
+ */
+export const toggleBlockChat = internalMutation({
+  args: {
+    chatId: v.string(),
+    isBlocked: v.boolean(),
+  },
+  handler: async (ctx, args) => {
+    const chat = await ctx.db
+      .query("beeperChats")
+      .withIndex("by_chat_id", (q) => q.eq("chatId", args.chatId))
+      .first();
+    
+    if (!chat) {
+      throw new Error(`Chat ${args.chatId} not found`);
+    }
+
+    await ctx.db.patch(chat._id, {
+      isBlocked: args.isBlocked,
+    });
+
+    return { success: true, chatId: args.chatId, isBlocked: args.isBlocked };
+  },
+});
+
+/**
  * Mark a chat as read
  * Sets the unread count to 0
  */

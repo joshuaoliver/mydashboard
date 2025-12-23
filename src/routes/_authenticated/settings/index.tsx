@@ -4,8 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useMutation, useAction } from 'convex/react'
-import { useQuery } from '@tanstack/react-query'
-import { convexQuery } from '@convex-dev/react-query'
+import { useCachedQuery } from '@/lib/convex-cache'
 import { api } from '../../../../convex/_generated/api'
 import { useState, useEffect, useRef } from 'react'
 import { Trash2, Database, AlertCircle, CheckCircle, Settings as SettingsIcon, Users, RefreshCw, Bot, MessageSquare, MapPin, RotateCcw, Compass, Clock, History, Square, Play, FileText } from 'lucide-react'
@@ -42,9 +41,9 @@ function SettingsPage() {
   const triggerRematch = useAction(api.contactMutations.triggerFullRematch)
   const runHistoricalBatch = useAction(api.beeperPagination.runHistoricalSyncBatch)
   const stopHistoricalSync = useAction(api.beeperPagination.stopHistoricalSync)
-  const { data: dexStats } = useQuery(convexQuery(api.dexQueries.getSyncStats, {}))
-  const { data: syncDiagnostics } = useQuery(convexQuery(api.cursorHelpers.getSyncDiagnostics, {}))
-  const { data: historicalSyncStatus } = useQuery(convexQuery(api.beeperPagination.getHistoricalSyncStatus, {}))
+  const dexStats = useCachedQuery(api.dexQueries.getSyncStats, {})
+  const syncDiagnostics = useCachedQuery(api.cursorHelpers.getSyncDiagnostics, {})
+  const historicalSyncStatus = useCachedQuery(api.beeperPagination.getHistoricalSyncStatus, {})
 
   const handleClearMessages = async () => {
     if (!confirm('Delete all cached messages?')) return

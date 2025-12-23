@@ -5,6 +5,7 @@ import { QueryClientProvider, QueryClient } from '@tanstack/react-query'
 import { ConvexAuthProvider } from '@convex-dev/auth/react'
 import { ConvexReactClient } from 'convex/react'
 import { ConvexQueryClient } from '@convex-dev/react-query'
+import { ConvexQueryCacheProvider } from 'convex-helpers/react/cache'
 import { ThemeProvider } from '@/components/theme-provider'
 import { createRouter } from './router'
 import './styles/app.css'
@@ -57,9 +58,15 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
       <ConvexAuthProvider client={convex}>
-        <QueryClientProvider client={queryClient}>
-          <RouterProvider router={router} />
-        </QueryClientProvider>
+        <ConvexQueryCacheProvider
+          expiration={5 * 60 * 1000} // 5 minutes (default)
+          maxIdleEntries={250} // max cached subscriptions (default)
+          debug={false} // set to true to see cache debug logs
+        >
+          <QueryClientProvider client={queryClient}>
+            <RouterProvider router={router} />
+          </QueryClientProvider>
+        </ConvexQueryCacheProvider>
       </ConvexAuthProvider>
     </ThemeProvider>
   </React.StrictMode>
