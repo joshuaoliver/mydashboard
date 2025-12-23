@@ -87,6 +87,45 @@ export const saveOAuthTokens = mutation({
 });
 
 /**
+ * Save OAuth tokens (internal - for HTTP callback)
+ */
+export const saveOAuthTokensInternal = internalMutation({
+  args: {
+    accessToken: v.string(),
+    refreshToken: v.optional(v.string()),
+    expiresIn: v.number(),
+    calendarId: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const now = Date.now();
+    const tokenExpiresAt = now + args.expiresIn * 1000;
+
+    const existing = await ctx.db.query("googleCalendarSettings").first();
+
+    if (existing) {
+      await ctx.db.patch(existing._id, {
+        accessToken: args.accessToken,
+        refreshToken: args.refreshToken ?? existing.refreshToken,
+        tokenExpiresAt,
+        calendarId: args.calendarId ?? existing.calendarId,
+        isConfigured: true,
+      });
+      return existing._id;
+    }
+
+    const id = await ctx.db.insert("googleCalendarSettings", {
+      accessToken: args.accessToken,
+      refreshToken: args.refreshToken ?? "",
+      tokenExpiresAt,
+      calendarId: args.calendarId ?? "primary",
+      isConfigured: true,
+    });
+
+    return id;
+  },
+});
+
+/**
  * Update access token (internal - for token refresh)
  */
 export const updateAccessToken = internalMutation({

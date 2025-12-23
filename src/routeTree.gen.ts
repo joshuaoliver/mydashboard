@@ -39,6 +39,7 @@ import { Route as AuthenticatedSettingsLinearRouteImport } from './routes/_authe
 import { Route as AuthenticatedSettingsIntegrationsRouteImport } from './routes/_authenticated/settings/integrations'
 import { Route as AuthenticatedSettingsHubstaffRouteImport } from './routes/_authenticated/settings/hubstaff'
 import { Route as AuthenticatedSettingsGmailRouteImport } from './routes/_authenticated/settings/gmail'
+import { Route as AuthenticatedSettingsCalendarRouteImport } from './routes/_authenticated/settings/calendar'
 import { Route as AuthenticatedSettingsAiRouteImport } from './routes/_authenticated/settings/ai'
 import { Route as AuthenticatedContactsContactIdRouteImport } from './routes/_authenticated/contacts/$contactId'
 import { Route as AuthenticatedSettingsProjectsProjectIdRouteImport } from './routes/_authenticated/settings/projects.$projectId'
@@ -206,6 +207,12 @@ const AuthenticatedSettingsGmailRoute =
     path: '/gmail',
     getParentRoute: () => AuthenticatedSettingsRoute,
   } as any)
+const AuthenticatedSettingsCalendarRoute =
+  AuthenticatedSettingsCalendarRouteImport.update({
+    id: '/calendar',
+    path: '/calendar',
+    getParentRoute: () => AuthenticatedSettingsRoute,
+  } as any)
 const AuthenticatedSettingsAiRoute = AuthenticatedSettingsAiRouteImport.update({
   id: '/ai',
   path: '/ai',
@@ -239,6 +246,7 @@ export interface FileRoutesByFullPath {
   '/': typeof AuthenticatedIndexRoute
   '/contacts/$contactId': typeof AuthenticatedContactsContactIdRoute
   '/settings/ai': typeof AuthenticatedSettingsAiRoute
+  '/settings/calendar': typeof AuthenticatedSettingsCalendarRoute
   '/settings/gmail': typeof AuthenticatedSettingsGmailRoute
   '/settings/hubstaff': typeof AuthenticatedSettingsHubstaffRoute
   '/settings/integrations': typeof AuthenticatedSettingsIntegrationsRoute
@@ -269,6 +277,7 @@ export interface FileRoutesByTo {
   '/': typeof AuthenticatedIndexRoute
   '/contacts/$contactId': typeof AuthenticatedContactsContactIdRoute
   '/settings/ai': typeof AuthenticatedSettingsAiRoute
+  '/settings/calendar': typeof AuthenticatedSettingsCalendarRoute
   '/settings/gmail': typeof AuthenticatedSettingsGmailRoute
   '/settings/hubstaff': typeof AuthenticatedSettingsHubstaffRoute
   '/settings/integrations': typeof AuthenticatedSettingsIntegrationsRoute
@@ -305,6 +314,7 @@ export interface FileRoutesById {
   '/_authenticated/': typeof AuthenticatedIndexRoute
   '/_authenticated/contacts/$contactId': typeof AuthenticatedContactsContactIdRoute
   '/_authenticated/settings/ai': typeof AuthenticatedSettingsAiRoute
+  '/_authenticated/settings/calendar': typeof AuthenticatedSettingsCalendarRoute
   '/_authenticated/settings/gmail': typeof AuthenticatedSettingsGmailRoute
   '/_authenticated/settings/hubstaff': typeof AuthenticatedSettingsHubstaffRoute
   '/_authenticated/settings/integrations': typeof AuthenticatedSettingsIntegrationsRoute
@@ -341,6 +351,7 @@ export interface FileRouteTypes {
     | '/'
     | '/contacts/$contactId'
     | '/settings/ai'
+    | '/settings/calendar'
     | '/settings/gmail'
     | '/settings/hubstaff'
     | '/settings/integrations'
@@ -371,6 +382,7 @@ export interface FileRouteTypes {
     | '/'
     | '/contacts/$contactId'
     | '/settings/ai'
+    | '/settings/calendar'
     | '/settings/gmail'
     | '/settings/hubstaff'
     | '/settings/integrations'
@@ -406,6 +418,7 @@ export interface FileRouteTypes {
     | '/_authenticated/'
     | '/_authenticated/contacts/$contactId'
     | '/_authenticated/settings/ai'
+    | '/_authenticated/settings/calendar'
     | '/_authenticated/settings/gmail'
     | '/_authenticated/settings/hubstaff'
     | '/_authenticated/settings/integrations'
@@ -645,6 +658,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSettingsGmailRouteImport
       parentRoute: typeof AuthenticatedSettingsRoute
     }
+    '/_authenticated/settings/calendar': {
+      id: '/_authenticated/settings/calendar'
+      path: '/calendar'
+      fullPath: '/settings/calendar'
+      preLoaderRoute: typeof AuthenticatedSettingsCalendarRouteImport
+      parentRoute: typeof AuthenticatedSettingsRoute
+    }
     '/_authenticated/settings/ai': {
       id: '/_authenticated/settings/ai'
       path: '/ai'
@@ -701,6 +721,7 @@ const AuthenticatedSettingsProjectsRouteWithChildren =
 
 interface AuthenticatedSettingsRouteChildren {
   AuthenticatedSettingsAiRoute: typeof AuthenticatedSettingsAiRoute
+  AuthenticatedSettingsCalendarRoute: typeof AuthenticatedSettingsCalendarRoute
   AuthenticatedSettingsGmailRoute: typeof AuthenticatedSettingsGmailRoute
   AuthenticatedSettingsHubstaffRoute: typeof AuthenticatedSettingsHubstaffRoute
   AuthenticatedSettingsIntegrationsRoute: typeof AuthenticatedSettingsIntegrationsRoute
@@ -714,6 +735,7 @@ interface AuthenticatedSettingsRouteChildren {
 
 const AuthenticatedSettingsRouteChildren: AuthenticatedSettingsRouteChildren = {
   AuthenticatedSettingsAiRoute: AuthenticatedSettingsAiRoute,
+  AuthenticatedSettingsCalendarRoute: AuthenticatedSettingsCalendarRoute,
   AuthenticatedSettingsGmailRoute: AuthenticatedSettingsGmailRoute,
   AuthenticatedSettingsHubstaffRoute: AuthenticatedSettingsHubstaffRoute,
   AuthenticatedSettingsIntegrationsRoute:

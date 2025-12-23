@@ -705,4 +705,143 @@ export default defineSchema({
     isDefault: v.boolean(),                   // Show by default in suggestions
     order: v.number(),
   }),
+
+  // ===========================================
+  // Operator Intelligence Layer
+  // ===========================================
+
+  // Daily energy/context notes (free-form text input)
+  dailyContext: defineTable({
+    date: v.string(),                         // YYYY-MM-DD
+    planId: v.optional(v.id("todayPlans")),   // Link to today's plan
+    // Morning context (set at start of day)
+    morningContext: v.optional(v.string()),   // "Low energy, still want to make progress"
+    // Inline notes throughout the day
+    contextNotes: v.array(v.object({
+      text: v.string(),
+      timestamp: v.number(),
+    })),
+    // AI-inferred state (updated as context changes)
+    inferredEnergy: v.optional(v.union(
+      v.literal("low"),
+      v.literal("medium"),
+      v.literal("high")
+    )),
+    inferredFocus: v.optional(v.union(
+      v.literal("scattered"),
+      v.literal("moderate"),
+      v.literal("deep")
+    )),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_date", ["date"]),
+
+  // Momentum tracking - daily stats
+  dailyMomentum: defineTable({
+    date: v.string(),                         // YYYY-MM-DD
+    planId: v.optional(v.id("todayPlans")),
+    // Block stats
+    blocksStarted: v.number(),
+    blocksCompleted: v.number(),
+    blocksPartial: v.number(),
+    blocksSkipped: v.number(),
+    // Time stats
+    totalMinutesPlanned: v.number(),
+    totalMinutesWorked: v.number(),
+    averageBlockDuration: v.number(),
+    // Frog stats
+    frogAttempts: v.number(),
+    frogCompletions: v.number(),
+    // Task type breakdown
+    taskTypeBreakdown: v.object({
+      todo: v.number(),
+      linear: v.number(),
+      email: v.number(),
+      adhoc: v.number(),
+    }),
+    // Timing patterns
+    firstBlockStartedAt: v.optional(v.number()),
+    lastBlockEndedAt: v.optional(v.number()),
+    averageTimeToStart: v.optional(v.number()), // Avg seconds from block start to session start
+    // Computed at end of day
+    computedAt: v.number(),
+  })
+    .index("by_date", ["date"]),
+
+  // Task skip history (for weighted selection decay)
+  taskSkipHistory: defineTable({
+    taskType: v.string(),
+    taskId: v.string(),
+    taskTitle: v.string(),
+    skippedAt: v.number(),
+    skipCount: v.number(),                    // How many times skipped recently
+    lastOfferedAt: v.number(),                // When it was last suggested
+  })
+    .index("by_task", ["taskType", "taskId"])
+    .index("by_skipped", ["skippedAt"]),
+
+  // Daily summary reports (HTML)
+  dailySummaries: defineTable({
+    date: v.string(),                         // YYYY-MM-DD
+    planId: v.optional(v.id("todayPlans")),
+    momentumId: v.optional(v.id("dailyMomentum")),
+    contextId: v.optional(v.id("dailyContext")),
+    // Generated content
+    htmlContent: v.string(),                  // Full HTML report
+    summaryText: v.string(),                  // Plain text version
+    oneLiner: v.string(),                     // Single reflection line
+    // AI metadata
+    modelUsed: v.string(),
+    generatedAt: v.number(),
+    // Report sections (for partial updates)
+    sections: v.object({
+      overview: v.string(),
+      workedOn: v.string(),
+      momentum: v.string(),
+      patterns: v.string(),
+      reflection: v.string(),
+    }),
+  })
+    .index("by_date", ["date"]),
+
+  // Active execution state (singleton for current session)
+  executionState: defineTable({
+    // Current session info
+    isActive: v.boolean(),
+    sessionId: v.optional(v.id("timerSessions")),
+    planId: v.optional(v.id("todayPlans")),
+    // Current task
+    currentTask: v.optional(v.object({
+      type: v.string(),
+      id: v.string(),
+      title: v.string(),
+      startedAt: v.number(),
+      targetDuration: v.number(),
+    })),
+    // Next suggestions (pre-computed for fast display)
+    nextSuggestions: v.array(v.object({
+      taskType: v.string(),
+      taskId: v.string(),
+      taskTitle: v.string(),
+      weight: v.number(),                     // Weighted score
+      duration: v.number(),
+      reason: v.string(),
+    })),
+    // Weighted candidate pool
+    candidatePool: v.array(v.object({
+      taskType: v.string(),
+      taskId: v.string(),
+      taskTitle: v.string(),
+      weight: v.number(),
+      factors: v.object({
+        priority: v.number(),
+        deadline: v.number(),
+        frogBonus: v.number(),
+        skipDecay: v.number(),
+        durationFit: v.number(),
+      }),
+    })),
+    updatedAt: v.number(),
+  }),
 });

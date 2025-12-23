@@ -295,9 +295,9 @@ export const getHubstaffSettingsInternal = internalQuery({
       .query("settings")
       .withIndex("by_key", (q) => q.eq("key", "hubstaff"))
       .first();
-    
+
     if (!setting) return null;
-    
+
     return setting.value as {
       refreshToken?: string;
       accessToken?: string;
@@ -306,6 +306,46 @@ export const getHubstaffSettingsInternal = internalQuery({
       organizationName?: string;
       selectedUserId?: number;
       selectedUserName?: string;
+      isConfigured?: boolean;
+    };
+  },
+});
+
+/**
+ * Get Google Calendar settings
+ */
+export const getCalendarSettings = query({
+  args: {},
+  handler: async (ctx) => {
+    const setting = await ctx.db
+      .query("settings")
+      .withIndex("by_key", (q) => q.eq("key", "calendar"))
+      .first();
+
+    if (!setting) return null;
+
+    return setting.value as {
+      clientId?: string;
+      clientSecret?: string;
+      isConfigured?: boolean;
+    };
+  },
+});
+
+export const getCalendarSettingsInternal = internalQuery({
+  args: {},
+  handler: async (ctx) => {
+    const setting = await ctx.db
+      .query("settings")
+      .withIndex("by_key", (q) => q.eq("key", "calendar"))
+      .first();
+
+    if (!setting) return null;
+
+    return setting.value as {
+      clientId?: string;
+      clientSecret?: string;
+      refreshToken?: string;
       isConfigured?: boolean;
     };
   },
