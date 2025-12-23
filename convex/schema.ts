@@ -535,13 +535,13 @@ export default defineSchema({
     originalTodoId: v.optional(v.id("todoItems")),
     originalDocumentId: v.optional(v.id("todoDocuments")),
     originalNodeId: v.optional(v.string()),
-    
+
     // Snapshot of the todo at completion time
     text: v.string(),
     projectId: v.optional(v.id("projects")),
     projectName: v.optional(v.string()),      // Snapshot in case project is deleted
     documentTitle: v.optional(v.string()),    // Snapshot in case document is deleted
-    
+
     // Timestamps
     todoCreatedAt: v.number(),                // When the original todo was created
     completedAt: v.number(),                  // When it was completed
@@ -549,4 +549,299 @@ export default defineSchema({
     .index("by_completed", ["completedAt"])
     .index("by_project", ["projectId"])
     .index("by_original_todo", ["originalTodoId"]),
+
+  // ===========================================
+  // Today Plan Feature Tables
+  // ===========================================
+
+  // Google Calendar settings for OAuth
+  googleCalendarSettings: defineTable({
+    accessToken: v.string(),
+    refreshToken: v.string(),
+    tokenExpiresAt: v.number(),
+    calendarId: v.string(),                   // Usually "primary"
+    isConfigured: v.boolean(),
+    lastSyncedAt: v.optional(v.number()),
+  }),
+
+  // Calendar events (fetched from Google Calendar)
+  calendarEvents: defineTable({
+    eventId: v.string(),                      // Google Calendar event ID
+    summary: v.string(),                      // Event title
+    description: v.optional(v.string()),
+    startTime: v.number(),                    // Unix timestamp
+    endTime: v.number(),                      // Unix timestamp
+    duration: v.number(),                     // Duration in minutes
+    isAllDay: v.boolean(),
+    location: v.optional(v.string()),
+    attendees: v.optional(v.array(v.string())),
+    status: v.string(),                       // "confirmed", "tentative", "cancelled"
+    syncedAt: v.number(),
+  })
+    .index("by_start_time", ["startTime"])
+    .index("by_event_id", ["eventId"]),
+
+  // Today Plan - main document for each day
+  todayPlans: defineTable({
+    date: v.string(),                         // YYYY-MM-DD format
+    // Cached free blocks (regenerated on calendar sync)
+    freeBlocks: v.array(v.object({
+      id: v.string(),                         // Unique block ID
+      startTime: v.number(),                  // Unix timestamp
+      endTime: v.number(),                    // Unix timestamp
+      duration: v.number(),                   // Duration in minutes
+      label: v.optional(v.string()),          // Optional context label (e.g., "Before meeting")
+    })),
+    // The "frog" task ID for today (if set)
+    frogTaskId: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_date", ["date"]),
+
+  // Ad-hoc life items (breakfast, lunch, gym, etc.)
+  // These are constraints/context for AI suggestions
+  adhocItems: defineTable({
+    planId: v.id("todayPlans"),               // Which day this belongs to
+    text: v.string(),                         // "Get breakfast", "Gym", "Lunch", etc.
+    estimatedDuration: v.optional(v.number()), // Duration in minutes (optional)
+    preferredTime: v.optional(v.number()),    // Preferred start time (optional)
+    isCompleted: v.boolean(),
+    completedAt: v.optional(v.number()),
+    order: v.number(),                        // Display order
+    createdAt: v.number(),
+  })
+    .index("by_plan", ["planId"]),
+
+  // Block assignments - which task is assigned to which block
+  blockAssignments: defineTable({
+    planId: v.id("todayPlans"),
+    blockId: v.string(),                      // References freeBlocks[].id
+    // Task source and reference
+    taskType: v.union(
+      v.literal("todo"),                      // From todoItems
+      v.literal("linear"),                    // From linearIssues
+      v.literal("adhoc"),                     // From adhocItems
+      v.literal("email")                      // Email block (bounded)
+    ),
+    taskId: v.string(),                       // ID reference (todoItem._id, linearId, adhocItem._id)
+    // Snapshot of task info (for display)
+    taskTitle: v.string(),
+    taskDuration: v.number(),                 // Allocated minutes for this block
+    // Status
+    status: v.union(
+      v.literal("suggested"),                 // AI suggested
+      v.literal("assigned"),                  // User confirmed
+      v.literal("in_progress"),               // Currently working
+      v.literal("completed"),                 // Finished
+      v.literal("skipped")                    // User skipped
+    ),
+    // AI suggestion metadata
+    aiConfidence: v.optional(v.number()),     // 0-1 confidence score
+    aiReason: v.optional(v.string()),         // Why AI suggested this
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_plan", ["planId"])
+    .index("by_block", ["planId", "blockId"]),
+
+  // Timer sessions - tracks active work sessions
+  timerSessions: defineTable({
+    planId: v.id("todayPlans"),
+    blockId: v.optional(v.string()),          // Which block (if any)
+    assignmentId: v.optional(v.id("blockAssignments")),
+    // Task info (snapshot)
+    taskType: v.string(),
+    taskId: v.string(),
+    taskTitle: v.string(),
+    // Session config
+    mode: v.union(
+      v.literal("normal"),                    // Regular timer
+      v.literal("frog")                       // Frog mode (forced hard task)
+    ),
+    targetDuration: v.number(),               // Planned duration in minutes
+    // Timing
+    startedAt: v.number(),
+    pausedAt: v.optional(v.number()),         // If paused
+    endedAt: v.optional(v.number()),          // When completed
+    totalPausedSeconds: v.number(),           // Accumulated pause time
+    // Result
+    result: v.optional(v.union(
+      v.literal("completed"),
+      v.literal("partial"),
+      v.literal("skipped")
+    )),
+    resultNote: v.optional(v.string()),       // User note on completion
+    isActive: v.boolean(),
+  })
+    .index("by_plan", ["planId"])
+    .index("by_active", ["isActive"]),
+
+  // AI block suggestions cache
+  aiBlockSuggestions: defineTable({
+    planId: v.id("todayPlans"),
+    blockId: v.string(),
+    // Suggestions (up to 3)
+    suggestions: v.array(v.object({
+      taskType: v.string(),
+      taskId: v.string(),
+      taskTitle: v.string(),
+      suggestedDuration: v.number(),
+      confidence: v.number(),
+      reason: v.string(),
+    })),
+    // Context when generated
+    contextHash: v.string(),                  // Hash of work pool state for cache invalidation
+    generatedAt: v.number(),
+    modelUsed: v.string(),
+  })
+    .index("by_plan_block", ["planId", "blockId"]),
+
+  // Email blocks - predefined email task templates
+  emailBlocks: defineTable({
+    title: v.string(),                        // "Reply to newest 5", "Triage inbox", etc.
+    description: v.optional(v.string()),
+    duration: v.number(),                     // Minutes
+    isDefault: v.boolean(),                   // Show by default in suggestions
+    order: v.number(),
+  }),
+
+  // ===========================================
+  // Operator Intelligence Layer
+  // ===========================================
+
+  // Daily energy/context notes (free-form text input)
+  dailyContext: defineTable({
+    date: v.string(),                         // YYYY-MM-DD
+    planId: v.optional(v.id("todayPlans")),   // Link to today's plan
+    // Morning context (set at start of day)
+    morningContext: v.optional(v.string()),   // "Low energy, still want to make progress"
+    // Inline notes throughout the day
+    contextNotes: v.array(v.object({
+      text: v.string(),
+      timestamp: v.number(),
+    })),
+    // AI-inferred state (updated as context changes)
+    inferredEnergy: v.optional(v.union(
+      v.literal("low"),
+      v.literal("medium"),
+      v.literal("high")
+    )),
+    inferredFocus: v.optional(v.union(
+      v.literal("scattered"),
+      v.literal("moderate"),
+      v.literal("deep")
+    )),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_date", ["date"]),
+
+  // Momentum tracking - daily stats
+  dailyMomentum: defineTable({
+    date: v.string(),                         // YYYY-MM-DD
+    planId: v.optional(v.id("todayPlans")),
+    // Block stats
+    blocksStarted: v.number(),
+    blocksCompleted: v.number(),
+    blocksPartial: v.number(),
+    blocksSkipped: v.number(),
+    // Time stats
+    totalMinutesPlanned: v.number(),
+    totalMinutesWorked: v.number(),
+    averageBlockDuration: v.number(),
+    // Frog stats
+    frogAttempts: v.number(),
+    frogCompletions: v.number(),
+    // Task type breakdown
+    taskTypeBreakdown: v.object({
+      todo: v.number(),
+      linear: v.number(),
+      email: v.number(),
+      adhoc: v.number(),
+    }),
+    // Timing patterns
+    firstBlockStartedAt: v.optional(v.number()),
+    lastBlockEndedAt: v.optional(v.number()),
+    averageTimeToStart: v.optional(v.number()), // Avg seconds from block start to session start
+    // Computed at end of day
+    computedAt: v.number(),
+  })
+    .index("by_date", ["date"]),
+
+  // Task skip history (for weighted selection decay)
+  taskSkipHistory: defineTable({
+    taskType: v.string(),
+    taskId: v.string(),
+    taskTitle: v.string(),
+    skippedAt: v.number(),
+    skipCount: v.number(),                    // How many times skipped recently
+    lastOfferedAt: v.number(),                // When it was last suggested
+  })
+    .index("by_task", ["taskType", "taskId"])
+    .index("by_skipped", ["skippedAt"]),
+
+  // Daily summary reports (HTML)
+  dailySummaries: defineTable({
+    date: v.string(),                         // YYYY-MM-DD
+    planId: v.optional(v.id("todayPlans")),
+    momentumId: v.optional(v.id("dailyMomentum")),
+    contextId: v.optional(v.id("dailyContext")),
+    // Generated content
+    htmlContent: v.string(),                  // Full HTML report
+    summaryText: v.string(),                  // Plain text version
+    oneLiner: v.string(),                     // Single reflection line
+    // AI metadata
+    modelUsed: v.string(),
+    generatedAt: v.number(),
+    // Report sections (for partial updates)
+    sections: v.object({
+      overview: v.string(),
+      workedOn: v.string(),
+      momentum: v.string(),
+      patterns: v.string(),
+      reflection: v.string(),
+    }),
+  })
+    .index("by_date", ["date"]),
+
+  // Active execution state (singleton for current session)
+  executionState: defineTable({
+    // Current session info
+    isActive: v.boolean(),
+    sessionId: v.optional(v.id("timerSessions")),
+    planId: v.optional(v.id("todayPlans")),
+    // Current task
+    currentTask: v.optional(v.object({
+      type: v.string(),
+      id: v.string(),
+      title: v.string(),
+      startedAt: v.number(),
+      targetDuration: v.number(),
+    })),
+    // Next suggestions (pre-computed for fast display)
+    nextSuggestions: v.array(v.object({
+      taskType: v.string(),
+      taskId: v.string(),
+      taskTitle: v.string(),
+      weight: v.number(),                     // Weighted score
+      duration: v.number(),
+      reason: v.string(),
+    })),
+    // Weighted candidate pool
+    candidatePool: v.array(v.object({
+      taskType: v.string(),
+      taskId: v.string(),
+      taskTitle: v.string(),
+      weight: v.number(),
+      factors: v.object({
+        priority: v.number(),
+        deadline: v.number(),
+        frogBonus: v.number(),
+        skipDecay: v.number(),
+        durationFit: v.number(),
+      }),
+    })),
+    updatedAt: v.number(),
+  }),
 });

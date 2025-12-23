@@ -382,5 +382,102 @@ http.route({
   }),
 });
 
+/**
+ * Google Calendar OAuth Callback Endpoint
+ *
+ * Handles the OAuth redirect from Google for Calendar access.
+ * Similar to Gmail OAuth but with calendar-specific scopes.
+ *
+ * Flow:
+ * 1. Google redirects to: https://your-app.convex.site/calendar-callback?code=xxx
+ * 2. This endpoint exchanges the code for tokens (server-side)
+ * 3. Redirects to frontend /settings/calendar with success/error status
+ *
+ * Configure Google OAuth with redirect URI:
+ *   https://your-convex-site.convex.site/calendar-callback
+ */
+http.route({
+  path: "/calendar-callback",
+  method: "GET",
+  handler: httpAction(async (ctx, request) => {
+    const url = new URL(request.url);
+    const code = url.searchParams.get("code");
+    const error = url.searchParams.get("error");
+
+    const FRONTEND_URL = process.env.SITE_URL || "https://mydashboard-oliver.up.railway.app";
+    const settingsUrl = `${FRONTEND_URL}/settings/calendar`;
+
+    console.log(`[Calendar OAuth] Callback received: hasCode=${!!code}, error=${error}`);
+
+    if (error) {
+      console.error(`[Calendar OAuth] Error from Google: ${error}`);
+      const redirectUrl = `${settingsUrl}?oauth_error=${encodeURIComponent(error)}`;
+      return Response.redirect(redirectUrl, 302);
+    }
+
+    if (!code) {
+      console.error(`[Calendar OAuth] No authorization code received`);
+      const redirectUrl = `${settingsUrl}?oauth_error=${encodeURIComponent("No authorization code received")}`;
+      return Response.redirect(redirectUrl, 302);
+    }
+
+    try {
+      // Get Calendar settings (client ID and secret)
+      const settings = await ctx.runQuery(internal.settingsStore.getCalendarSettingsInternal, {});
+
+      if (!settings?.clientId || !settings?.clientSecret) {
+        throw new Error("Calendar OAuth not configured. Please set Client ID and Client Secret first.");
+      }
+
+      const redirectUri = `${url.origin}/calendar-callback`;
+
+      console.log(`[Calendar OAuth] Exchanging code for tokens with redirect_uri: ${redirectUri}`);
+
+      // Exchange code for tokens
+      const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: new URLSearchParams({
+          code,
+          client_id: settings.clientId,
+          client_secret: settings.clientSecret,
+          redirect_uri: redirectUri,
+          grant_type: "authorization_code",
+        }),
+      });
+
+      if (!tokenResponse.ok) {
+        const errorText = await tokenResponse.text();
+        console.error(`[Calendar OAuth] Token exchange failed: ${tokenResponse.status}`, errorText);
+        throw new Error(`Token exchange failed: ${tokenResponse.status}`);
+      }
+
+      const tokens = await tokenResponse.json();
+      console.log(`[Calendar OAuth] Token exchange successful, storing tokens...`);
+
+      // Store tokens in googleCalendarSettings table
+      await ctx.runMutation(internal.googleCalendar.saveOAuthTokensInternal, {
+        accessToken: tokens.access_token,
+        refreshToken: tokens.refresh_token || settings.refreshToken,
+        expiresIn: tokens.expires_in,
+        calendarId: "primary",
+      });
+
+      console.log(`[Calendar OAuth] ✅ OAuth complete, redirecting to frontend`);
+
+      const redirectUrl = `${settingsUrl}?oauth_success=true`;
+      return Response.redirect(redirectUrl, 302);
+
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : "Unknown error";
+      console.error(`[Calendar OAuth] Error:`, errorMsg);
+      const redirectUrl = `${settingsUrl}?oauth_error=${encodeURIComponent(errorMsg)}`;
+      return Response.redirect(redirectUrl, 302);
+    }
+  }),
+});
+
 export default http;
 

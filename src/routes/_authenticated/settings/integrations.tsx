@@ -53,6 +53,16 @@ function IntegrationsPage() {
   )
   const linearSync = useConvexAction(api.linearSync.triggerManualSync)
 
+  // Google Calendar
+  const { data: calendarSettings } = useQuery(
+    convexQuery(api.googleCalendar.getSettings, {})
+  )
+  const { data: calendarEvents } = useQuery({
+    ...convexQuery(api.googleCalendar.getTodayEvents, {}),
+    enabled: !!calendarSettings?.isConfigured,
+  })
+  const calendarSync = useConvexAction(api.googleCalendar.triggerSync)
+
   // State for sync/backfill operations
   const [syncing, setSyncing] = useState<string | null>(null)
   const [results, setResults] = useState<Record<string, { success: boolean; message: string }>>({})
@@ -61,6 +71,7 @@ function IntegrationsPage() {
   const gmailConfigured = gmailSettings?.isConfigured ?? false
   const hubstaffConfigured = hubstaffSettings?.isConfigured ?? false
   const linearConfigured = (linearStats?.totalWorkspaces ?? 0) > 0
+  const calendarConfigured = calendarSettings?.isConfigured ?? false
 
   const handleSync = async (integration: string, syncFn: () => Promise<any>) => {
     setSyncing(integration)
@@ -176,6 +187,27 @@ function IntegrationsPage() {
       onSync: () => handleSync('linear', () => linearSync({})),
       canBackfill: false,
     },
+    {
+      id: 'calendar',
+      name: 'Google Calendar',
+      description: 'Calendar events and free time blocks for Today Plan',
+      icon: Calendar,
+      iconColor: 'text-blue-500',
+      configured: calendarConfigured,
+      settingsPath: '/settings/calendar',
+      statsPath: '/today-plan',
+      stats: calendarConfigured
+        ? {
+            'Today\'s Events': calendarEvents?.length ?? 0,
+            'Calendar': calendarSettings?.calendarId ?? 'primary',
+            'Last Sync': calendarSettings?.lastSyncedAt
+              ? formatSydneyDateTime(calendarSettings.lastSyncedAt)
+              : 'Never',
+          }
+        : null,
+      onSync: () => handleSync('calendar', () => calendarSync({})),
+      canBackfill: false,
+    },
   ]
 
   return (
@@ -209,6 +241,7 @@ function IntegrationsPage() {
                 if (gmailConfigured) await handleSync('gmail', () => gmailSync({}))
                 if (hubstaffConfigured) await handleSync('hubstaff', () => hubstaffSync({}))
                 if (linearConfigured) await handleSync('linear', () => linearSync({}))
+                if (calendarConfigured) await handleSync('calendar', () => calendarSync({}))
               }}
               disabled={syncing !== null}
             >

@@ -16,6 +16,8 @@ import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
 import { Route as AuthenticatedTodosListRouteImport } from './routes/_authenticated/todos-list'
 import { Route as AuthenticatedTodosRouteImport } from './routes/_authenticated/todos'
+import { Route as AuthenticatedTodayPlanRouteImport } from './routes/_authenticated/today-plan'
+import { Route as AuthenticatedSummariesRouteImport } from './routes/_authenticated/summaries'
 import { Route as AuthenticatedStatsRouteImport } from './routes/_authenticated/stats'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
 import { Route as AuthenticatedSalesRouteImport } from './routes/_authenticated/sales'
@@ -38,6 +40,7 @@ import { Route as AuthenticatedSettingsLinearRouteImport } from './routes/_authe
 import { Route as AuthenticatedSettingsIntegrationsRouteImport } from './routes/_authenticated/settings/integrations'
 import { Route as AuthenticatedSettingsHubstaffRouteImport } from './routes/_authenticated/settings/hubstaff'
 import { Route as AuthenticatedSettingsGmailRouteImport } from './routes/_authenticated/settings/gmail'
+import { Route as AuthenticatedSettingsCalendarRouteImport } from './routes/_authenticated/settings/calendar'
 import { Route as AuthenticatedSettingsAiRouteImport } from './routes/_authenticated/settings/ai'
 import { Route as AuthenticatedContactsContactIdRouteImport } from './routes/_authenticated/contacts/$contactId'
 import { Route as AuthenticatedSettingsProjectsProjectIdRouteImport } from './routes/_authenticated/settings/projects.$projectId'
@@ -74,6 +77,16 @@ const AuthenticatedTodosListRoute = AuthenticatedTodosListRouteImport.update({
 const AuthenticatedTodosRoute = AuthenticatedTodosRouteImport.update({
   id: '/todos',
   path: '/todos',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedTodayPlanRoute = AuthenticatedTodayPlanRouteImport.update({
+  id: '/today-plan',
+  path: '/today-plan',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedSummariesRoute = AuthenticatedSummariesRouteImport.update({
+  id: '/summaries',
+  path: '/summaries',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedStatsRoute = AuthenticatedStatsRouteImport.update({
@@ -200,6 +213,12 @@ const AuthenticatedSettingsGmailRoute =
     path: '/gmail',
     getParentRoute: () => AuthenticatedSettingsRoute,
   } as any)
+const AuthenticatedSettingsCalendarRoute =
+  AuthenticatedSettingsCalendarRouteImport.update({
+    id: '/calendar',
+    path: '/calendar',
+    getParentRoute: () => AuthenticatedSettingsRoute,
+  } as any)
 const AuthenticatedSettingsAiRoute = AuthenticatedSettingsAiRouteImport.update({
   id: '/ai',
   path: '/ai',
@@ -227,11 +246,14 @@ export interface FileRoutesByFullPath {
   '/sales': typeof AuthenticatedSalesRoute
   '/settings': typeof AuthenticatedSettingsRouteWithChildren
   '/stats': typeof AuthenticatedStatsRouteWithChildren
+  '/summaries': typeof AuthenticatedSummariesRoute
+  '/today-plan': typeof AuthenticatedTodayPlanRoute
   '/todos': typeof AuthenticatedTodosRouteWithChildren
   '/todos-list': typeof AuthenticatedTodosListRoute
   '/': typeof AuthenticatedIndexRoute
   '/contacts/$contactId': typeof AuthenticatedContactsContactIdRoute
   '/settings/ai': typeof AuthenticatedSettingsAiRoute
+  '/settings/calendar': typeof AuthenticatedSettingsCalendarRoute
   '/settings/gmail': typeof AuthenticatedSettingsGmailRoute
   '/settings/hubstaff': typeof AuthenticatedSettingsHubstaffRoute
   '/settings/integrations': typeof AuthenticatedSettingsIntegrationsRoute
@@ -257,10 +279,13 @@ export interface FileRoutesByTo {
   '/sign-up': typeof SignUpRoute
   '/messages': typeof AuthenticatedMessagesRoute
   '/sales': typeof AuthenticatedSalesRoute
+  '/summaries': typeof AuthenticatedSummariesRoute
+  '/today-plan': typeof AuthenticatedTodayPlanRoute
   '/todos-list': typeof AuthenticatedTodosListRoute
   '/': typeof AuthenticatedIndexRoute
   '/contacts/$contactId': typeof AuthenticatedContactsContactIdRoute
   '/settings/ai': typeof AuthenticatedSettingsAiRoute
+  '/settings/calendar': typeof AuthenticatedSettingsCalendarRoute
   '/settings/gmail': typeof AuthenticatedSettingsGmailRoute
   '/settings/hubstaff': typeof AuthenticatedSettingsHubstaffRoute
   '/settings/integrations': typeof AuthenticatedSettingsIntegrationsRoute
@@ -291,11 +316,14 @@ export interface FileRoutesById {
   '/_authenticated/sales': typeof AuthenticatedSalesRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRouteWithChildren
   '/_authenticated/stats': typeof AuthenticatedStatsRouteWithChildren
+  '/_authenticated/summaries': typeof AuthenticatedSummariesRoute
+  '/_authenticated/today-plan': typeof AuthenticatedTodayPlanRoute
   '/_authenticated/todos': typeof AuthenticatedTodosRouteWithChildren
   '/_authenticated/todos-list': typeof AuthenticatedTodosListRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
   '/_authenticated/contacts/$contactId': typeof AuthenticatedContactsContactIdRoute
   '/_authenticated/settings/ai': typeof AuthenticatedSettingsAiRoute
+  '/_authenticated/settings/calendar': typeof AuthenticatedSettingsCalendarRoute
   '/_authenticated/settings/gmail': typeof AuthenticatedSettingsGmailRoute
   '/_authenticated/settings/hubstaff': typeof AuthenticatedSettingsHubstaffRoute
   '/_authenticated/settings/integrations': typeof AuthenticatedSettingsIntegrationsRoute
@@ -326,11 +354,14 @@ export interface FileRouteTypes {
     | '/sales'
     | '/settings'
     | '/stats'
+    | '/summaries'
+    | '/today-plan'
     | '/todos'
     | '/todos-list'
     | '/'
     | '/contacts/$contactId'
     | '/settings/ai'
+    | '/settings/calendar'
     | '/settings/gmail'
     | '/settings/hubstaff'
     | '/settings/integrations'
@@ -356,10 +387,13 @@ export interface FileRouteTypes {
     | '/sign-up'
     | '/messages'
     | '/sales'
+    | '/summaries'
+    | '/today-plan'
     | '/todos-list'
     | '/'
     | '/contacts/$contactId'
     | '/settings/ai'
+    | '/settings/calendar'
     | '/settings/gmail'
     | '/settings/hubstaff'
     | '/settings/integrations'
@@ -389,11 +423,14 @@ export interface FileRouteTypes {
     | '/_authenticated/sales'
     | '/_authenticated/settings'
     | '/_authenticated/stats'
+    | '/_authenticated/summaries'
+    | '/_authenticated/today-plan'
     | '/_authenticated/todos'
     | '/_authenticated/todos-list'
     | '/_authenticated/'
     | '/_authenticated/contacts/$contactId'
     | '/_authenticated/settings/ai'
+    | '/_authenticated/settings/calendar'
     | '/_authenticated/settings/gmail'
     | '/_authenticated/settings/hubstaff'
     | '/_authenticated/settings/integrations'
@@ -470,6 +507,20 @@ declare module '@tanstack/react-router' {
       path: '/todos'
       fullPath: '/todos'
       preLoaderRoute: typeof AuthenticatedTodosRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/today-plan': {
+      id: '/_authenticated/today-plan'
+      path: '/today-plan'
+      fullPath: '/today-plan'
+      preLoaderRoute: typeof AuthenticatedTodayPlanRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/summaries': {
+      id: '/_authenticated/summaries'
+      path: '/summaries'
+      fullPath: '/summaries'
+      preLoaderRoute: typeof AuthenticatedSummariesRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/stats': {
@@ -626,6 +677,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSettingsGmailRouteImport
       parentRoute: typeof AuthenticatedSettingsRoute
     }
+    '/_authenticated/settings/calendar': {
+      id: '/_authenticated/settings/calendar'
+      path: '/calendar'
+      fullPath: '/settings/calendar'
+      preLoaderRoute: typeof AuthenticatedSettingsCalendarRouteImport
+      parentRoute: typeof AuthenticatedSettingsRoute
+    }
     '/_authenticated/settings/ai': {
       id: '/_authenticated/settings/ai'
       path: '/ai'
@@ -682,6 +740,7 @@ const AuthenticatedSettingsProjectsRouteWithChildren =
 
 interface AuthenticatedSettingsRouteChildren {
   AuthenticatedSettingsAiRoute: typeof AuthenticatedSettingsAiRoute
+  AuthenticatedSettingsCalendarRoute: typeof AuthenticatedSettingsCalendarRoute
   AuthenticatedSettingsGmailRoute: typeof AuthenticatedSettingsGmailRoute
   AuthenticatedSettingsHubstaffRoute: typeof AuthenticatedSettingsHubstaffRoute
   AuthenticatedSettingsIntegrationsRoute: typeof AuthenticatedSettingsIntegrationsRoute
@@ -695,6 +754,7 @@ interface AuthenticatedSettingsRouteChildren {
 
 const AuthenticatedSettingsRouteChildren: AuthenticatedSettingsRouteChildren = {
   AuthenticatedSettingsAiRoute: AuthenticatedSettingsAiRoute,
+  AuthenticatedSettingsCalendarRoute: AuthenticatedSettingsCalendarRoute,
   AuthenticatedSettingsGmailRoute: AuthenticatedSettingsGmailRoute,
   AuthenticatedSettingsHubstaffRoute: AuthenticatedSettingsHubstaffRoute,
   AuthenticatedSettingsIntegrationsRoute:
@@ -752,6 +812,8 @@ interface AuthenticatedRouteChildren {
   AuthenticatedSalesRoute: typeof AuthenticatedSalesRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRouteWithChildren
   AuthenticatedStatsRoute: typeof AuthenticatedStatsRouteWithChildren
+  AuthenticatedSummariesRoute: typeof AuthenticatedSummariesRoute
+  AuthenticatedTodayPlanRoute: typeof AuthenticatedTodayPlanRoute
   AuthenticatedTodosRoute: typeof AuthenticatedTodosRouteWithChildren
   AuthenticatedTodosListRoute: typeof AuthenticatedTodosListRoute
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
@@ -763,6 +825,8 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedSalesRoute: AuthenticatedSalesRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRouteWithChildren,
   AuthenticatedStatsRoute: AuthenticatedStatsRouteWithChildren,
+  AuthenticatedSummariesRoute: AuthenticatedSummariesRoute,
+  AuthenticatedTodayPlanRoute: AuthenticatedTodayPlanRoute,
   AuthenticatedTodosRoute: AuthenticatedTodosRouteWithChildren,
   AuthenticatedTodosListRoute: AuthenticatedTodosListRoute,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
