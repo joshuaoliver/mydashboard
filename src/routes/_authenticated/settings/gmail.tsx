@@ -1,7 +1,5 @@
 import { createFileRoute, useSearch } from '@tanstack/react-router'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { convexQuery } from '@convex-dev/react-query'
-import { useConvexMutation, useConvexAction } from '@convex-dev/react-query'
+import { useQuery as useConvexQuery, useMutation, useAction } from 'convex/react'
 import { api } from '../../../../convex/_generated/api'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'

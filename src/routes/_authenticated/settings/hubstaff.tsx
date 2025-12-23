@@ -28,19 +28,18 @@ export const Route = createFileRoute('/_authenticated/settings/hubstaff')({
 })
 
 function HubstaffSettingsPage() {
-  const { data: settings } = useQuery(
-    convexQuery(api.settingsStore.getHubstaffSettings, {})
+  // Use Convex native useQuery with "skip" for conditional queries
+  const settings = useConvexQuery(api.settingsStore.getHubstaffSettings, {})
+  const stats = useConvexQuery(
+    api.hubstaffSync.getStats,
+    settings?.isConfigured ? {} : "skip"
   )
-  const { data: stats } = useQuery({
-    ...convexQuery(api.hubstaffSync.getStats, {}),
-    enabled: !!settings?.isConfigured,
-  })
 
-  const saveConfiguration = useConvexAction(api.hubstaffActions.saveConfiguration)
-  const testConnection = useConvexAction(api.hubstaffActions.testConnection)
-  const fetchOrganizations = useConvexAction(api.hubstaffActions.fetchOrganizations)
-  const fetchUsers = useConvexAction(api.hubstaffActions.fetchOrganizationUsers)
-  const backfillData = useConvexAction(api.hubstaffSync.backfillHistoricalData)
+  const saveConfiguration = useAction(api.hubstaffActions.saveConfiguration)
+  const testConnection = useAction(api.hubstaffActions.testConnection)
+  const fetchOrganizations = useAction(api.hubstaffActions.fetchOrganizations)
+  const fetchUsers = useAction(api.hubstaffActions.fetchOrganizationUsers)
+  const backfillData = useAction(api.hubstaffSync.backfillHistoricalData)
 
   const [refreshToken, setRefreshToken] = useState('')
   const [organizationId, setOrganizationId] = useState<number | null>(null)
