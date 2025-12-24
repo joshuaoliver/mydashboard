@@ -22,11 +22,15 @@ import { Route as AuthenticatedSummariesRouteImport } from './routes/_authentica
 import { Route as AuthenticatedStatsRouteImport } from './routes/_authenticated/stats'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
 import { Route as AuthenticatedSalesRouteImport } from './routes/_authenticated/sales'
+import { Route as AuthenticatedNotesRouteImport } from './routes/_authenticated/notes'
 import { Route as AuthenticatedMessagesRouteImport } from './routes/_authenticated/messages'
+import { Route as AuthenticatedFocusRouteImport } from './routes/_authenticated/focus'
 import { Route as AuthenticatedContactsRouteImport } from './routes/_authenticated/contacts'
+import { Route as AuthenticatedChatRouteImport } from './routes/_authenticated/chat'
 import { Route as AuthenticatedTodosIndexRouteImport } from './routes/_authenticated/todos/index'
 import { Route as AuthenticatedStatsIndexRouteImport } from './routes/_authenticated/stats/index'
 import { Route as AuthenticatedSettingsIndexRouteImport } from './routes/_authenticated/settings/index'
+import { Route as AuthenticatedNotesIndexRouteImport } from './routes/_authenticated/notes/index'
 import { Route as AuthenticatedContactsIndexRouteImport } from './routes/_authenticated/contacts/index'
 import { Route as AuthenticatedTodosDocumentIdRouteImport } from './routes/_authenticated/todos/$documentId'
 import { Route as AuthenticatedStatsMessagesRouteImport } from './routes/_authenticated/stats/messages'
@@ -43,6 +47,7 @@ import { Route as AuthenticatedSettingsHubstaffRouteImport } from './routes/_aut
 import { Route as AuthenticatedSettingsGmailRouteImport } from './routes/_authenticated/settings/gmail'
 import { Route as AuthenticatedSettingsCalendarRouteImport } from './routes/_authenticated/settings/calendar'
 import { Route as AuthenticatedSettingsAiRouteImport } from './routes/_authenticated/settings/ai'
+import { Route as AuthenticatedNotesDocumentIdRouteImport } from './routes/_authenticated/notes/$documentId'
 import { Route as AuthenticatedContactsContactIdRouteImport } from './routes/_authenticated/contacts/$contactId'
 import { Route as AuthenticatedSettingsProjectsProjectIdRouteImport } from './routes/_authenticated/settings/projects.$projectId'
 
@@ -110,14 +115,29 @@ const AuthenticatedSalesRoute = AuthenticatedSalesRouteImport.update({
   path: '/sales',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedNotesRoute = AuthenticatedNotesRouteImport.update({
+  id: '/notes',
+  path: '/notes',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 const AuthenticatedMessagesRoute = AuthenticatedMessagesRouteImport.update({
   id: '/messages',
   path: '/messages',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedFocusRoute = AuthenticatedFocusRouteImport.update({
+  id: '/focus',
+  path: '/focus',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 const AuthenticatedContactsRoute = AuthenticatedContactsRouteImport.update({
   id: '/contacts',
   path: '/contacts',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedChatRoute = AuthenticatedChatRouteImport.update({
+  id: '/chat',
+  path: '/chat',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedTodosIndexRoute = AuthenticatedTodosIndexRouteImport.update({
@@ -136,6 +156,11 @@ const AuthenticatedSettingsIndexRoute =
     path: '/',
     getParentRoute: () => AuthenticatedSettingsRoute,
   } as any)
+const AuthenticatedNotesIndexRoute = AuthenticatedNotesIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AuthenticatedNotesRoute,
+} as any)
 const AuthenticatedContactsIndexRoute =
   AuthenticatedContactsIndexRouteImport.update({
     id: '/',
@@ -230,6 +255,12 @@ const AuthenticatedSettingsAiRoute = AuthenticatedSettingsAiRouteImport.update({
   path: '/ai',
   getParentRoute: () => AuthenticatedSettingsRoute,
 } as any)
+const AuthenticatedNotesDocumentIdRoute =
+  AuthenticatedNotesDocumentIdRouteImport.update({
+    id: '/$documentId',
+    path: '/$documentId',
+    getParentRoute: () => AuthenticatedNotesRoute,
+  } as any)
 const AuthenticatedContactsContactIdRoute =
   AuthenticatedContactsContactIdRouteImport.update({
     id: '/$contactId',
@@ -247,8 +278,11 @@ export interface FileRoutesByFullPath {
   '/gmail-callback': typeof GmailCallbackRoute
   '/sign-in': typeof SignInRoute
   '/sign-up': typeof SignUpRoute
+  '/chat': typeof AuthenticatedChatRoute
   '/contacts': typeof AuthenticatedContactsRouteWithChildren
+  '/focus': typeof AuthenticatedFocusRoute
   '/messages': typeof AuthenticatedMessagesRoute
+  '/notes': typeof AuthenticatedNotesRouteWithChildren
   '/sales': typeof AuthenticatedSalesRoute
   '/settings': typeof AuthenticatedSettingsRouteWithChildren
   '/stats': typeof AuthenticatedStatsRouteWithChildren
@@ -259,6 +293,7 @@ export interface FileRoutesByFullPath {
   '/work': typeof AuthenticatedWorkRoute
   '/': typeof AuthenticatedIndexRoute
   '/contacts/$contactId': typeof AuthenticatedContactsContactIdRoute
+  '/notes/$documentId': typeof AuthenticatedNotesDocumentIdRoute
   '/settings/ai': typeof AuthenticatedSettingsAiRoute
   '/settings/calendar': typeof AuthenticatedSettingsCalendarRoute
   '/settings/gmail': typeof AuthenticatedSettingsGmailRoute
@@ -275,6 +310,7 @@ export interface FileRoutesByFullPath {
   '/stats/messages': typeof AuthenticatedStatsMessagesRoute
   '/todos/$documentId': typeof AuthenticatedTodosDocumentIdRoute
   '/contacts/': typeof AuthenticatedContactsIndexRoute
+  '/notes/': typeof AuthenticatedNotesIndexRoute
   '/settings/': typeof AuthenticatedSettingsIndexRoute
   '/stats/': typeof AuthenticatedStatsIndexRoute
   '/todos/': typeof AuthenticatedTodosIndexRoute
@@ -284,6 +320,8 @@ export interface FileRoutesByTo {
   '/gmail-callback': typeof GmailCallbackRoute
   '/sign-in': typeof SignInRoute
   '/sign-up': typeof SignUpRoute
+  '/chat': typeof AuthenticatedChatRoute
+  '/focus': typeof AuthenticatedFocusRoute
   '/messages': typeof AuthenticatedMessagesRoute
   '/sales': typeof AuthenticatedSalesRoute
   '/summaries': typeof AuthenticatedSummariesRoute
@@ -292,6 +330,7 @@ export interface FileRoutesByTo {
   '/work': typeof AuthenticatedWorkRoute
   '/': typeof AuthenticatedIndexRoute
   '/contacts/$contactId': typeof AuthenticatedContactsContactIdRoute
+  '/notes/$documentId': typeof AuthenticatedNotesDocumentIdRoute
   '/settings/ai': typeof AuthenticatedSettingsAiRoute
   '/settings/calendar': typeof AuthenticatedSettingsCalendarRoute
   '/settings/gmail': typeof AuthenticatedSettingsGmailRoute
@@ -308,6 +347,7 @@ export interface FileRoutesByTo {
   '/stats/messages': typeof AuthenticatedStatsMessagesRoute
   '/todos/$documentId': typeof AuthenticatedTodosDocumentIdRoute
   '/contacts': typeof AuthenticatedContactsIndexRoute
+  '/notes': typeof AuthenticatedNotesIndexRoute
   '/settings': typeof AuthenticatedSettingsIndexRoute
   '/stats': typeof AuthenticatedStatsIndexRoute
   '/todos': typeof AuthenticatedTodosIndexRoute
@@ -319,8 +359,11 @@ export interface FileRoutesById {
   '/gmail-callback': typeof GmailCallbackRoute
   '/sign-in': typeof SignInRoute
   '/sign-up': typeof SignUpRoute
+  '/_authenticated/chat': typeof AuthenticatedChatRoute
   '/_authenticated/contacts': typeof AuthenticatedContactsRouteWithChildren
+  '/_authenticated/focus': typeof AuthenticatedFocusRoute
   '/_authenticated/messages': typeof AuthenticatedMessagesRoute
+  '/_authenticated/notes': typeof AuthenticatedNotesRouteWithChildren
   '/_authenticated/sales': typeof AuthenticatedSalesRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRouteWithChildren
   '/_authenticated/stats': typeof AuthenticatedStatsRouteWithChildren
@@ -331,6 +374,7 @@ export interface FileRoutesById {
   '/_authenticated/work': typeof AuthenticatedWorkRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
   '/_authenticated/contacts/$contactId': typeof AuthenticatedContactsContactIdRoute
+  '/_authenticated/notes/$documentId': typeof AuthenticatedNotesDocumentIdRoute
   '/_authenticated/settings/ai': typeof AuthenticatedSettingsAiRoute
   '/_authenticated/settings/calendar': typeof AuthenticatedSettingsCalendarRoute
   '/_authenticated/settings/gmail': typeof AuthenticatedSettingsGmailRoute
@@ -347,6 +391,7 @@ export interface FileRoutesById {
   '/_authenticated/stats/messages': typeof AuthenticatedStatsMessagesRoute
   '/_authenticated/todos/$documentId': typeof AuthenticatedTodosDocumentIdRoute
   '/_authenticated/contacts/': typeof AuthenticatedContactsIndexRoute
+  '/_authenticated/notes/': typeof AuthenticatedNotesIndexRoute
   '/_authenticated/settings/': typeof AuthenticatedSettingsIndexRoute
   '/_authenticated/stats/': typeof AuthenticatedStatsIndexRoute
   '/_authenticated/todos/': typeof AuthenticatedTodosIndexRoute
@@ -358,8 +403,11 @@ export interface FileRouteTypes {
     | '/gmail-callback'
     | '/sign-in'
     | '/sign-up'
+    | '/chat'
     | '/contacts'
+    | '/focus'
     | '/messages'
+    | '/notes'
     | '/sales'
     | '/settings'
     | '/stats'
@@ -370,6 +418,7 @@ export interface FileRouteTypes {
     | '/work'
     | '/'
     | '/contacts/$contactId'
+    | '/notes/$documentId'
     | '/settings/ai'
     | '/settings/calendar'
     | '/settings/gmail'
@@ -386,6 +435,7 @@ export interface FileRouteTypes {
     | '/stats/messages'
     | '/todos/$documentId'
     | '/contacts/'
+    | '/notes/'
     | '/settings/'
     | '/stats/'
     | '/todos/'
@@ -395,6 +445,8 @@ export interface FileRouteTypes {
     | '/gmail-callback'
     | '/sign-in'
     | '/sign-up'
+    | '/chat'
+    | '/focus'
     | '/messages'
     | '/sales'
     | '/summaries'
@@ -403,6 +455,7 @@ export interface FileRouteTypes {
     | '/work'
     | '/'
     | '/contacts/$contactId'
+    | '/notes/$documentId'
     | '/settings/ai'
     | '/settings/calendar'
     | '/settings/gmail'
@@ -419,6 +472,7 @@ export interface FileRouteTypes {
     | '/stats/messages'
     | '/todos/$documentId'
     | '/contacts'
+    | '/notes'
     | '/settings'
     | '/stats'
     | '/todos'
@@ -429,8 +483,11 @@ export interface FileRouteTypes {
     | '/gmail-callback'
     | '/sign-in'
     | '/sign-up'
+    | '/_authenticated/chat'
     | '/_authenticated/contacts'
+    | '/_authenticated/focus'
     | '/_authenticated/messages'
+    | '/_authenticated/notes'
     | '/_authenticated/sales'
     | '/_authenticated/settings'
     | '/_authenticated/stats'
@@ -441,6 +498,7 @@ export interface FileRouteTypes {
     | '/_authenticated/work'
     | '/_authenticated/'
     | '/_authenticated/contacts/$contactId'
+    | '/_authenticated/notes/$documentId'
     | '/_authenticated/settings/ai'
     | '/_authenticated/settings/calendar'
     | '/_authenticated/settings/gmail'
@@ -457,6 +515,7 @@ export interface FileRouteTypes {
     | '/_authenticated/stats/messages'
     | '/_authenticated/todos/$documentId'
     | '/_authenticated/contacts/'
+    | '/_authenticated/notes/'
     | '/_authenticated/settings/'
     | '/_authenticated/stats/'
     | '/_authenticated/todos/'
@@ -563,6 +622,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSalesRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/notes': {
+      id: '/_authenticated/notes'
+      path: '/notes'
+      fullPath: '/notes'
+      preLoaderRoute: typeof AuthenticatedNotesRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/messages': {
       id: '/_authenticated/messages'
       path: '/messages'
@@ -570,11 +636,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedMessagesRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/focus': {
+      id: '/_authenticated/focus'
+      path: '/focus'
+      fullPath: '/focus'
+      preLoaderRoute: typeof AuthenticatedFocusRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/contacts': {
       id: '/_authenticated/contacts'
       path: '/contacts'
       fullPath: '/contacts'
       preLoaderRoute: typeof AuthenticatedContactsRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/chat': {
+      id: '/_authenticated/chat'
+      path: '/chat'
+      fullPath: '/chat'
+      preLoaderRoute: typeof AuthenticatedChatRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/todos/': {
@@ -597,6 +677,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/settings/'
       preLoaderRoute: typeof AuthenticatedSettingsIndexRouteImport
       parentRoute: typeof AuthenticatedSettingsRoute
+    }
+    '/_authenticated/notes/': {
+      id: '/_authenticated/notes/'
+      path: '/'
+      fullPath: '/notes/'
+      preLoaderRoute: typeof AuthenticatedNotesIndexRouteImport
+      parentRoute: typeof AuthenticatedNotesRoute
     }
     '/_authenticated/contacts/': {
       id: '/_authenticated/contacts/'
@@ -710,6 +797,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSettingsAiRouteImport
       parentRoute: typeof AuthenticatedSettingsRoute
     }
+    '/_authenticated/notes/$documentId': {
+      id: '/_authenticated/notes/$documentId'
+      path: '/$documentId'
+      fullPath: '/notes/$documentId'
+      preLoaderRoute: typeof AuthenticatedNotesDocumentIdRouteImport
+      parentRoute: typeof AuthenticatedNotesRoute
+    }
     '/_authenticated/contacts/$contactId': {
       id: '/_authenticated/contacts/$contactId'
       path: '/$contactId'
@@ -741,6 +835,19 @@ const AuthenticatedContactsRouteWithChildren =
   AuthenticatedContactsRoute._addFileChildren(
     AuthenticatedContactsRouteChildren,
   )
+
+interface AuthenticatedNotesRouteChildren {
+  AuthenticatedNotesDocumentIdRoute: typeof AuthenticatedNotesDocumentIdRoute
+  AuthenticatedNotesIndexRoute: typeof AuthenticatedNotesIndexRoute
+}
+
+const AuthenticatedNotesRouteChildren: AuthenticatedNotesRouteChildren = {
+  AuthenticatedNotesDocumentIdRoute: AuthenticatedNotesDocumentIdRoute,
+  AuthenticatedNotesIndexRoute: AuthenticatedNotesIndexRoute,
+}
+
+const AuthenticatedNotesRouteWithChildren =
+  AuthenticatedNotesRoute._addFileChildren(AuthenticatedNotesRouteChildren)
 
 interface AuthenticatedSettingsProjectsRouteChildren {
   AuthenticatedSettingsProjectsProjectIdRoute: typeof AuthenticatedSettingsProjectsProjectIdRoute
@@ -826,8 +933,11 @@ const AuthenticatedTodosRouteWithChildren =
   AuthenticatedTodosRoute._addFileChildren(AuthenticatedTodosRouteChildren)
 
 interface AuthenticatedRouteChildren {
+  AuthenticatedChatRoute: typeof AuthenticatedChatRoute
   AuthenticatedContactsRoute: typeof AuthenticatedContactsRouteWithChildren
+  AuthenticatedFocusRoute: typeof AuthenticatedFocusRoute
   AuthenticatedMessagesRoute: typeof AuthenticatedMessagesRoute
+  AuthenticatedNotesRoute: typeof AuthenticatedNotesRouteWithChildren
   AuthenticatedSalesRoute: typeof AuthenticatedSalesRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRouteWithChildren
   AuthenticatedStatsRoute: typeof AuthenticatedStatsRouteWithChildren
@@ -840,8 +950,11 @@ interface AuthenticatedRouteChildren {
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
+  AuthenticatedChatRoute: AuthenticatedChatRoute,
   AuthenticatedContactsRoute: AuthenticatedContactsRouteWithChildren,
+  AuthenticatedFocusRoute: AuthenticatedFocusRoute,
   AuthenticatedMessagesRoute: AuthenticatedMessagesRoute,
+  AuthenticatedNotesRoute: AuthenticatedNotesRouteWithChildren,
   AuthenticatedSalesRoute: AuthenticatedSalesRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRouteWithChildren,
   AuthenticatedStatsRoute: AuthenticatedStatsRouteWithChildren,

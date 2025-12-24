@@ -843,9 +843,12 @@ function TodayPlanPage() {
     const startTime = now.getTime()
     const endTime = startTime + item.estimatedDuration * 60 * 1000
 
+    // Map 'email' type to 'adhoc' since createPlannedTask only accepts 'todo' | 'linear' | 'adhoc'
+    const taskType: 'todo' | 'linear' | 'adhoc' = item.type === 'email' ? 'adhoc' : item.type
+
     await createPlannedTask({
       date: getTodayDateString(),
-      taskType: item.type as 'todo' | 'linear' | 'adhoc',
+      taskType,
       taskId: item.id,
       startTime,
       endTime,

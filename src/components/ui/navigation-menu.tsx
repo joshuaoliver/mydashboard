@@ -9,14 +9,17 @@ function NavigationMenu({
   className,
   children,
   viewport = true,
+  delayDuration = 0,
   ...props
 }: React.ComponentProps<typeof NavigationMenuPrimitive.Root> & {
   viewport?: boolean
+  delayDuration?: number
 }) {
   return (
     <NavigationMenuPrimitive.Root
       data-slot="navigation-menu"
       data-viewport={viewport}
+      delayDuration={delayDuration}
       className={cn(
         "group/navigation-menu relative flex max-w-max flex-1 items-center justify-center",
         className
@@ -129,7 +132,12 @@ function NavigationMenuLink({
     <NavigationMenuPrimitive.Link
       data-slot="navigation-menu-link"
       className={cn(
-        "data-[active=true]:focus:bg-accent data-[active=true]:hover:bg-accent data-[active=true]:bg-accent/50 data-[active=true]:text-accent-foreground hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground focus-visible:ring-ring/50 [&_svg:not([class*='text-'])]:text-muted-foreground flex gap-2 rounded-sm p-2 text-sm transition-all outline-none focus-visible:ring-[3px] focus-visible:outline-1 [&_svg:not([class*='size-'])]:size-4",
+        "flex gap-2 rounded-sm p-2 text-sm transition-all outline-none",
+        "text-slate-300 hover:text-white hover:bg-slate-700",
+        "focus:text-white focus:bg-slate-700",
+        "data-[active=true]:text-white data-[active=true]:bg-slate-700",
+        "focus-visible:ring-slate-500/50 focus-visible:ring-[3px] focus-visible:outline-1",
+        "[&_svg:not([class*='text-'])]:text-slate-400 [&_svg:not([class*='size-'])]:size-4",
         className
       )}
       {...props}

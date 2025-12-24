@@ -24,23 +24,21 @@ import {
   Settings,
   User,
   MessageSquare,
-  LayoutDashboard,
   Users,
-  HeartHandshake,
   LogOut,
   Menu,
-  BarChart3,
   FolderKanban,
   Zap,
   Bot,
   FileText,
   MapPin,
-  CheckSquare,
-  CalendarClock,
+  CalendarDays,
   BookOpen,
   Target,
   Play,
   Pause,
+  Inbox,
+  Sparkles,
 } from "lucide-react"
 import { ModeToggle } from "@/components/ui/mode-toggle"
 import { Link, useNavigate } from '@tanstack/react-router'
@@ -88,7 +86,7 @@ function ActiveSessionTimer() {
 
   return (
     <button
-      onClick={() => navigate({ to: '/work' })}
+      onClick={() => navigate({ to: '/focus' })}
       className={cn(
         "flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all",
         "bg-primary/20 hover:bg-primary/30 border border-primary/30",
@@ -141,16 +139,13 @@ interface DashboardLayoutProps {
 // Keyboard shortcuts for navigation
 // Only active when no input/textarea is focused
 const KEYBOARD_SHORTCUTS: Record<string, { to: string; search?: Record<string, unknown> }> = {
-  'h': { to: '/' },
-  'n': { to: '/todos' },
-  't': { to: '/todos-list' },
-  'p': { to: '/today-plan' },  // 'p' for plan
-  'w': { to: '/work' },        // 'w' for work session
-  'm': { to: '/messages', search: { chatId: undefined } },
-  'c': { to: '/contacts' },
-  's': { to: '/sales' },
-  'a': { to: '/stats' },  // 'a' for analytics/stats since 's' is taken
-  'r': { to: '/summaries' },  // 'r' for reflections/summaries
+  't': { to: '/' },           // 't' for Today
+  'f': { to: '/focus' },      // 'f' for Focus
+  'n': { to: '/notes' },      // 'n' for Notes
+  'a': { to: '/chat' },       // 'a' for AI/Agent chat
+  'i': { to: '/inbox', search: { chatId: undefined } },  // 'i' for Inbox
+  'p': { to: '/people' },     // 'p' for People
+  'r': { to: '/reflect' },    // 'r' for Reflect
 }
 
 export function DashboardLayout({ children }: DashboardLayoutProps) {
@@ -213,7 +208,8 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
               </Button>
             </SheetTrigger>
             <SheetContent side="left" className="bg-slate-900 border-slate-700 text-slate-300 w-64">
-              <nav className="flex flex-col gap-4 mt-8">
+              <nav className="flex flex-col gap-1 mt-8">
+                {/* Main Navigation */}
                 <Link 
                   to="/" 
                   onClick={() => setMobileMenuOpen(false)}
@@ -225,11 +221,25 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                   )}
                   activeProps={{ className: "active" }}
                 >
-                  <LayoutDashboard className="h-5 w-5" />
-                  Home
+                  <CalendarDays className="h-5 w-5" />
+                  Today
                 </Link>
                 <Link 
-                  to="/todos"
+                  to="/focus"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={cn(
+                    "flex items-center gap-3 px-4 py-3 rounded-md",
+                    "text-base font-medium transition-all",
+                    "text-slate-300 hover:text-white hover:bg-slate-800/80",
+                    "[&.active]:bg-slate-800 [&.active]:text-white"
+                  )}
+                  activeProps={{ className: "active" }}
+                >
+                  <Target className="h-5 w-5" />
+                  Focus
+                </Link>
+                <Link
+                  to="/notes"
                   onClick={() => setMobileMenuOpen(false)}
                   className={cn(
                     "flex items-center gap-3 px-4 py-3 rounded-md",
@@ -243,7 +253,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                   Notes
                 </Link>
                 <Link
-                  to="/todos-list"
+                  to="/chat"
                   onClick={() => setMobileMenuOpen(false)}
                   className={cn(
                     "flex items-center gap-3 px-4 py-3 rounded-md",
@@ -253,39 +263,11 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                   )}
                   activeProps={{ className: "active" }}
                 >
-                  <CheckSquare className="h-5 w-5" />
-                  Todos
+                  <Sparkles className="h-5 w-5" />
+                  Chat
                 </Link>
                 <Link
-                  to="/today-plan"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className={cn(
-                    "flex items-center gap-3 px-4 py-3 rounded-md",
-                    "text-base font-medium transition-all",
-                    "text-slate-300 hover:text-white hover:bg-slate-800/80",
-                    "[&.active]:bg-slate-800 [&.active]:text-white"
-                  )}
-                  activeProps={{ className: "active" }}
-                >
-                  <CalendarClock className="h-5 w-5" />
-                  Today Plan
-                </Link>
-                <Link
-                  to="/work"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className={cn(
-                    "flex items-center gap-3 px-4 py-3 rounded-md",
-                    "text-base font-medium transition-all",
-                    "text-slate-300 hover:text-white hover:bg-slate-800/80",
-                    "[&.active]:bg-slate-800 [&.active]:text-white"
-                  )}
-                  activeProps={{ className: "active" }}
-                >
-                  <Target className="h-5 w-5" />
-                  Work
-                </Link>
-                <Link
-                  to="/messages"
+                  to="/inbox"
                   search={{ chatId: undefined }}
                   onClick={() => setMobileMenuOpen(false)}
                   className={cn(
@@ -296,11 +278,11 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                   )}
                   activeProps={{ className: "active" }}
                 >
-                  <MessageSquare className="h-5 w-5" />
-                  Messages
+                  <Inbox className="h-5 w-5" />
+                  Inbox
                 </Link>
                 <Link 
-                  to="/contacts"
+                  to="/people"
                   onClick={() => setMobileMenuOpen(false)}
                   className={cn(
                     "flex items-center gap-3 px-4 py-3 rounded-md",
@@ -311,38 +293,10 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                   activeProps={{ className: "active" }}
                 >
                   <Users className="h-5 w-5" />
-                  Contacts
-                </Link>
-                <Link 
-                  to="/sales"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className={cn(
-                    "flex items-center gap-3 px-4 py-3 rounded-md",
-                    "text-base font-medium transition-all",
-                    "text-slate-300 hover:text-white hover:bg-slate-800/80",
-                    "[&.active]:bg-slate-800 [&.active]:text-white"
-                  )}
-                  activeProps={{ className: "active" }}
-                >
-                  <HeartHandshake className="h-5 w-5" />
-                  Sales
+                  People
                 </Link>
                 <Link
-                  to="/stats"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className={cn(
-                    "flex items-center gap-3 px-4 py-3 rounded-md",
-                    "text-base font-medium transition-all",
-                    "text-slate-300 hover:text-white hover:bg-slate-800/80",
-                    "[&.active]:bg-slate-800 [&.active]:text-white"
-                  )}
-                  activeProps={{ className: "active" }}
-                >
-                  <BarChart3 className="h-5 w-5" />
-                  Stats
-                </Link>
-                <Link
-                  to="/summaries"
+                  to="/reflect"
                   onClick={() => setMobileMenuOpen(false)}
                   className={cn(
                     "flex items-center gap-3 px-4 py-3 rounded-md",
@@ -353,9 +307,11 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                   activeProps={{ className: "active" }}
                 >
                   <BookOpen className="h-5 w-5" />
-                  Summaries
+                  Reflect
                 </Link>
-                <div className="border-t border-slate-700 pt-4 mt-2">
+
+                {/* Settings Section */}
+                <div className="border-t border-slate-700 pt-4 mt-4">
                   <div className="px-4 py-2 text-xs font-semibold text-slate-400 uppercase tracking-wide">
                     Settings
                   </div>
@@ -381,31 +337,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                     className="flex items-center gap-3 px-4 py-3 rounded-md text-base text-slate-300 hover:text-white hover:bg-slate-800/80 transition-all"
                   >
                     <Bot className="h-5 w-5" />
-                    AI Models
-                  </Link>
-                  <Link 
-                    to="/settings/prompts"
-                    onClick={() => setMobileMenuOpen(false)}
-                    className="flex items-center gap-3 px-4 py-3 rounded-md text-base text-slate-300 hover:text-white hover:bg-slate-800/80 transition-all"
-                  >
-                    <MessageSquare className="h-5 w-5" />
-                    AI Prompts
-                  </Link>
-                  <Link 
-                    to="/settings/locations"
-                    onClick={() => setMobileMenuOpen(false)}
-                    className="flex items-center gap-3 px-4 py-3 rounded-md text-base text-slate-300 hover:text-white hover:bg-slate-800/80 transition-all"
-                  >
-                    <MapPin className="h-5 w-5" />
-                    Locations
-                  </Link>
-                  <Link 
-                    to="/settings/sample-outputs"
-                    onClick={() => setMobileMenuOpen(false)}
-                    className="flex items-center gap-3 px-4 py-3 rounded-md text-base text-slate-300 hover:text-white hover:bg-slate-800/80 transition-all"
-                  >
-                    <FileText className="h-5 w-5" />
-                    Sample Outputs
+                    AI Settings
                   </Link>
                   <Link 
                     to="/settings"
@@ -413,9 +345,11 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                     className="flex items-center gap-3 px-4 py-3 rounded-md text-base text-slate-300 hover:text-white hover:bg-slate-800/80 transition-all"
                   >
                     <Settings className="h-5 w-5" />
-                    General Settings
+                    General
                   </Link>
                 </div>
+
+                {/* Sign Out */}
                 <div className="border-t border-slate-700 pt-4 mt-2">
                   <button
                     onClick={() => {
@@ -440,31 +374,42 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                   <Link 
                     to="/" 
                     className={cn(
-                      "inline-flex items-center gap-2 px-4 py-2 rounded-md",
+                      "inline-flex items-center gap-2 px-3 py-2 rounded-md",
                       "text-sm font-medium transition-all",
                       "text-slate-300 hover:text-white hover:bg-slate-800/80",
                       "[&.active]:bg-slate-800 [&.active]:text-white"
                     )}
-                    activeProps={{
-                      className: "active"
-                    }}
+                    activeProps={{ className: "active" }}
                   >
-                    <LayoutDashboard className="h-4 w-4" />
-                    <span><span className="underline decoration-slate-500">H</span>ome</span>
+                    <CalendarDays className="h-4 w-4" />
+                    <span><span className="underline decoration-slate-500">T</span>oday</span>
                   </Link>
                 </NavigationMenuItem>
                 <NavigationMenuItem>
                   <Link 
-                    to="/todos" 
+                    to="/focus" 
                     className={cn(
-                      "inline-flex items-center gap-2 px-4 py-2 rounded-md",
+                      "inline-flex items-center gap-2 px-3 py-2 rounded-md",
                       "text-sm font-medium transition-all",
                       "text-slate-300 hover:text-white hover:bg-slate-800/80",
                       "[&.active]:bg-slate-800 [&.active]:text-white"
                     )}
-                    activeProps={{
-                      className: "active"
-                    }}
+                    activeProps={{ className: "active" }}
+                  >
+                    <Target className="h-4 w-4" />
+                    <span><span className="underline decoration-slate-500">F</span>ocus</span>
+                  </Link>
+                </NavigationMenuItem>
+                <NavigationMenuItem>
+                  <Link
+                    to="/notes"
+                    className={cn(
+                      "inline-flex items-center gap-2 px-3 py-2 rounded-md",
+                      "text-sm font-medium transition-all",
+                      "text-slate-300 hover:text-white hover:bg-slate-800/80",
+                      "[&.active]:bg-slate-800 [&.active]:text-white"
+                    )}
+                    activeProps={{ className: "active" }}
                   >
                     <FileText className="h-4 w-4" />
                     <span><span className="underline decoration-slate-500">N</span>otes</span>
@@ -472,144 +417,68 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                 </NavigationMenuItem>
                 <NavigationMenuItem>
                   <Link
-                    to="/todos-list"
+                    to="/chat"
                     className={cn(
-                      "inline-flex items-center gap-2 px-4 py-2 rounded-md",
+                      "inline-flex items-center gap-2 px-3 py-2 rounded-md",
                       "text-sm font-medium transition-all",
                       "text-slate-300 hover:text-white hover:bg-slate-800/80",
                       "[&.active]:bg-slate-800 [&.active]:text-white"
                     )}
-                    activeProps={{
-                      className: "active"
-                    }}
+                    activeProps={{ className: "active" }}
                   >
-                    <CheckSquare className="h-4 w-4" />
-                    <span><span className="underline decoration-slate-500">T</span>odos</span>
+                    <Sparkles className="h-4 w-4" />
+                    <span>Ch<span className="underline decoration-slate-500">a</span>t</span>
                   </Link>
                 </NavigationMenuItem>
                 <NavigationMenuItem>
                   <Link
-                    to="/today-plan"
-                    className={cn(
-                      "inline-flex items-center gap-2 px-4 py-2 rounded-md",
-                      "text-sm font-medium transition-all",
-                      "text-slate-300 hover:text-white hover:bg-slate-800/80",
-                      "[&.active]:bg-slate-800 [&.active]:text-white"
-                    )}
-                    activeProps={{
-                      className: "active"
-                    }}
-                  >
-                    <CalendarClock className="h-4 w-4" />
-                    <span><span className="underline decoration-slate-500">P</span>lan</span>
-                  </Link>
-                </NavigationMenuItem>
-                <NavigationMenuItem>
-                  <Link
-                    to="/work"
-                    className={cn(
-                      "inline-flex items-center gap-2 px-4 py-2 rounded-md",
-                      "text-sm font-medium transition-all",
-                      "text-slate-300 hover:text-white hover:bg-slate-800/80",
-                      "[&.active]:bg-slate-800 [&.active]:text-white"
-                    )}
-                    activeProps={{
-                      className: "active"
-                    }}
-                  >
-                    <Target className="h-4 w-4" />
-                    <span><span className="underline decoration-slate-500">W</span>ork</span>
-                  </Link>
-                </NavigationMenuItem>
-                <NavigationMenuItem>
-                  <Link
-                    to="/messages"
+                    to="/inbox"
                     search={{ chatId: undefined }}
                     className={cn(
-                      "inline-flex items-center gap-2 px-4 py-2 rounded-md",
+                      "inline-flex items-center gap-2 px-3 py-2 rounded-md",
                       "text-sm font-medium transition-all",
                       "text-slate-300 hover:text-white hover:bg-slate-800/80",
                       "[&.active]:bg-slate-800 [&.active]:text-white"
                     )}
-                    activeProps={{
-                      className: "active"
-                    }}
+                    activeProps={{ className: "active" }}
                   >
-                    <MessageSquare className="h-4 w-4" />
-                    <span><span className="underline decoration-slate-500">M</span>essages</span>
+                    <Inbox className="h-4 w-4" />
+                    <span><span className="underline decoration-slate-500">I</span>nbox</span>
                   </Link>
                 </NavigationMenuItem>
                 <NavigationMenuItem>
                   <Link 
-                    to="/contacts" 
+                    to="/people" 
                     className={cn(
-                      "inline-flex items-center gap-2 px-4 py-2 rounded-md",
+                      "inline-flex items-center gap-2 px-3 py-2 rounded-md",
                       "text-sm font-medium transition-all",
                       "text-slate-300 hover:text-white hover:bg-slate-800/80",
                       "[&.active]:bg-slate-800 [&.active]:text-white"
                     )}
-                    activeProps={{
-                      className: "active"
-                    }}
+                    activeProps={{ className: "active" }}
                   >
                     <Users className="h-4 w-4" />
-                    <span><span className="underline decoration-slate-500">C</span>ontacts</span>
-                  </Link>
-                </NavigationMenuItem>
-                <NavigationMenuItem>
-                  <Link 
-                    to="/sales"
-                    className={cn(
-                      "inline-flex items-center gap-2 px-4 py-2 rounded-md",
-                      "text-sm font-medium transition-all",
-                      "text-slate-300 hover:text-white hover:bg-slate-800/80",
-                      "[&.active]:bg-slate-800 [&.active]:text-white"
-                    )}
-                    activeProps={{
-                      className: "active"
-                    }}
-                  >
-                    <HeartHandshake className="h-4 w-4" />
-                    <span><span className="underline decoration-slate-500">S</span>ales</span>
+                    <span><span className="underline decoration-slate-500">P</span>eople</span>
                   </Link>
                 </NavigationMenuItem>
                 <NavigationMenuItem>
                   <Link
-                    to="/stats"
+                    to="/reflect"
                     className={cn(
-                      "inline-flex items-center gap-2 px-4 py-2 rounded-md",
+                      "inline-flex items-center gap-2 px-3 py-2 rounded-md",
                       "text-sm font-medium transition-all",
                       "text-slate-300 hover:text-white hover:bg-slate-800/80",
                       "[&.active]:bg-slate-800 [&.active]:text-white"
                     )}
-                    activeProps={{
-                      className: "active"
-                    }}
-                  >
-                    <BarChart3 className="h-4 w-4" />
-                    <span>St<span className="underline decoration-slate-500">a</span>ts</span>
-                  </Link>
-                </NavigationMenuItem>
-                <NavigationMenuItem>
-                  <Link
-                    to="/summaries"
-                    className={cn(
-                      "inline-flex items-center gap-2 px-4 py-2 rounded-md",
-                      "text-sm font-medium transition-all",
-                      "text-slate-300 hover:text-white hover:bg-slate-800/80",
-                      "[&.active]:bg-slate-800 [&.active]:text-white"
-                    )}
-                    activeProps={{
-                      className: "active"
-                    }}
+                    activeProps={{ className: "active" }}
                   >
                     <BookOpen className="h-4 w-4" />
-                    <span><span className="underline decoration-slate-500">R</span>eflections</span>
+                    <span><span className="underline decoration-slate-500">R</span>eflect</span>
                   </Link>
                 </NavigationMenuItem>
                 <NavigationMenuItem>
                   <NavigationMenuTrigger className={cn(
-                    "inline-flex items-center gap-2 px-4 py-2 rounded-md",
+                    "inline-flex items-center gap-2 px-3 py-2 rounded-md",
                     "text-sm font-medium transition-all",
                     "text-slate-300 hover:text-white hover:bg-slate-800/80 data-[state=open]:bg-slate-800 data-[state=open]:text-white",
                     "bg-transparent"
@@ -617,14 +486,11 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                     <Settings className="h-4 w-4" />
                     Settings
                   </NavigationMenuTrigger>
-                  <NavigationMenuContent className="bg-slate-800 border-slate-700 z-[100]">
-                    <ul className="grid w-[220px] gap-1 p-2">
+                  <NavigationMenuContent className="z-[100]">
+                    <ul className="grid w-[200px] gap-1 p-2">
                       <li>
                         <NavigationMenuLink asChild>
-                          <Link 
-                            to="/settings/integrations"
-                            className="flex flex-row items-center gap-2 px-3 py-2 rounded-md text-sm text-slate-300 hover:text-white hover:bg-slate-700 transition-colors w-full"
-                          >
+                          <Link to="/settings/integrations" className="w-full">
                             <Zap className="h-4 w-4 flex-shrink-0" />
                             <span>Integrations</span>
                           </Link>
@@ -632,10 +498,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                       </li>
                       <li>
                         <NavigationMenuLink asChild>
-                          <Link 
-                            to="/settings/projects"
-                            className="flex flex-row items-center gap-2 px-3 py-2 rounded-md text-sm text-slate-300 hover:text-white hover:bg-slate-700 transition-colors w-full"
-                          >
+                          <Link to="/settings/projects" className="w-full">
                             <FolderKanban className="h-4 w-4 flex-shrink-0" />
                             <span>Projects</span>
                           </Link>
@@ -643,56 +506,17 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                       </li>
                       <li>
                         <NavigationMenuLink asChild>
-                          <Link 
-                            to="/settings/ai"
-                            className="flex flex-row items-center gap-2 px-3 py-2 rounded-md text-sm text-slate-300 hover:text-white hover:bg-slate-700 transition-colors w-full"
-                          >
+                          <Link to="/settings/ai" className="w-full">
                             <Bot className="h-4 w-4 flex-shrink-0" />
-                            <span>AI Models</span>
+                            <span>AI Settings</span>
                           </Link>
                         </NavigationMenuLink>
                       </li>
                       <li>
                         <NavigationMenuLink asChild>
-                          <Link 
-                            to="/settings/prompts"
-                            className="flex flex-row items-center gap-2 px-3 py-2 rounded-md text-sm text-slate-300 hover:text-white hover:bg-slate-700 transition-colors w-full"
-                          >
-                            <MessageSquare className="h-4 w-4 flex-shrink-0" />
-                            <span>AI Prompts</span>
-                          </Link>
-                        </NavigationMenuLink>
-                      </li>
-                      <li>
-                        <NavigationMenuLink asChild>
-                          <Link 
-                            to="/settings/locations"
-                            className="flex flex-row items-center gap-2 px-3 py-2 rounded-md text-sm text-slate-300 hover:text-white hover:bg-slate-700 transition-colors w-full"
-                          >
-                            <MapPin className="h-4 w-4 flex-shrink-0" />
-                            <span>Locations</span>
-                          </Link>
-                        </NavigationMenuLink>
-                      </li>
-                      <li>
-                        <NavigationMenuLink asChild>
-                          <Link 
-                            to="/settings/sample-outputs"
-                            className="flex flex-row items-center gap-2 px-3 py-2 rounded-md text-sm text-slate-300 hover:text-white hover:bg-slate-700 transition-colors w-full"
-                          >
-                            <FileText className="h-4 w-4 flex-shrink-0" />
-                            <span>Sample Outputs</span>
-                          </Link>
-                        </NavigationMenuLink>
-                      </li>
-                      <li>
-                        <NavigationMenuLink asChild>
-                          <Link 
-                            to="/settings"
-                            className="flex flex-row items-center gap-2 px-3 py-2 rounded-md text-sm text-slate-300 hover:text-white hover:bg-slate-700 transition-colors w-full"
-                          >
+                          <Link to="/settings" className="w-full">
                             <Settings className="h-4 w-4 flex-shrink-0" />
-                            <span>General Settings</span>
+                            <span>General</span>
                           </Link>
                         </NavigationMenuLink>
                       </li>
