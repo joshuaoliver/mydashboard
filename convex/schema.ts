@@ -895,4 +895,67 @@ export default defineSchema({
     })),
     updatedAt: v.number(),
   }),
+
+  // ===========================================
+  // Agent Chat Feature Tables
+  // ===========================================
+
+  // Agent threads - conversation threads for the AI assistant
+  agentThreads: defineTable({
+    title: v.optional(v.string()),           // Thread title (auto-generated or user-set)
+    userId: v.string(),                       // User who owns this thread
+    lastMessageAt: v.optional(v.number()),   // Timestamp of last message
+    messageCount: v.number(),                 // Number of messages in thread
+    modelId: v.optional(v.string()),         // User-selected model for this thread (e.g., "openai/gpt-4o")
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_recent", ["userId", "lastMessageAt"]),
+
+  // Pending actions awaiting user approval (human-in-the-loop)
+  agentPendingActions: defineTable({
+    threadId: v.string(),                     // Which chat thread this belongs to
+    messageId: v.optional(v.string()),        // Which message triggered this action
+    actionType: v.union(
+      v.literal("message_contact"),           // Send a message to someone
+      v.literal("create_todo"),               // Create a todo item
+      v.literal("create_reminder"),           // Set a reminder
+      v.literal("add_to_note"),               // Add content to a note
+      v.literal("schedule_task"),             // Schedule a task on calendar
+      v.literal("other")                      // Other action types
+    ),
+    title: v.string(),                        // Short action title for display
+    description: v.optional(v.string()),      // Detailed description of the action
+    actionData: v.any(),                      // Action-specific data (contact info, todo text, etc.)
+    status: v.union(
+      v.literal("pending"),                   // Awaiting user approval
+      v.literal("approved"),                  // User approved, ready to execute
+      v.literal("rejected"),                  // User rejected
+      v.literal("executed")                   // Successfully executed
+    ),
+    createdAt: v.number(),
+    executedAt: v.optional(v.number()),       // When the action was executed
+  })
+    .index("by_thread", ["threadId"])
+    .index("by_status", ["status"])
+    .index("by_thread_status", ["threadId", "status"]),
+
+  // Voice notes - stored audio recordings for transcription
+  voiceNotes: defineTable({
+    threadId: v.string(),                     // Which thread this belongs to
+    storageId: v.id("_storage"),              // Convex storage ID for the audio file
+    transcription: v.optional(v.string()),    // Transcribed text
+    durationSeconds: v.optional(v.number()),  // Duration in seconds
+    status: v.union(
+      v.literal("pending"),                   // Waiting to be transcribed
+      v.literal("transcribing"),              // Currently being transcribed
+      v.literal("completed"),                 // Successfully transcribed
+      v.literal("failed")                     // Transcription failed
+    ),
+    errorMessage: v.optional(v.string()),     // Error message if failed
+    createdAt: v.number(),
+  })
+    .index("by_thread", ["threadId"])
+    .index("by_status", ["status"]),
 });

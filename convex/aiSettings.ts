@@ -42,6 +42,14 @@ export const AVAILABLE_MODELS = [
 
 // Default AI settings for each use case
 export const DEFAULT_SETTINGS = {
+  "chat-agent": {
+    displayName: "Chat Agent",
+    description: "The AI model used for the chat assistant",
+    modelId: "google/gemini-3-flash",
+    promptName: undefined,
+    temperature: 0.7,
+    isEnabled: true,
+  },
   "reply-suggestions": {
     displayName: "Reply Suggestions",
     description: "AI-powered reply suggestions for messages",
@@ -64,6 +72,14 @@ export const DEFAULT_SETTINGS = {
     modelId: "google/gemini-3-flash",
     promptName: "message-compose",
     temperature: 1,
+    isEnabled: true,
+  },
+  "thread-title-generation": {
+    displayName: "Thread Title Generation",
+    description: "Auto-generate conversation titles from first message",
+    modelId: "google/gemini-3-flash",
+    promptName: undefined,
+    temperature: 0.7,
     isEnabled: true,
   },
 } as const;
