@@ -1,5 +1,5 @@
 import { Agent, createTool } from "@convex-dev/agent";
-import { components, internal } from "./_generated/api";
+import { components } from "./_generated/api";
 import { openai } from "@ai-sdk/openai";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createOpenAI } from "@ai-sdk/openai";
@@ -8,6 +8,12 @@ import { z } from "zod";
 import { query, mutation, internalQuery, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
 import { DEFAULT_SETTINGS } from "./aiSettings";
+import { internal } from "./_generated/api";
+import type { LanguageModel } from "ai";
+
+// Type assertion for internal references that may not be in generated types yet
+// Run `npx convex dev` to regenerate types after adding new files
+const internalRef = internal as any;
 
 // =============================================================================
 // Dynamic Model Creation
@@ -24,37 +30,37 @@ export function createModelFromId(modelId: string) {
       const google = createGoogleGenerativeAI({
         apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY,
       });
-      return google(modelName);
+      return google(modelName) as unknown as LanguageModel;
     case "openai":
       const openaiProvider = createOpenAI({
         apiKey: process.env.OPENAI_API_KEY,
       });
-      return openaiProvider(modelName);
+      return openaiProvider(modelName) as unknown as LanguageModel;
     case "anthropic":
       const anthropic = createAnthropic({
         apiKey: process.env.ANTHROPIC_API_KEY,
       });
-      return anthropic(modelName);
+      return anthropic(modelName) as unknown as LanguageModel;
     case "deepseek":
       // DeepSeek uses OpenAI-compatible API
       const deepseek = createOpenAI({
         apiKey: process.env.DEEPSEEK_API_KEY,
         baseURL: "https://api.deepseek.com/v1",
       });
-      return deepseek(modelName);
+      return deepseek(modelName) as unknown as LanguageModel;
     case "xai":
       // xAI Grok uses OpenAI-compatible API
       const xai = createOpenAI({
         apiKey: process.env.XAI_API_KEY,
         baseURL: "https://api.x.ai/v1",
       });
-      return xai(modelName);
+      return xai(modelName) as unknown as LanguageModel;
     default:
       // Default to Google Gemini Flash
       const defaultGoogle = createGoogleGenerativeAI({
         apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY,
       });
-      return defaultGoogle("gemini-2.0-flash");
+      return defaultGoogle("gemini-2.0-flash") as unknown as LanguageModel;
   }
 }
 
@@ -92,7 +98,7 @@ const lookupContact = createTool({
     name: z.string().describe("The name to search for (first name, last name, or both)"),
   }),
   handler: async (ctx, args) => {
-    const contacts = await ctx.runQuery(internal.agentChat.searchContacts, {
+    const contacts = await ctx.runQuery(internalRef.agentChat.searchContacts, {
       query: args.name,
     });
     if (contacts.length === 0) {
@@ -121,7 +127,7 @@ const createPendingAction = createTool({
     actionData: z.any().describe("Action-specific data (e.g., contact info, todo text, reminder time)"),
   }),
   handler: async (ctx, args) => {
-    const result = await ctx.runMutation(internal.agentChat.insertPendingAction, {
+    const result = await ctx.runMutation(internalRef.agentChat.insertPendingAction, {
       threadId: ctx.threadId!,
       messageId: ctx.messageId,
       actionType: args.actionType,
@@ -147,7 +153,7 @@ const createTodo = createTool({
     documentId: z.string().optional().describe("Optional: specific todo document to add to"),
   }),
   handler: async (ctx, args) => {
-    const result = await ctx.runMutation(internal.agentChat.createTodoItem, {
+    const result = await ctx.runMutation(internalRef.agentChat.createTodoItem, {
       text: args.text,
       documentId: args.documentId,
     });
@@ -169,7 +175,7 @@ const searchContactMessages = createTool({
     limit: z.number().optional().describe("Maximum number of messages to return (default 10)"),
   }),
   handler: async (ctx, args) => {
-    const messages = await ctx.runQuery(internal.agentChat.getContactMessages, {
+    const messages = await ctx.runQuery(internalRef.agentChat.getContactMessages, {
       contactName: args.contactName,
       limit: args.limit ?? 10,
     });
@@ -186,7 +192,7 @@ const listPendingActions = createTool({
     limit: z.number().optional().describe("Maximum number of actions to return (default 10)"),
   }),
   handler: async (ctx, args) => {
-    const actions = await ctx.runQuery(internal.agentChat.getPendingActions, {
+    const actions = await ctx.runQuery(internalRef.agentChat.getPendingActions, {
       threadId: ctx.threadId!,
       limit: args.limit ?? 10,
     });
@@ -201,7 +207,7 @@ const getCurrentContext = createTool({
   description: "Get the current date, time, and any relevant context for planning",
   args: z.object({}),
   handler: async (ctx) => {
-    const context = await ctx.runQuery(internal.agentChat.getDailyContext, {});
+    const context = await ctx.runQuery(internalRef.agentChat.getDailyContext, {});
     return context;
   },
 });
@@ -215,7 +221,7 @@ const getCalendarEvents = createTool({
     date: z.string().optional().describe("Date in YYYY-MM-DD format. Defaults to today."),
   }),
   handler: async (ctx, args) => {
-    const events = await ctx.runQuery(internal.agentChat.getCalendarEvents, {
+    const events = await ctx.runQuery(internalRef.agentChat.getCalendarEvents, {
       date: args.date,
     });
     return events;
@@ -229,7 +235,7 @@ const getTodayPlan = createTool({
   description: "Get the current day's plan including scheduled blocks, tasks, and adhoc items",
   args: z.object({}),
   handler: async (ctx) => {
-    const plan = await ctx.runQuery(internal.agentChat.getTodayPlanSummary, {});
+    const plan = await ctx.runQuery(internalRef.agentChat.getTodayPlanSummary, {});
     return plan;
   },
 });
@@ -244,7 +250,7 @@ const addAdhocTask = createTool({
     priority: z.enum(["high", "medium", "low"]).optional().describe("Task priority (default: medium)"),
   }),
   handler: async (ctx, args) => {
-    const result = await ctx.runMutation(internal.agentChat.addAdhocTaskToday, {
+    const result = await ctx.runMutation(internalRef.agentChat.addAdhocTaskToday, {
       text: args.text,
       priority: args.priority ?? "medium",
     });
@@ -259,7 +265,7 @@ const listProjects = createTool({
   description: "List all active projects to understand what the user is working on",
   args: z.object({}),
   handler: async (ctx) => {
-    const projects = await ctx.runQuery(internal.agentChat.getActiveProjects, {});
+    const projects = await ctx.runQuery(internalRef.agentChat.getActiveProjects, {});
     return projects;
   },
 });
@@ -273,7 +279,7 @@ const listNotes = createTool({
     limit: z.number().optional().describe("Maximum number of notes to return (default 10)"),
   }),
   handler: async (ctx, args) => {
-    const notes = await ctx.runQuery(internal.agentChat.getRecentNotes, {
+    const notes = await ctx.runQuery(internalRef.agentChat.getRecentNotes, {
       limit: args.limit ?? 10,
     });
     return notes;
@@ -341,10 +347,11 @@ You have access to long-term memory across conversations. Use it to:
 
 // Default agent uses the settings default model
 // For dynamic model selection, use createAgentWithModel()
-export const chatAgent = new Agent(components.agent, {
+// Note: components.agent may not be typed until `npx convex dev` is run
+export const chatAgent = new Agent((components as any).agent, {
   name: "PersonalAssistant",
-  chat: createModelFromId(getDefaultModelId()),
-  textEmbedding: openai.embedding("text-embedding-3-small"),
+  languageModel: createModelFromId(getDefaultModelId()),
+  textEmbeddingModel: openai.embedding("text-embedding-3-small"),
   instructions: agentInstructions,
   tools: {
     lookupContact,
@@ -367,10 +374,10 @@ export const chatAgent = new Agent(components.agent, {
  * Use this when you need to use a different model than the default
  */
 export function createAgentWithModel(modelId: string, customInstructions?: string) {
-  return new Agent(components.agent, {
+  return new Agent((components as any).agent, {
     name: "PersonalAssistant",
-    chat: createModelFromId(modelId),
-    textEmbedding: openai.embedding("text-embedding-3-small"),
+    languageModel: createModelFromId(modelId),
+    textEmbeddingModel: openai.embedding("text-embedding-3-small"),
     instructions: customInstructions || agentInstructions,
     tools: {
       lookupContact,
@@ -652,9 +659,9 @@ export const getDailyContext = internalQuery({
 });
 
 /**
- * Get calendar events
+ * Get calendar events (internal query for tools)
  */
-export const getCalendarEvents = internalQuery({
+export const getCalendarEventsInternal = internalQuery({
   args: { date: v.optional(v.string()) },
   handler: async (ctx, args) => {
     const targetDate = args.date || new Date().toISOString().split("T")[0];
@@ -675,7 +682,7 @@ export const getCalendarEvents = internalQuery({
       .collect();
 
     return events.map((e) => ({
-      title: e.title,
+      title: e.summary,
       startTime: new Date(e.startTime).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }),
       endTime: new Date(e.endTime).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }),
       location: e.location,
@@ -707,14 +714,19 @@ export const getTodayPlanSummary = internalQuery({
       .withIndex("by_plan", (q) => q.eq("planId", todayPlan._id))
       .collect();
 
+    // Get daily context for additional info (morningContext is stored there)
+    const dailyContext = await ctx.db
+      .query("dailyContext")
+      .withIndex("by_date", (q) => q.eq("date", today))
+      .first();
+
     return {
       hasPlan: true,
-      status: todayPlan.status,
-      morningContext: todayPlan.morningContext,
+      freeBlocks: todayPlan.freeBlocks.length,
+      morningContext: dailyContext?.morningContext,
       adhocItems: adhocItems.map((item) => ({
         text: item.text,
         isCompleted: item.isCompleted,
-        priority: item.priority,
       })),
     };
   },
@@ -740,18 +752,25 @@ export const addAdhocTaskToday = internalMutation({
       // Create a basic plan
       const planId = await ctx.db.insert("todayPlans", {
         date: today,
-        status: "active",
+        freeBlocks: [],
         createdAt: Date.now(),
         updatedAt: Date.now(),
       });
       todayPlan = await ctx.db.get(planId);
     }
 
+    // Get existing adhoc items to determine order
+    const existingAdhoc = await ctx.db
+      .query("adhocItems")
+      .withIndex("by_plan", (q) => q.eq("planId", todayPlan!._id))
+      .collect();
+    const maxOrder = existingAdhoc.reduce((max, item) => Math.max(max, item.order), -1);
+
     const adhocId = await ctx.db.insert("adhocItems", {
       planId: todayPlan!._id,
       text: args.text,
       isCompleted: false,
-      priority: args.priority as "high" | "medium" | "low",
+      order: maxOrder + 1,
       createdAt: Date.now(),
     });
 
@@ -773,7 +792,8 @@ export const getActiveProjects = internalQuery({
     return projects.map((p) => ({
       id: p._id,
       name: p.name,
-      description: p.description,
+      hubstaffProjectName: p.hubstaffProjectName,
+      linearTeamName: p.linearTeamName,
     }));
   },
 });

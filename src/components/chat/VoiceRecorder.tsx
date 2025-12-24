@@ -1,9 +1,13 @@
 import { useState, useRef, useCallback } from "react";
 import { useMutation } from "convex/react";
-import { api } from "~/convex/_generated/api";
+import { api } from "../../../convex/_generated/api";
 import { PromptInputButton } from "@/components/ai-elements/prompt-input";
 import { Mic, Loader2, Square } from "lucide-react";
 import { cn } from "~/lib/utils";
+
+// Type assertion for API references not yet in generated types
+// Run `npx convex dev` to regenerate types after adding new files
+const voiceNotesApi = (api as any).voiceNotes;
 
 interface VoiceRecorderProps {
   threadId: string | null;
@@ -18,8 +22,8 @@ export function VoiceRecorder({ threadId }: VoiceRecorderProps) {
   const timerRef = useRef<number | null>(null);
 
   // Mutations
-  const generateUploadUrl = useMutation(api.voiceNotes.generateUploadUrl);
-  const saveVoiceNote = useMutation(api.voiceNotes.saveVoiceNote);
+  const generateUploadUrl = useMutation(voiceNotesApi.generateUploadUrl);
+  const saveVoiceNote = useMutation(voiceNotesApi.saveVoiceNote);
 
   const startRecording = useCallback(async () => {
     if (!threadId) return;

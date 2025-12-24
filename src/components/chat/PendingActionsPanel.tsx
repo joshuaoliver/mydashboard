@@ -1,5 +1,5 @@
 import { useQuery, useMutation } from "convex/react";
-import { api } from "~/convex/_generated/api";
+import { api } from "../../../convex/_generated/api";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
@@ -15,7 +15,22 @@ import {
   Clock,
 } from "lucide-react";
 import { cn, formatDistanceToNow } from "~/lib/utils";
-import type { Id } from "~/convex/_generated/dataModel";
+import type { Id } from "../../../convex/_generated/dataModel";
+
+// Type assertion for API references not yet in generated types
+// Run `npx convex dev` to regenerate types after adding new files
+const agentChatApi = (api as any).agentChat;
+
+interface PendingAction {
+  _id: string;
+  threadId?: string;
+  type: string;
+  title: string;
+  description: string;
+  status: "pending" | "approved" | "rejected" | "executed";
+  data?: Record<string, unknown>;
+  createdAt: number;
+}
 
 interface PendingActionsPanelProps {
   threadId: string | null;
@@ -48,12 +63,12 @@ const STATUS_STYLES: Record<string, string> = {
 
 export function PendingActionsPanel({ threadId }: PendingActionsPanelProps) {
   const actions = useQuery(
-    api.agentChat.listPendingActionsForThread,
+    agentChatApi.listPendingActionsForThread,
     threadId ? { threadId } : "skip"
   );
 
-  const approveAction = useMutation(api.agentChat.approvePendingAction);
-  const rejectAction = useMutation(api.agentChat.rejectPendingAction);
+  const approveAction = useMutation(agentChatApi.approvePendingAction);
+  const rejectAction = useMutation(agentChatApi.rejectPendingAction);
 
   const handleApprove = async (actionId: Id<"agentPendingActions">) => {
     try {
@@ -84,9 +99,9 @@ export function PendingActionsPanel({ threadId }: PendingActionsPanelProps) {
     );
   }
 
-  const pendingActions = actions?.filter((a) => a.status === "pending") || [];
+  const pendingActions = actions?.filter((a: PendingAction) => a.status === "pending") || [];
   const completedActions =
-    actions?.filter((a) => a.status !== "pending").slice(0, 10) || [];
+    actions?.filter((a: PendingAction) => a.status !== "pending").slice(0, 10) || [];
 
   return (
     <div className="flex flex-col h-full border-l">
@@ -127,12 +142,12 @@ export function PendingActionsPanel({ threadId }: PendingActionsPanelProps) {
                   <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
                     Awaiting Approval
                   </h3>
-                  {pendingActions.map((action) => (
+                  {pendingActions.map((action: PendingAction) => (
                     <ActionCard
                       key={action._id}
-                      action={action}
-                      onApprove={() => handleApprove(action._id)}
-                      onReject={() => handleReject(action._id)}
+                      action={action as any}
+                      onApprove={() => handleApprove(action._id as any)}
+                      onReject={() => handleReject(action._id as any)}
                     />
                   ))}
                 </div>
@@ -144,8 +159,8 @@ export function PendingActionsPanel({ threadId }: PendingActionsPanelProps) {
                   <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
                     Recent Actions
                   </h3>
-                  {completedActions.map((action) => (
-                    <ActionCard key={action._id} action={action} readonly />
+                  {completedActions.map((action: PendingAction) => (
+                    <ActionCard key={action._id} action={action as any} readonly />
                   ))}
                 </div>
               )}

@@ -5,6 +5,10 @@ import { PromptInputButton } from "@/components/ai-elements/prompt-input";
 import { Paperclip, X, FileIcon, ImageIcon, Loader2 } from "lucide-react";
 import { cn } from "~/lib/utils";
 
+// Type assertion for API references not yet in generated types
+// Run `npx convex dev` to regenerate types after adding new files
+const chatApi = (api as any).chat;
+
 interface AttachmentButtonProps {
   threadId: string | null;
   onAttachmentReady?: (attachment: AttachmentInfo) => void;
@@ -29,7 +33,7 @@ export function AttachmentButton({
   const [attachment, setAttachment] = useState<AttachmentInfo | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const generateUploadUrl = useMutation(api.chat.generateAttachmentUploadUrl);
+  const generateUploadUrl = useMutation(chatApi.generateAttachmentUploadUrl);
 
   const handleFileSelect = useCallback(
     async (event: React.ChangeEvent<HTMLInputElement>) => {

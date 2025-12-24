@@ -4,7 +4,7 @@ import { ThreadSidebar } from "@/components/chat/ThreadSidebar";
 import { ChatConversation } from "@/components/chat/ChatConversation";
 import { PendingActionsPanel } from "@/components/chat/PendingActionsPanel";
 import { useQuery } from "convex/react";
-import { api } from "~/convex/_generated/api";
+import { api } from "../../../convex/_generated/api";
 import { useState } from "react";
 import {
   ResizableHandle,
@@ -22,6 +22,20 @@ import { Button } from "@/components/ui/button";
 import { ArrowLeft, ListTodo } from "lucide-react";
 import { Sidebar, SidebarHeader } from "@/components/layout/sidebar";
 import { cn } from "~/lib/utils";
+
+// Type assertion for API references not yet in generated types
+// Run `npx convex dev` to regenerate types after adding new files
+const chatApi = (api as any).chat;
+const agentChatApi = (api as any).agentChat;
+
+interface PendingAction {
+  status: string;
+}
+
+interface Thread {
+  id: { toString(): string };
+  title?: string;
+}
 
 export const Route = createFileRoute("/_authenticated/chat")({
   component: ChatPage,
@@ -43,14 +57,14 @@ function ChatPage() {
 
   // Get pending actions count for the badge
   const pendingActions = useQuery(
-    api.agentChat.listPendingActionsForThread,
+    agentChatApi.listPendingActionsForThread,
     selectedThreadId ? { threadId: selectedThreadId } : "skip"
   );
-  const pendingCount = pendingActions?.filter((a) => a.status === "pending").length || 0;
+  const pendingCount = pendingActions?.filter((a: PendingAction) => a.status === "pending").length || 0;
 
   // Get thread title for mobile header
-  const threads = useQuery(api.chat.listThreads);
-  const currentThread = threads?.find((t) => t.id.toString() === selectedThreadId);
+  const threads = useQuery(chatApi.listThreads);
+  const currentThread = threads?.find((t: Thread) => t.id.toString() === selectedThreadId);
   const threadTitle = currentThread?.title || "Conversation";
 
   const handleSelectThread = (threadId: string) => {

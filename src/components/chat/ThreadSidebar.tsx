@@ -19,6 +19,16 @@ import {
 } from "@/components/ui/alert-dialog";
 import type { Id } from "../../../convex/_generated/dataModel";
 
+// Type assertion for API references not yet in generated types
+// Run `npx convex dev` to regenerate types after adding new files
+const chatApi = (api as any).chat;
+
+interface Thread {
+  id: { toString(): string };
+  title: string;
+  lastMessageAt?: number;
+}
+
 interface ThreadSidebarProps {
   selectedThreadId: string | null;
   onSelectThread: (threadId: string) => void;
@@ -28,10 +38,10 @@ export function ThreadSidebar({
   selectedThreadId,
   onSelectThread,
 }: ThreadSidebarProps) {
-  const threads = useQuery(api.chat.listThreads);
-  const createThread = useMutation(api.chat.createThread);
-  const deleteThread = useMutation(api.chat.deleteThread);
-  const updateThreadTitle = useMutation(api.chat.updateThreadTitle);
+  const threads = useQuery(chatApi.listThreads);
+  const createThread = useMutation(chatApi.createThread);
+  const deleteThread = useMutation(chatApi.deleteThread);
+  const updateThreadTitle = useMutation(chatApi.updateThreadTitle);
   const [threadToDelete, setThreadToDelete] = useState<string | null>(null);
   const [editingThreadId, setEditingThreadId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState("");
@@ -51,7 +61,7 @@ export function ThreadSidebar({
     if (!threads) return [];
     if (!searchTerm.trim()) return threads;
     const lower = searchTerm.toLowerCase();
-    return threads.filter((t) =>
+    return threads.filter((t: Thread) =>
       t.title.toLowerCase().includes(lower)
     );
   }, [threads, searchTerm]);
@@ -67,7 +77,7 @@ export function ThreadSidebar({
       setThreadToDelete(null);
       if (selectedThreadId === threadToDelete) {
         // Select the first remaining thread or nothing
-        const remainingThreads = threads?.filter((t) => t.id.toString() !== threadToDelete);
+        const remainingThreads = threads?.filter((t: Thread) => t.id.toString() !== threadToDelete);
         if (remainingThreads && remainingThreads.length > 0) {
           onSelectThread(remainingThreads[0].id.toString());
         }
@@ -160,7 +170,7 @@ export function ThreadSidebar({
             </div>
           ) : (
             // Thread list
-            filteredThreads.map((thread) => {
+            filteredThreads.map((thread: Thread) => {
               const threadIdStr = thread.id.toString();
               const isEditing = editingThreadId === threadIdStr;
               const isSelected = selectedThreadId === threadIdStr;

@@ -3,10 +3,15 @@ import { v } from "convex/values";
 import { paginationOptsValidator } from "convex/server";
 import { listUIMessages, syncStreams, vStreamArgs } from "@convex-dev/agent";
 import { components, internal } from "./_generated/api";
-import { chatAgent, createAgentWithModel, createModelFromId, getDefaultModelId } from "./agentChat";
+import { createAgentWithModel, createModelFromId, getDefaultModelId } from "./agentChat";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { generateText } from "ai";
 import { DEFAULT_SETTINGS } from "./aiSettings";
+
+// Type assertion for internal references that may not be in generated types yet
+// Run `npx convex dev` to regenerate types after adding new files
+const internalRef = internal as any;
+const componentsRef = components as any;
 
 // =============================================================================
 // Thread Management
@@ -76,14 +81,10 @@ export const createThread = mutation({
       updatedAt: Date.now(),
     });
 
-    // Also create the agent thread using the same ID as string
-    const agentThreadId = threadId.toString();
-    await chatAgent.createThread(ctx, {
-      threadId: agentThreadId,
-      userId,
-    });
-
-    return { threadId: threadId.toString(), agentThreadId };
+    // For mutations, we manage our own thread in the agentThreads table
+    // The Convex Agent component creates its own internal threads
+    // We use the string version of our threadId as the agent thread ID
+    return { threadId: threadId.toString() };
   },
 });
 
@@ -167,13 +168,13 @@ export const listThreadMessages = query({
   },
   handler: async (ctx, args) => {
     // Get paginated messages from the agent component
-    const paginated = await listUIMessages(ctx, components.agent, {
+    const paginated = await listUIMessages(ctx, componentsRef.agent, {
       threadId: args.threadId,
       paginationOpts: args.paginationOpts,
     });
 
     // Get active stream deltas for real-time streaming
-    const streams = await syncStreams(ctx, components.agent, {
+    const streams = await syncStreams(ctx, componentsRef.agent, {
       threadId: args.threadId,
       streamArgs: args.streamArgs,
     });
@@ -199,7 +200,7 @@ export const sendMessage = mutation({
     if (!userId) throw new Error("Not authenticated");
 
     // Schedule async response generation
-    await ctx.scheduler.runAfter(0, internal.chat.generateResponseAsync, {
+    await ctx.scheduler.runAfter(0, internalRef.chat.generateResponseAsync, {
       threadId: args.threadId,
       prompt: args.prompt,
     });
@@ -256,7 +257,7 @@ export const sendMessageWithAttachment = mutation({
     if (!userId) throw new Error("Not authenticated");
 
     // Schedule async response generation with attachment info
-    await ctx.scheduler.runAfter(0, internal.chat.generateResponseWithAttachment, {
+    await ctx.scheduler.runAfter(0, internalRef.chat.generateResponseWithAttachment, {
       threadId: args.threadId,
       prompt: args.prompt,
       storageId: args.storageId,
@@ -314,12 +315,12 @@ export const generateResponseWithAttachment = internalAction({
     }
 
     // Get the thread's selected model or fall back to settings default
-    const threadModelId = await ctx.runQuery(internal.chat.getThreadModel, {
+    const threadModelId = await ctx.runQuery(internalRef.chat.getThreadModel, {
       threadId: args.threadId,
     });
     let modelId = threadModelId;
     if (!modelId) {
-      const setting = await ctx.runQuery(internal.chat.getChatAgentSetting, {});
+      const setting = await ctx.runQuery(internalRef.chat.getChatAgentSetting, {});
       modelId = setting?.modelId || getDefaultModelId();
     }
 
@@ -331,7 +332,8 @@ export const generateResponseWithAttachment = internalAction({
 
     // Create agent with the appropriate model, custom instructions, and stream response
     const agent = createAgentWithModel(modelId, customInstructions);
-    await agent.streamText(
+    // Type assertion needed due to AI SDK version conflicts
+    await (agent as any).streamText(
       ctx,
       { threadId: args.threadId },
       { prompt: promptWithAttachment },
@@ -381,14 +383,14 @@ export const generateResponseAsync = internalAction({
   },
   handler: async (ctx, args) => {
     // Get the thread's selected model or fall back to settings default
-    const threadModelId = await ctx.runQuery(internal.chat.getThreadModel, {
+    const threadModelId = await ctx.runQuery(internalRef.chat.getThreadModel, {
       threadId: args.threadId,
     });
 
     // Get model from settings if thread has no model set
     let modelId = threadModelId;
     if (!modelId) {
-      const setting = await ctx.runQuery(internal.chat.getChatAgentSetting, {});
+      const setting = await ctx.runQuery(internalRef.chat.getChatAgentSetting, {});
       modelId = setting?.modelId || getDefaultModelId();
     }
 
@@ -400,7 +402,8 @@ export const generateResponseAsync = internalAction({
 
     // Create agent with the appropriate model and custom instructions
     const agent = createAgentWithModel(modelId, customInstructions);
-    await agent.streamText(
+    // Type assertion needed due to AI SDK version conflicts
+    await (agent as any).streamText(
       ctx,
       { threadId: args.threadId },
       { prompt: args.prompt },
@@ -442,27 +445,23 @@ export const startConversation = mutation({
 
     const agentThreadId = threadId.toString();
 
-    // Create agent thread
-    await chatAgent.createThread(ctx, {
-      threadId: agentThreadId,
-      userId,
-    });
+    // Note: Agent thread creation happens automatically when we stream text
+    // The agent will create its internal thread structure on first message
 
     // Schedule async response generation with the first message
-    await ctx.scheduler.runAfter(0, internal.chat.generateResponseAsync, {
+    await ctx.scheduler.runAfter(0, internalRef.chat.generateResponseAsync, {
       threadId: agentThreadId,
       prompt: args.prompt,
     });
 
     // Schedule title generation after response
-    await ctx.scheduler.runAfter(3000, internal.chat.generateThreadTitle, {
+    await ctx.scheduler.runAfter(3000, internalRef.chat.generateThreadTitle, {
       threadId: agentThreadId,
       firstMessage: args.prompt,
     });
 
     return {
       threadId: threadId.toString(),
-      agentThreadId,
     };
   },
 });
@@ -523,13 +522,13 @@ export const generateThreadTitle = internalAction({
         prompt: `Generate a very short (3-5 word) title for this conversation. Just respond with the title, nothing else. No quotes, no punctuation at the end.
 
 First message: "${args.firstMessage.slice(0, 500)}"`,
-        maxTokens: 30,
+        maxOutputTokens: 30,
         temperature,
       });
 
       const title = text.trim().replace(/^["']|["']$/g, ""); // Remove quotes if present
 
-      await ctx.runMutation(internal.chat.updateThreadTitleInternal, {
+      await ctx.runMutation(internalRef.chat.updateThreadTitleInternal, {
         threadId: args.threadId,
         title,
       });

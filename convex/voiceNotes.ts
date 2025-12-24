@@ -5,6 +5,10 @@ import { openai } from "@ai-sdk/openai";
 import { internal } from "./_generated/api";
 import { chatAgent } from "./agentChat";
 
+// Type assertion for internal references that may not be in generated types yet
+// Run `npx convex dev` to regenerate types after adding new files
+const internalRef = internal as any;
+
 // =============================================================================
 // Voice Note Upload and Transcription
 // =============================================================================
@@ -37,7 +41,7 @@ export const saveVoiceNote = mutation({
     });
 
     // Schedule transcription
-    await ctx.scheduler.runAfter(0, internal.voiceNotes.transcribeVoiceNote, {
+    await ctx.scheduler.runAfter(0, internalRef.voiceNotes.transcribeVoiceNote, {
       voiceNoteId,
     });
 
@@ -54,7 +58,7 @@ export const transcribeVoiceNote = internalAction({
   },
   handler: async (ctx, args) => {
     // Get voice note record
-    const voiceNote = await ctx.runQuery(internal.voiceNotes.getVoiceNote, {
+    const voiceNote = await ctx.runQuery(internalRef.voiceNotes.getVoiceNote, {
       voiceNoteId: args.voiceNoteId,
     });
 
@@ -63,7 +67,7 @@ export const transcribeVoiceNote = internalAction({
     }
 
     // Mark as transcribing
-    await ctx.runMutation(internal.voiceNotes.updateVoiceNoteStatus, {
+    await ctx.runMutation(internalRef.voiceNotes.updateVoiceNoteStatus, {
       voiceNoteId: args.voiceNoteId,
       status: "transcribing",
     });
@@ -89,14 +93,14 @@ export const transcribeVoiceNote = internalAction({
       });
 
       // Update voice note with transcription
-      await ctx.runMutation(internal.voiceNotes.updateVoiceNoteTranscription, {
+      await ctx.runMutation(internalRef.voiceNotes.updateVoiceNoteTranscription, {
         voiceNoteId: args.voiceNoteId,
         transcription: result.text,
         durationSeconds: result.durationInSeconds,
       });
 
       // Send transcribed text to the agent for processing
-      await ctx.runAction(internal.voiceNotes.processTranscription, {
+      await ctx.runAction(internalRef.voiceNotes.processTranscription, {
         threadId: voiceNote.threadId,
         transcription: result.text,
       });
@@ -108,7 +112,7 @@ export const transcribeVoiceNote = internalAction({
       };
     } catch (error) {
       // Mark as failed
-      await ctx.runMutation(internal.voiceNotes.updateVoiceNoteStatus, {
+      await ctx.runMutation(internalRef.voiceNotes.updateVoiceNoteStatus, {
         voiceNoteId: args.voiceNoteId,
         status: "failed",
         errorMessage: error instanceof Error ? error.message : "Unknown error",
@@ -129,7 +133,8 @@ export const processTranscription = internalAction({
   },
   handler: async (ctx, args) => {
     // Generate response from agent with streaming
-    await chatAgent.streamText(
+    // Type assertion needed due to AI SDK version conflicts
+    await (chatAgent as any).streamText(
       ctx,
       { threadId: args.threadId },
       {

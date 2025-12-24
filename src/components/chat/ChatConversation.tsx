@@ -41,6 +41,10 @@ import { cn } from "~/lib/utils";
 import { Button } from "@/components/ui/button";
 import type { Id } from "../../../convex/_generated/dataModel";
 
+// Type assertion for API references not yet in generated types
+// Run `npx convex dev` to regenerate types after adding new files
+const chatApi = (api as any).chat;
+
 interface ChatConversationProps {
   threadId: string | null;
   onThreadCreated?: (threadId: string) => void;
@@ -64,7 +68,7 @@ export function ChatConversation({ threadId, onThreadCreated }: ChatConversation
 
   // Query the current thread to get its model
   const thread = useQuery(
-    api.chat.getThread,
+    chatApi.getThread,
     threadId ? { threadId: threadId as Id<"agentThreads"> } : "skip"
   );
 
@@ -81,11 +85,11 @@ export function ChatConversation({ threadId, onThreadCreated }: ChatConversation
   const effectiveModel = selectedModel || defaultModel;
 
   // Mutations
-  const sendMessage = useMutation(api.chat.sendMessage);
-  const sendMessageWithAttachment = useMutation(api.chat.sendMessageWithAttachment);
-  const startConversation = useMutation(api.chat.startConversation);
-  const createThread = useMutation(api.chat.createThread);
-  const updateThreadModel = useMutation(api.chat.updateThreadModel);
+  const sendMessage = useMutation(chatApi.sendMessage);
+  const sendMessageWithAttachment = useMutation(chatApi.sendMessageWithAttachment);
+  const startConversation = useMutation(chatApi.startConversation);
+  const createThread = useMutation(chatApi.createThread);
+  const updateThreadModel = useMutation(chatApi.updateThreadModel);
 
   // Handle model selection change
   const handleModelChange = async (modelId: string) => {
@@ -100,7 +104,7 @@ export function ChatConversation({ threadId, onThreadCreated }: ChatConversation
 
   // Use the Convex Agent streaming hook for messages
   const { results: messages, status, loadMore } = useUIMessages(
-    api.chat.listThreadMessages,
+    chatApi.listThreadMessages,
     threadId ? { threadId } : "skip",
     { initialNumItems: 50, stream: true }
   );
@@ -216,8 +220,8 @@ export function ChatConversation({ threadId, onThreadCreated }: ChatConversation
           )}
 
           {/* Messages list */}
-          {messages?.map((message) => (
-            <StreamingMessage key={message.key} message={message} />
+          {messages?.map((message, index) => (
+            <StreamingMessage key={(message as any).key ?? `msg-${index}`} message={message as any} />
           ))}
 
           <div ref={messagesEndRef} />
@@ -386,7 +390,7 @@ const TOOL_ICONS: Record<string, React.ComponentType<{ className?: string }>> = 
 };
 
 // Get a friendly display name and summary for tool results
-function getToolSummary(toolName: string, args?: Record<string, unknown>, result?: unknown): string | null {
+function getToolSummary(toolName: string, _args?: Record<string, unknown>, result?: unknown): string | null {
   if (!result) return null;
 
   try {
@@ -473,9 +477,9 @@ function ToolCallDisplay({
   // Get a summary of the result
   const summary = getToolSummary(toolName, args, result);
 
-  // Determine status
-  const hasError = result && typeof result === "object" && "error" in (result as object);
-  const isComplete = result && !isExecuting;
+  // Determine status - ensure boolean types for cn() usage
+  const hasError = Boolean(result && typeof result === "object" && "error" in (result as object));
+  const isComplete = Boolean(result && !isExecuting);
 
   return (
     <div className={cn(
