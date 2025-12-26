@@ -24,6 +24,91 @@ export const getChatListSync = internalQuery({
 });
 
 /**
+ * Try to acquire a sync lock
+ * Returns true if lock was acquired, false if already locked
+ * Lock expires after 60 seconds to prevent deadlocks
+ */
+export const tryAcquireSyncLock = internalMutation({
+  args: {
+    syncId: v.string(), // Unique ID for this sync instance
+  },
+  handler: async (ctx, args) => {
+    const LOCK_EXPIRY_MS = 60 * 1000; // 60 seconds
+    const now = Date.now();
+    
+    const syncState = await ctx.db
+      .query("chatListSync")
+      .withIndex("by_key", (q) => q.eq("key", "global"))
+      .first();
+    
+    // Check if there's an active lock
+    if (syncState?.syncLockId && syncState?.syncLockAt) {
+      const lockAge = now - syncState.syncLockAt;
+      if (lockAge < LOCK_EXPIRY_MS) {
+        // Lock is still valid - another sync is running
+        console.log(
+          `[Sync Lock] Lock held by ${syncState.syncLockId.slice(0, 8)}... ` +
+          `(${Math.round(lockAge / 1000)}s old) - rejecting ${args.syncId.slice(0, 8)}...`
+        );
+        return false;
+      }
+      // Lock expired - can be taken over
+      console.log(
+        `[Sync Lock] Expired lock from ${syncState.syncLockId.slice(0, 8)}... ` +
+        `- acquiring for ${args.syncId.slice(0, 8)}...`
+      );
+    }
+    
+    // Acquire the lock
+    if (syncState) {
+      await ctx.db.patch(syncState._id, {
+        syncLockId: args.syncId,
+        syncLockAt: now,
+      });
+    } else {
+      await ctx.db.insert("chatListSync", {
+        key: "global",
+        syncLockId: args.syncId,
+        syncLockAt: now,
+        lastSyncedAt: now,
+        syncSource: "lock_init",
+        totalChats: 0,
+      });
+    }
+    
+    console.log(`[Sync Lock] Acquired by ${args.syncId.slice(0, 8)}...`);
+    return true;
+  },
+});
+
+/**
+ * Release the sync lock
+ * Only releases if the lock is held by the given syncId
+ */
+export const releaseSyncLock = internalMutation({
+  args: {
+    syncId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const syncState = await ctx.db
+      .query("chatListSync")
+      .withIndex("by_key", (q) => q.eq("key", "global"))
+      .first();
+    
+    if (!syncState) return;
+    
+    // Only release if we hold the lock
+    if (syncState.syncLockId === args.syncId) {
+      await ctx.db.patch(syncState._id, {
+        syncLockId: undefined,
+        syncLockAt: undefined,
+      });
+      console.log(`[Sync Lock] Released by ${args.syncId.slice(0, 8)}...`);
+    }
+  },
+});
+
+/**
  * Update or create the global chat list sync state
  * Stores cursor boundaries after each chat list sync
  * 

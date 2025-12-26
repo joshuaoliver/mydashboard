@@ -82,6 +82,42 @@ function NavigationMenuTrigger({
   )
 }
 
+// A trigger that also navigates on click while still showing dropdown on hover
+// Does NOT apply default navigationMenuTriggerStyle - caller has full control over styling
+function NavigationMenuLinkTrigger({
+  className,
+  children,
+  href,
+  onClick,
+  ...props
+}: React.ComponentProps<typeof NavigationMenuPrimitive.Trigger> & {
+  href?: string
+  onClick?: (e: React.MouseEvent) => void
+}) {
+  const handleClick = (e: React.MouseEvent) => {
+    // Let the click propagate to navigate, but the trigger's hover behavior still works
+    onClick?.(e)
+  }
+  
+  return (
+    <NavigationMenuPrimitive.Trigger
+      data-slot="navigation-menu-trigger"
+      className={cn(
+        "group inline-flex h-9 w-max items-center justify-center rounded-md px-4 py-2 text-sm font-medium cursor-pointer outline-none transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50",
+        className
+      )}
+      onClick={handleClick}
+      {...props}
+    >
+      {children}{" "}
+      <ChevronDownIcon
+        className="relative top-[1px] ml-1 size-3 transition duration-300 group-data-[state=open]:rotate-180"
+        aria-hidden="true"
+      />
+    </NavigationMenuPrimitive.Trigger>
+  )
+}
+
 function NavigationMenuContent({
   className,
   ...props
@@ -90,7 +126,7 @@ function NavigationMenuContent({
     <NavigationMenuPrimitive.Content
       data-slot="navigation-menu-content"
       className={cn(
-        "data-[motion^=from-]:animate-in data-[motion^=to-]:animate-out data-[motion^=from-]:fade-in data-[motion^=to-]:fade-out data-[motion=from-end]:slide-in-from-right-52 data-[motion=from-start]:slide-in-from-left-52 data-[motion=to-end]:slide-out-to-right-52 data-[motion=to-start]:slide-out-to-left-52 top-0 left-0 w-full p-2 pr-2.5 md:absolute md:w-auto",
+        "data-[motion^=from-]:animate-in data-[motion^=to-]:animate-out data-[motion^=from-]:fade-in data-[motion^=to-]:fade-out data-[motion=from-end]:slide-in-from-right-52 data-[motion=from-start]:slide-in-from-left-52 data-[motion=to-end]:slide-out-to-right-52 data-[motion=to-start]:slide-out-to-left-52 top-0 left-0 w-full p-1 md:absolute md:w-auto",
         "group-data-[viewport=false]/navigation-menu:bg-slate-800 group-data-[viewport=false]/navigation-menu:text-slate-200 group-data-[viewport=false]/navigation-menu:data-[state=open]:animate-in group-data-[viewport=false]/navigation-menu:data-[state=closed]:animate-out group-data-[viewport=false]/navigation-menu:data-[state=closed]:zoom-out-95 group-data-[viewport=false]/navigation-menu:data-[state=open]:zoom-in-95 group-data-[viewport=false]/navigation-menu:data-[state=open]:fade-in-0 group-data-[viewport=false]/navigation-menu:data-[state=closed]:fade-out-0 group-data-[viewport=false]/navigation-menu:top-full group-data-[viewport=false]/navigation-menu:mt-1.5 group-data-[viewport=false]/navigation-menu:overflow-hidden group-data-[viewport=false]/navigation-menu:rounded-md group-data-[viewport=false]/navigation-menu:border group-data-[viewport=false]/navigation-menu:border-slate-700 group-data-[viewport=false]/navigation-menu:shadow group-data-[viewport=false]/navigation-menu:duration-200 **:data-[slot=navigation-menu-link]:focus:ring-0 **:data-[slot=navigation-menu-link]:focus:outline-none",
         className
       )}
@@ -129,7 +165,7 @@ function NavigationMenuLink({
     <NavigationMenuPrimitive.Link
       data-slot="navigation-menu-link"
       className={cn(
-        "data-[active=true]:focus:bg-slate-700 data-[active=true]:hover:bg-slate-700 data-[active=true]:bg-slate-700/50 data-[active=true]:text-white hover:bg-slate-700 hover:text-white focus:bg-slate-700 focus:text-white focus-visible:ring-ring/50 [&_svg:not([class*='text-'])]:text-slate-400 flex items-center gap-2 rounded-sm px-2 py-1.5 text-sm transition-all outline-none focus-visible:ring-[3px] focus-visible:outline-1 [&_svg:not([class*='size-'])]:size-4",
+        "data-[active=true]:focus:bg-slate-700 data-[active=true]:hover:bg-slate-700 data-[active=true]:bg-slate-700/50 data-[active=true]:text-white hover:bg-slate-700 hover:text-white focus:bg-slate-700 focus:text-white focus-visible:ring-ring/50 [&_svg:not([class*='text-'])]:text-slate-400 flex items-center gap-1.5 rounded-sm px-2 py-1 text-sm transition-all outline-none focus-visible:ring-[3px] focus-visible:outline-1 [&_svg:not([class*='size-'])]:size-3.5",
         className
       )}
       {...props}
@@ -161,6 +197,7 @@ export {
   NavigationMenuItem,
   NavigationMenuContent,
   NavigationMenuTrigger,
+  NavigationMenuLinkTrigger,
   NavigationMenuLink,
   NavigationMenuIndicator,
   NavigationMenuViewport,

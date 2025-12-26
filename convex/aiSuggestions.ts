@@ -126,6 +126,53 @@ export const hasCachedSuggestions = query({
 });
 
 /**
+ * Public query to get cached suggestions for a chat
+ * Returns the most recent cached suggestions without requiring lastMessageId
+ * This is used by the frontend to display pre-generated suggestions
+ */
+export const getSuggestionsForChat = query({
+  args: {
+    chatId: v.string(),
+  },
+  returns: v.union(
+    v.object({
+      suggestions: v.array(v.object({
+        reply: v.string(),
+      })),
+      conversationContext: v.object({
+        lastMessage: v.string(),
+        messageCount: v.number(),
+      }),
+      generatedAt: v.number(),
+      lastMessageId: v.string(),
+    }),
+    v.null()
+  ),
+  handler: async (ctx, args) => {
+    // Get all cached suggestions for this chat, then pick the most recent
+    // (index doesn't support ordering by generatedAt, so we collect and sort)
+    const allCached = await ctx.db
+      .query("aiReplySuggestions")
+      .withIndex("by_chat_id", (q) => q.eq("chatId", args.chatId))
+      .collect();
+
+    if (allCached.length === 0) {
+      return null;
+    }
+
+    // Sort by generatedAt descending to get the most recent
+    const cached = allCached.sort((a, b) => b.generatedAt - a.generatedAt)[0];
+
+    return {
+      suggestions: cached.suggestions.map(s => ({ reply: s.reply })),
+      conversationContext: cached.conversationContext,
+      generatedAt: cached.generatedAt,
+      lastMessageId: cached.lastMessageId,
+    };
+  },
+});
+
+/**
  * Mutation to clear cached suggestions for a chat
  * Useful if user wants to force regeneration
  * If chatId is not provided, clears ALL cached suggestions (for schema migrations)

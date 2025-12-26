@@ -41,12 +41,13 @@ export const AVAILABLE_MODELS = [
 ] as const;
 
 // Default AI settings for each use case
+// Only includes settings that are actually used in the codebase
 export const DEFAULT_SETTINGS = {
   "chat-agent": {
     displayName: "Chat Agent",
     description: "The AI model used for the chat assistant",
     modelId: "google/gemini-3-flash",
-    promptName: undefined,
+    promptName: "chat-agent",
     temperature: 1,
     isEnabled: true,
   },
@@ -55,22 +56,6 @@ export const DEFAULT_SETTINGS = {
     description: "AI-powered reply suggestions for messages",
     modelId: "google/gemini-3-flash",
     promptName: "reply-suggestions",
-    temperature: 1,
-    isEnabled: true,
-  },
-  "contact-summary": {
-    displayName: "Contact Summary",
-    description: "Generate summaries of conversation history with contacts",
-    modelId: "google/gemini-3-flash",
-    promptName: "contact-summary",
-    temperature: 1,
-    isEnabled: true,
-  },
-  "message-compose": {
-    displayName: "Message Composer",
-    description: "AI assistance for composing new messages",
-    modelId: "google/gemini-3-flash",
-    promptName: "message-compose",
     temperature: 1,
     isEnabled: true,
   },

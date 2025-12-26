@@ -92,7 +92,7 @@ export function MessageInputPanel({
             placeholder="Type your reply..."
             value={messageInputValue}
             onChange={(e) => handleInputChange(e.target.value)}
-            className="text-[13px] text-gray-900 placeholder:text-gray-500 min-h-[36px] max-h-24 py-1.5"
+            className="text-sm text-gray-900 placeholder:text-gray-500 min-h-[36px] max-h-24 py-1.5"
           />
         </PromptInputBody>
         <PromptInputToolbar className="py-0.5 px-1">

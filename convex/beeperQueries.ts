@@ -373,6 +373,7 @@ export const getCachedMessages = query({
     // Transform messages (page is already sorted newest-first from query)
     // Also extract text in case any old data has JSON text objects
     const transformedPage = result.page.map((msg) => ({
+      _id: msg._id,  // Include doc ID for retry functionality
       id: msg.messageId,
       text: extractMessageText(msg.text),
       timestamp: msg.timestamp,
@@ -380,6 +381,8 @@ export const getCachedMessages = query({
       senderName: msg.senderName,
       isFromUser: msg.isFromUser,
       attachments: msg.attachments,
+      status: msg.status,  // "sending" | "sent" | "failed" | undefined
+      errorMessage: msg.errorMessage,  // Error message if failed
     }));
 
     // Return with page in reverse order (oldest-first) for display

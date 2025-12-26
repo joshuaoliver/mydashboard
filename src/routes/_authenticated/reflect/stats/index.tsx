@@ -50,10 +50,10 @@ function ReflectStatsPage() {
   const linearConfigured = (linearStats?.totalWorkspaces ?? 0) > 0
 
   return (
-    <div className="container mx-auto p-6">
+    <div className="p-6 max-w-6xl">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">Stats Dashboard</h1>
-        <p className="text-sm text-gray-600 mt-1">
+        <h1 className="text-2xl font-bold">Stats Dashboard</h1>
+        <p className="text-muted-foreground mt-1">
           Overview of your Gmail, Hubstaff, and Linear integrations
         </p>
       </div>
@@ -67,7 +67,7 @@ function ReflectStatsPage() {
                 <MessageSquare className="w-5 h-5 text-blue-500" />
                 Messages
               </CardTitle>
-              <Badge className="bg-green-100 text-green-800">
+              <Badge variant="outline" className="text-green-600 border-green-300">
                 <CheckCircle2 className="w-3 h-3 mr-1" />
                 Active
               </Badge>
@@ -78,25 +78,25 @@ function ReflectStatsPage() {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-3xl font-bold">{messageSnapshot.activeChats}</p>
-                      <p className="text-sm text-gray-500">Active Chats</p>
+                      <p className="text-sm text-muted-foreground">Active Chats</p>
                     </div>
                     <div className="text-right">
-                      <p className="text-2xl font-semibold text-orange-600">
+                      <p className="text-2xl font-semibold text-orange-500">
                         {messageSnapshot.needsReplyChats}
                       </p>
-                      <p className="text-sm text-gray-500 flex items-center justify-end gap-1">
+                      <p className="text-sm text-muted-foreground flex items-center justify-end gap-1">
                         <Reply className="w-3 h-3" />
                         Awaiting Reply
                       </p>
                     </div>
                   </div>
-                  <div className="flex items-center justify-between text-sm text-gray-500">
+                  <div className="flex items-center justify-between text-sm text-muted-foreground">
                     <span>{messageSnapshot.archivedChats} archived</span>
                     <ArrowRight className="w-4 h-4" />
                   </div>
                 </div>
               ) : (
-                <div className="py-4 text-center text-gray-500">
+                <div className="py-4 text-center text-muted-foreground">
                   <MessageSquare className="w-8 h-8 mx-auto mb-2 opacity-50" />
                   <p className="text-sm">No data yet</p>
                 </div>
@@ -114,12 +114,12 @@ function ReflectStatsPage() {
                 Gmail
               </CardTitle>
               {gmailConfigured ? (
-                <Badge className="bg-green-100 text-green-800">
+                <Badge variant="outline" className="text-green-600 border-green-300">
                   <CheckCircle2 className="w-3 h-3 mr-1" />
                   Connected
                 </Badge>
               ) : (
-                <Badge className="bg-gray-100 text-gray-800">
+                <Badge variant="outline" className="text-muted-foreground">
                   <AlertCircle className="w-3 h-3 mr-1" />
                   Not Set Up
                 </Badge>
@@ -131,22 +131,22 @@ function ReflectStatsPage() {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-3xl font-bold">{gmailSnapshot.totalInbox}</p>
-                      <p className="text-sm text-gray-500">Total Emails</p>
+                      <p className="text-sm text-muted-foreground">Total Emails</p>
                     </div>
                     <div className="text-right">
-                      <p className="text-2xl font-semibold text-red-600">
+                      <p className="text-2xl font-semibold text-red-500">
                         {gmailSnapshot.unread}
                       </p>
-                      <p className="text-sm text-gray-500">Unread</p>
+                      <p className="text-sm text-muted-foreground">Unread</p>
                     </div>
                   </div>
-                  <div className="flex items-center justify-between text-sm text-gray-500">
+                  <div className="flex items-center justify-between text-sm text-muted-foreground">
                     <span>Updated: {new Date(gmailSnapshot.timestamp).toLocaleTimeString()}</span>
                     <ArrowRight className="w-4 h-4" />
                   </div>
                 </div>
               ) : (
-                <div className="py-4 text-center text-gray-500">
+                <div className="py-4 text-center text-muted-foreground">
                   <Inbox className="w-8 h-8 mx-auto mb-2 opacity-50" />
                   <p className="text-sm">
                     {gmailConfigured
@@ -168,12 +168,12 @@ function ReflectStatsPage() {
                 Hubstaff
               </CardTitle>
               {hubstaffConfigured ? (
-                <Badge className="bg-green-100 text-green-800">
+                <Badge variant="outline" className="text-green-600 border-green-300">
                   <CheckCircle2 className="w-3 h-3 mr-1" />
                   Connected
                 </Badge>
               ) : (
-                <Badge className="bg-gray-100 text-gray-800">
+                <Badge variant="outline" className="text-muted-foreground">
                   <AlertCircle className="w-3 h-3 mr-1" />
                   Not Set Up
                 </Badge>
@@ -187,22 +187,22 @@ function ReflectStatsPage() {
                       <p className="text-3xl font-bold">
                         {hubstaffToday?.totalHours?.toFixed(1) ?? '0'}h
                       </p>
-                      <p className="text-sm text-gray-500">Today</p>
+                      <p className="text-sm text-muted-foreground">Today</p>
                     </div>
                     <div className="text-right">
-                      <p className="text-2xl font-semibold text-green-600">
+                      <p className="text-2xl font-semibold text-green-500">
                         {hubstaffWeek?.totalHours?.toFixed(1) ?? '0'}h
                       </p>
-                      <p className="text-sm text-gray-500">This Week</p>
+                      <p className="text-sm text-muted-foreground">This Week</p>
                     </div>
                   </div>
-                  <div className="flex items-center justify-between text-sm text-gray-500">
+                  <div className="flex items-center justify-between text-sm text-muted-foreground">
                     <span>{hubstaffSettings?.selectedUserName || 'Tracking time'}</span>
                     <ArrowRight className="w-4 h-4" />
                   </div>
                 </div>
               ) : (
-                <div className="py-4 text-center text-gray-500">
+                <div className="py-4 text-center text-muted-foreground">
                   <Clock className="w-8 h-8 mx-auto mb-2 opacity-50" />
                   <p className="text-sm">Connect Hubstaff in settings</p>
                 </div>
@@ -220,12 +220,12 @@ function ReflectStatsPage() {
               Linear
             </CardTitle>
             {linearConfigured ? (
-              <Badge className="bg-green-100 text-green-800">
+              <Badge variant="outline" className="text-green-600 border-green-300">
                 <CheckCircle2 className="w-3 h-3 mr-1" />
                 Connected
               </Badge>
             ) : (
-              <Badge className="bg-gray-100 text-gray-800">
+              <Badge variant="outline" className="text-muted-foreground">
                 <AlertCircle className="w-3 h-3 mr-1" />
                 Not Set Up
               </Badge>
@@ -237,28 +237,28 @@ function ReflectStatsPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-3xl font-bold">{linearStats.totalIssues}</p>
-                    <p className="text-sm text-gray-500">Open Issues</p>
+                    <p className="text-sm text-muted-foreground">Open Issues</p>
                   </div>
                   <div className="text-right space-y-1">
                     {linearStats.byPriority.urgent > 0 && (
-                      <Badge className="bg-red-100 text-red-800">
+                      <Badge variant="destructive">
                         {linearStats.byPriority.urgent} Urgent
                       </Badge>
                     )}
                     {linearStats.byPriority.high > 0 && (
-                      <Badge className="bg-orange-100 text-orange-800">
+                      <Badge variant="outline" className="text-orange-500 border-orange-300">
                         {linearStats.byPriority.high} High
                       </Badge>
                     )}
                   </div>
                 </div>
-                <div className="flex items-center justify-between text-sm text-gray-500">
+                <div className="flex items-center justify-between text-sm text-muted-foreground">
                   <span>{linearStats.byStatusType.started} in progress</span>
                   <ArrowRight className="w-4 h-4" />
                 </div>
               </div>
             ) : (
-              <div className="py-4 text-center text-gray-500">
+              <div className="py-4 text-center text-muted-foreground">
                 <LayoutList className="w-8 h-8 mx-auto mb-2 opacity-50" />
                 <p className="text-sm">Connect Linear in settings</p>
               </div>
@@ -275,7 +275,7 @@ function ReflectStatsPage() {
           {!gmailConfigured && (
             <Link
               to="/settings/integrations"
-              className="inline-flex items-center gap-2 px-4 py-2 bg-red-50 text-red-700 rounded-lg hover:bg-red-100 transition-colors"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-red-500/10 text-red-500 rounded-lg hover:bg-red-500/20 transition-colors border border-red-500/20"
             >
               <Mail className="w-4 h-4" />
               Set up Gmail
@@ -284,7 +284,7 @@ function ReflectStatsPage() {
           {!hubstaffConfigured && (
             <Link
               to="/settings/integrations"
-              className="inline-flex items-center gap-2 px-4 py-2 bg-green-50 text-green-700 rounded-lg hover:bg-green-100 transition-colors"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-green-500/10 text-green-500 rounded-lg hover:bg-green-500/20 transition-colors border border-green-500/20"
             >
               <Clock className="w-4 h-4" />
               Set up Hubstaff
@@ -293,7 +293,7 @@ function ReflectStatsPage() {
           {!linearConfigured && (
             <Link
               to="/settings/integrations"
-              className="inline-flex items-center gap-2 px-4 py-2 bg-purple-50 text-purple-700 rounded-lg hover:bg-purple-100 transition-colors"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-purple-500/10 text-purple-500 rounded-lg hover:bg-purple-500/20 transition-colors border border-purple-500/20"
             >
               <LayoutList className="w-4 h-4" />
               Set up Linear
@@ -301,7 +301,7 @@ function ReflectStatsPage() {
           )}
           <Link
             to="/settings/projects"
-            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition-colors"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-500/10 text-blue-500 rounded-lg hover:bg-blue-500/20 transition-colors border border-blue-500/20"
           >
             <TrendingUp className="w-4 h-4" />
             Manage Projects

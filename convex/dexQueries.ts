@@ -257,6 +257,40 @@ export const getRecentlyModifiedContacts = query({
 });
 
 /**
+ * List contacts that have a leadStatus set (for dating kanban board)
+ * Uses the by_lead_status index for efficient filtering
+ * Returns contacts sorted by lastModifiedAt (most recent first)
+ */
+export const listContactsWithLeadStatus = query({
+  args: {},
+  handler: async (ctx) => {
+    // Query contacts that have any lead status set
+    // Since Convex doesn't support "not null" index queries, we query each status
+    const statuses = ["Potential", "Talking", "Planning", "Dated", "Connected", "Current", "Former"] as const;
+    
+    const contactsByStatus = await Promise.all(
+      statuses.map((status) =>
+        ctx.db
+          .query("contacts")
+          .withIndex("by_lead_status", (q) => q.eq("leadStatus", status))
+          .collect()
+      )
+    );
+    
+    // Flatten and dedupe (shouldn't have dupes but just in case)
+    const allContacts = contactsByStatus.flat();
+    
+    // Sort by lastModifiedAt descending (most recent first)
+    allContacts.sort((a, b) => (b.lastModifiedAt ?? 0) - (a.lastModifiedAt ?? 0));
+    
+    return {
+      contacts: allContacts,
+      total: allContacts.length,
+    };
+  },
+});
+
+/**
  * Get sync statistics
  * Returns useful stats about the contact sync state
  */

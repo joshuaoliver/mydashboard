@@ -11,6 +11,9 @@ import {
   NavigationMenu,
   NavigationMenuItem,
   NavigationMenuList,
+  NavigationMenuContent,
+  NavigationMenuLink,
+  NavigationMenuLinkTrigger,
 } from "@/components/ui/navigation-menu"
 import {
   Sheet,
@@ -43,9 +46,10 @@ import {
   Loader2,
   Download,
   CheckSquare,
+  DollarSign,
 } from "lucide-react"
 import { ModeToggle } from "@/components/ui/mode-toggle"
-import { Link, useNavigate } from '@tanstack/react-router'
+import { Link, useNavigate, useRouterState } from '@tanstack/react-router'
 import { useAuthActions } from '@convex-dev/auth/react'
 import { useQuery as useConvexQuery, useMutation } from 'convex/react'
 import { api } from '../../../convex/_generated/api'
@@ -325,7 +329,12 @@ const KEYBOARD_SHORTCUTS: Record<string, { to: string; search?: Record<string, u
 export function DashboardLayout({ children }: DashboardLayoutProps) {
   const { signOut } = useAuthActions()
   const navigate = useNavigate()
+  const routerState = useRouterState()
+  const currentPath = routerState.location.pathname
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false)
+  
+  // Helper to check if a path is active (starts with the given path)
+  const isActive = (path: string) => currentPath === path || currentPath.startsWith(path + '/')
 
   // Global keyboard shortcuts for navigation
   React.useEffect(() => {
@@ -608,6 +617,14 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                     AI Settings
                   </Link>
                   <Link 
+                    to="/settings/ai-costs"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex items-center gap-3 px-4 py-3 rounded-md text-base text-slate-300 hover:text-white hover:bg-slate-800/80 transition-all"
+                  >
+                    <DollarSign className="h-5 w-5" />
+                    AI Costs
+                  </Link>
+                  <Link 
                     to="/settings/sample-outputs"
                     onClick={() => setMobileMenuOpen(false)}
                     className="flex items-center gap-3 px-4 py-3 rounded-md text-base text-slate-300 hover:text-white hover:bg-slate-800/80 transition-all"
@@ -681,38 +698,88 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                   </Link>
                 </NavigationMenuItem>
 
-                {/* Focus - direct link */}
+                {/* Focus - hover for dropdown, click to navigate */}
                 <NavigationMenuItem>
-                  <Link
-                    to="/focus"
+                  <NavigationMenuLinkTrigger 
+                    onClick={() => navigate({ to: '/focus' })}
                     className={cn(
                       "inline-flex items-center gap-2 px-3 py-2 rounded-md",
-                      "text-sm font-medium transition-all",
-                      "text-slate-300 hover:text-white hover:bg-slate-800/80",
-                      "[&.active]:bg-slate-800 [&.active]:text-white"
+                      "text-sm font-medium transition-all bg-transparent",
+                      isActive('/focus') 
+                        ? "bg-slate-800 text-white hover:bg-slate-700 hover:text-white" 
+                        : "text-slate-300 hover:text-white hover:bg-slate-800/80",
+                      "data-[state=open]:bg-slate-800 data-[state=open]:text-white"
                     )}
-                    activeProps={{ className: "active" }}
                   >
                     <Target className="h-4 w-4" />
                     <span><span className="underline decoration-slate-500">F</span>ocus</span>
-                  </Link>
+                  </NavigationMenuLinkTrigger>
+                  <NavigationMenuContent className="z-[100]">
+                    <ul className="grid w-[160px] gap-0.5 p-1">
+                      <li>
+                        <NavigationMenuLink asChild>
+                          <Link to="/today-plan" className="w-full">
+                            <ListTodo className="h-4 w-4 flex-shrink-0" />
+                            <span>Today's Plan</span>
+                          </Link>
+                        </NavigationMenuLink>
+                      </li>
+                      <li>
+                        <NavigationMenuLink asChild>
+                          <Link to="/focus" className="w-full">
+                            <Timer className="h-4 w-4 flex-shrink-0" />
+                            <span>Focus Timer</span>
+                          </Link>
+                        </NavigationMenuLink>
+                      </li>
+                    </ul>
+                  </NavigationMenuContent>
                 </NavigationMenuItem>
 
-                {/* Notes - direct link */}
+                {/* Notes - hover for dropdown, click to navigate */}
                 <NavigationMenuItem>
-                  <Link
-                    to="/notes"
+                  <NavigationMenuLinkTrigger 
+                    onClick={() => navigate({ to: '/notes' })}
                     className={cn(
                       "inline-flex items-center gap-2 px-3 py-2 rounded-md",
-                      "text-sm font-medium transition-all",
-                      "text-slate-300 hover:text-white hover:bg-slate-800/80",
-                      "[&.active]:bg-slate-800 [&.active]:text-white"
+                      "text-sm font-medium transition-all bg-transparent",
+                      isActive('/notes') 
+                        ? "bg-slate-800 text-white hover:bg-slate-700 hover:text-white" 
+                        : "text-slate-300 hover:text-white hover:bg-slate-800/80",
+                      "data-[state=open]:bg-slate-800 data-[state=open]:text-white"
                     )}
-                    activeProps={{ className: "active" }}
                   >
                     <FileText className="h-4 w-4" />
                     <span><span className="underline decoration-slate-500">N</span>otes</span>
-                  </Link>
+                  </NavigationMenuLinkTrigger>
+                  <NavigationMenuContent className="z-[100]">
+                    <ul className="grid w-[160px] gap-0.5 p-1">
+                      <li>
+                        <NavigationMenuLink asChild>
+                          <Link to="/notes" className="w-full">
+                            <FileText className="h-4 w-4 flex-shrink-0" />
+                            <span>Notes</span>
+                          </Link>
+                        </NavigationMenuLink>
+                      </li>
+                      <li>
+                        <NavigationMenuLink asChild>
+                          <Link to="/todos" className="w-full">
+                            <ListTodo className="h-4 w-4 flex-shrink-0" />
+                            <span>Todos</span>
+                          </Link>
+                        </NavigationMenuLink>
+                      </li>
+                      <li>
+                        <NavigationMenuLink asChild>
+                          <Link to="/todos-list" className="w-full">
+                            <CheckSquare className="h-4 w-4 flex-shrink-0" />
+                            <span>All Todos</span>
+                          </Link>
+                        </NavigationMenuLink>
+                      </li>
+                    </ul>
+                  </NavigationMenuContent>
                 </NavigationMenuItem>
 
                 {/* Inbox - direct link */}
@@ -733,54 +800,150 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                   </Link>
                 </NavigationMenuItem>
 
-                {/* People - direct link */}
+                {/* People - hover for dropdown, click to navigate */}
                 <NavigationMenuItem>
-                  <Link
-                    to="/people"
+                  <NavigationMenuLinkTrigger 
+                    onClick={() => navigate({ to: '/people' })}
                     className={cn(
                       "inline-flex items-center gap-2 px-3 py-2 rounded-md",
-                      "text-sm font-medium transition-all",
-                      "text-slate-300 hover:text-white hover:bg-slate-800/80",
-                      "[&.active]:bg-slate-800 [&.active]:text-white"
+                      "text-sm font-medium transition-all bg-transparent",
+                      isActive('/people') 
+                        ? "bg-slate-800 text-white hover:bg-slate-700 hover:text-white" 
+                        : "text-slate-300 hover:text-white hover:bg-slate-800/80",
+                      "data-[state=open]:bg-slate-800 data-[state=open]:text-white"
                     )}
-                    activeProps={{ className: "active" }}
                   >
                     <Users className="h-4 w-4" />
                     <span><span className="underline decoration-slate-500">P</span>eople</span>
-                  </Link>
+                  </NavigationMenuLinkTrigger>
+                  <NavigationMenuContent className="z-[100]">
+                    <ul className="grid w-[160px] gap-0.5 p-1">
+                      <li>
+                        <NavigationMenuLink asChild>
+                          <Link to="/people" className="w-full">
+                            <Users className="h-4 w-4 flex-shrink-0" />
+                            <span>Contacts</span>
+                          </Link>
+                        </NavigationMenuLink>
+                      </li>
+                      <li>
+                        <NavigationMenuLink asChild>
+                          <Link to="/people/dating" className="w-full">
+                            <HeartHandshake className="h-4 w-4 flex-shrink-0" />
+                            <span>Dating</span>
+                          </Link>
+                        </NavigationMenuLink>
+                      </li>
+                    </ul>
+                  </NavigationMenuContent>
                 </NavigationMenuItem>
 
-                {/* Reflect - direct link */}
+                {/* Reflect - hover for dropdown, click to navigate */}
                 <NavigationMenuItem>
-                  <Link
-                    to="/reflect"
+                  <NavigationMenuLinkTrigger 
+                    onClick={() => navigate({ to: '/reflect' })}
                     className={cn(
                       "inline-flex items-center gap-2 px-3 py-2 rounded-md",
-                      "text-sm font-medium transition-all",
-                      "text-slate-300 hover:text-white hover:bg-slate-800/80",
-                      "[&.active]:bg-slate-800 [&.active]:text-white"
+                      "text-sm font-medium transition-all bg-transparent",
+                      isActive('/reflect') 
+                        ? "bg-slate-800 text-white hover:bg-slate-700 hover:text-white" 
+                        : "text-slate-300 hover:text-white hover:bg-slate-800/80",
+                      "data-[state=open]:bg-slate-800 data-[state=open]:text-white"
                     )}
-                    activeProps={{ className: "active" }}
                   >
                     <BookOpen className="h-4 w-4" />
                     <span><span className="underline decoration-slate-500">R</span>eflect</span>
-                  </Link>
+                  </NavigationMenuLinkTrigger>
+                  <NavigationMenuContent className="z-[100]">
+                    <ul className="grid w-[160px] gap-0.5 p-1">
+                      <li>
+                        <NavigationMenuLink asChild>
+                          <Link to="/reflect" className="w-full">
+                            <BookOpen className="h-4 w-4 flex-shrink-0" />
+                            <span>Summaries</span>
+                          </Link>
+                        </NavigationMenuLink>
+                      </li>
+                      <li>
+                        <NavigationMenuLink asChild>
+                          <Link to="/reflect/stats" className="w-full">
+                            <BarChart3 className="h-4 w-4 flex-shrink-0" />
+                            <span>Stats</span>
+                          </Link>
+                        </NavigationMenuLink>
+                      </li>
+                    </ul>
+                  </NavigationMenuContent>
                 </NavigationMenuItem>
-                {/* Settings - direct link */}
+
+                {/* Settings - hover for dropdown, click to navigate */}
                 <NavigationMenuItem>
-                  <Link
-                    to="/settings"
+                  <NavigationMenuLinkTrigger 
+                    onClick={() => navigate({ to: '/settings' })}
                     className={cn(
                       "inline-flex items-center gap-2 px-3 py-2 rounded-md",
-                      "text-sm font-medium transition-all",
-                      "text-slate-300 hover:text-white hover:bg-slate-800/80",
-                      "[&.active]:bg-slate-800 [&.active]:text-white"
+                      "text-sm font-medium transition-all bg-transparent",
+                      isActive('/settings') 
+                        ? "bg-slate-800 text-white hover:bg-slate-700 hover:text-white" 
+                        : "text-slate-300 hover:text-white hover:bg-slate-800/80",
+                      "data-[state=open]:bg-slate-800 data-[state=open]:text-white"
                     )}
-                    activeProps={{ className: "active" }}
                   >
                     <Settings className="h-4 w-4" />
-                    Settings
-                  </Link>
+                    <span>Settings</span>
+                  </NavigationMenuLinkTrigger>
+                  <NavigationMenuContent className="z-[100]">
+                    <ul className="grid w-[170px] gap-0.5 p-1">
+                      <li>
+                        <NavigationMenuLink asChild>
+                          <Link to="/settings/integrations" className="w-full">
+                            <Zap className="h-4 w-4 flex-shrink-0" />
+                            <span>Integrations</span>
+                          </Link>
+                        </NavigationMenuLink>
+                      </li>
+                      <li>
+                        <NavigationMenuLink asChild>
+                          <Link to="/settings/projects" className="w-full">
+                            <FolderKanban className="h-4 w-4 flex-shrink-0" />
+                            <span>Projects</span>
+                          </Link>
+                        </NavigationMenuLink>
+                      </li>
+                      <li>
+                        <NavigationMenuLink asChild>
+                          <Link to="/settings/ai" className="w-full">
+                            <Bot className="h-4 w-4 flex-shrink-0" />
+                            <span>AI Settings</span>
+                          </Link>
+                        </NavigationMenuLink>
+                      </li>
+                      <li>
+                        <NavigationMenuLink asChild>
+                          <Link to="/settings/ai-costs" className="w-full">
+                            <DollarSign className="h-4 w-4 flex-shrink-0" />
+                            <span>AI Costs</span>
+                          </Link>
+                        </NavigationMenuLink>
+                      </li>
+                      <li>
+                        <NavigationMenuLink asChild>
+                          <Link to="/settings/sample-outputs" className="w-full">
+                            <Download className="h-4 w-4 flex-shrink-0" />
+                            <span>Sample Outputs</span>
+                          </Link>
+                        </NavigationMenuLink>
+                      </li>
+                      <li>
+                        <NavigationMenuLink asChild>
+                          <Link to="/settings" className="w-full">
+                            <Settings className="h-4 w-4 flex-shrink-0" />
+                            <span>General</span>
+                          </Link>
+                        </NavigationMenuLink>
+                      </li>
+                    </ul>
+                  </NavigationMenuContent>
                 </NavigationMenuItem>
               </NavigationMenuList>
             </NavigationMenu>

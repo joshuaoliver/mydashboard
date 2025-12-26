@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useImperativeHandle, forwardRef } from 'react'
-import { useAction } from 'convex/react'
+import { useQuery, useAction } from 'convex/react'
 import { api } from '../../../convex/_generated/api'
 import { ReplySuggestions } from './ReplySuggestions'
 
@@ -26,76 +26,88 @@ export const ReplySuggestionsPanel = forwardRef<ReplySuggestionsPanelRef, ReplyS
   onSuggestionSelect,
   onSendMessage,
 }, ref) {
-  // Local state - isolated from parent
-  const [replySuggestions, setReplySuggestions] = useState<ReplySuggestion[]>([])
+  // Local state for custom regeneration only
   const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(0)
-  const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [isRegenerating, setIsRegenerating] = useState(false)
+  const [regenerateError, setRegenerateError] = useState<string | null>(null)
+  const [customSuggestions, setCustomSuggestions] = useState<ReplySuggestion[] | null>(null)
 
+  // Live query to cached suggestions - no action call needed!
+  const cachedSuggestions = useQuery(
+    api.aiSuggestions.getSuggestionsForChat,
+    selectedChatId ? { chatId: selectedChatId } : "skip"
+  )
+
+  // Action only used for manual regeneration with custom context
   const generateReplySuggestions = useAction(api.beeperActions.generateReplySuggestions)
 
-  const handleGenerateAISuggestions = useCallback(async (customContext?: string) => {
+  // Reset state when chat changes
+  useEffect(() => {
+    setSelectedSuggestionIndex(0)
+    setCustomSuggestions(null)
+    setRegenerateError(null)
+  }, [selectedChatId])
+
+  // Handle manual regeneration (with optional custom context)
+  const handleRegenerate = useCallback(async (customContext?: string) => {
     if (!selectedChatId) return
 
-    setIsLoading(true)
-    setError(null)
+    setIsRegenerating(true)
+    setRegenerateError(null)
 
     try {
-      const suggestionsResult = await generateReplySuggestions({
+      const result = await generateReplySuggestions({
         chatId: selectedChatId,
         chatName: selectedChatName,
         instagramUsername: username,
         customContext: customContext || undefined,
       })
 
-      const suggestions = suggestionsResult.suggestions || []
-      setReplySuggestions(suggestions)
-      
-      if (suggestionsResult.isCached) {
-        console.log(`✅ Using cached suggestions for ${selectedChatName}`)
+      // If custom context was provided, store in local state
+      // Otherwise the live query will pick up the new cached suggestions
+      if (customContext) {
+        setCustomSuggestions(result.suggestions || [])
+        console.log(`🔄 Generated custom suggestions for ${selectedChatName}`)
       } else {
-        console.log(`🔄 Generated fresh suggestions for ${selectedChatName}`)
+        setCustomSuggestions(null) // Clear custom, use cached
+        console.log(`🔄 Regenerated suggestions for ${selectedChatName}`)
       }
     } catch (err) {
-      console.error('Error generating suggestions:', err)
+      console.error('Error regenerating suggestions:', err)
       const errorMessage = err instanceof Error ? err.message : 'Failed to generate suggestions'
-      setError(errorMessage)
+      setRegenerateError(errorMessage)
     } finally {
-      setIsLoading(false)
+      setIsRegenerating(false)
     }
   }, [selectedChatId, selectedChatName, username, generateReplySuggestions])
 
   // Expose regeneration method to parent via ref
   useImperativeHandle(ref, () => ({
     regenerateWithContext: async (context: string) => {
-      await handleGenerateAISuggestions(context)
+      await handleRegenerate(context)
     }
-  }), [handleGenerateAISuggestions])
+  }), [handleRegenerate])
 
-  // Auto-generate suggestions when chat changes
-  useEffect(() => {
-    if (selectedChatId) {
-      handleGenerateAISuggestions()
-    } else {
-      setReplySuggestions([])
-      setSelectedSuggestionIndex(0)
-    }
-  }, [selectedChatId, handleGenerateAISuggestions])
+  // Determine which suggestions to display - limit to 3 for consistent height
+  const allSuggestions = customSuggestions ?? cachedSuggestions?.suggestions ?? []
+  const displaySuggestions = allSuggestions.slice(0, 3)
+  const isLoading = cachedSuggestions === undefined && !customSuggestions
 
   const handleSuggestionSelect = useCallback((index: number) => {
     setSelectedSuggestionIndex(index)
-    if (replySuggestions[index]) {
-      onSuggestionSelect(replySuggestions[index].reply)
+    if (displaySuggestions[index]) {
+      onSuggestionSelect(displaySuggestions[index].reply)
     }
-  }, [replySuggestions, onSuggestionSelect])
+  }, [displaySuggestions, onSuggestionSelect])
 
   return (
-    <div className="flex-shrink-0 border-t border-gray-200 bg-gray-50">
+    <div className="flex-shrink-0 border-t border-gray-200 bg-gray-50 min-h-[120px]">
       <ReplySuggestions
-        suggestions={replySuggestions}
+        suggestions={displaySuggestions}
         isLoading={isLoading}
-        error={error || undefined}
-        onGenerateClick={handleGenerateAISuggestions}
+        isRegenerating={isRegenerating}
+        error={regenerateError || undefined}
+        onGenerateClick={handleRegenerate}
         selectedIndex={selectedSuggestionIndex}
         onSuggestionSelect={handleSuggestionSelect}
         onSendSuggestion={onSendMessage}
@@ -103,4 +115,3 @@ export const ReplySuggestionsPanel = forwardRef<ReplySuggestionsPanelRef, ReplyS
     </div>
   )
 })
-

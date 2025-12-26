@@ -4,6 +4,7 @@ import { experimental_transcribe as transcribe } from "ai";
 import { openai } from "@ai-sdk/openai";
 import { internal } from "./_generated/api";
 import { getAuthUserId } from "@convex-dev/auth/server";
+import { trackAICost } from "./costs";
 
 // Note: agentChat imports are done dynamically in processTranscription to avoid
 // loading AI model code for simple database queries like getPendingTranscriptions
@@ -172,7 +173,7 @@ export const processTranscription = internalAction({
     }
 
     // Generate response from agent with streaming using the correct agent thread ID
-    await agent.streamText(
+    const result = await agent.streamText(
       ctx,
       { threadId: agentThreadId },
       {
@@ -185,6 +186,24 @@ export const processTranscription = internalAction({
         },
       }
     );
+
+    // Consume stream and track cost
+    await result.consumeStream();
+
+    // Track AI cost if usage is available
+    const usage = (result as any).usage;
+    if (usage && usage.totalTokens) {
+      await trackAICost(ctx, {
+        featureKey: "voice-notes",
+        fullModelId: modelId,
+        usage: {
+          promptTokens: usage.promptTokens ?? 0,
+          completionTokens: usage.completionTokens ?? 0,
+          totalTokens: usage.totalTokens,
+        },
+        threadId: agentThreadId,
+      });
+    }
   },
 });
 

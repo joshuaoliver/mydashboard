@@ -17,6 +17,7 @@ import {
 import { getAuthUserId } from '@convex-dev/auth/server'
 import { generateText } from 'ai'
 import { DEFAULT_SETTINGS } from './aiSettings'
+import { trackAICost } from './costs'
 
 // Type assertion for internal references that may not be in generated types yet
 // Run `npx convex dev` to regenerate types after adding new files
@@ -594,6 +595,23 @@ export const generateResponseAsync = internalAction({
       console.log(
         `[chat:generateResponseAsync] streamText completed successfully`,
       )
+
+      // Track AI cost after stream completion
+      // Note: The agent's streamText may not expose usage directly
+      // If usage is available, track it
+      const usage = (result as any).usage
+      if (usage && usage.totalTokens) {
+        await trackAICost(ctx, {
+          featureKey: 'chat-agent',
+          fullModelId: modelId,
+          usage: {
+            promptTokens: usage.promptTokens ?? 0,
+            completionTokens: usage.completionTokens ?? 0,
+            totalTokens: usage.totalTokens,
+          },
+          threadId: agentThreadId,
+        })
+      }
     } catch (error) {
       console.error(`[chat:generateResponseAsync] streamText failed:`, error)
       throw error
@@ -708,7 +726,7 @@ export const generateThreadTitle = internalAction({
     try {
       const model = createModelFromId(modelId)
 
-      const { text } = await generateText({
+      const result = await generateText({
         model,
         prompt: `Generate a very short (3-5 word) title for this conversation. Just respond with the title, nothing else. No quotes, no punctuation at the end.
 
@@ -717,7 +735,22 @@ First message: "${args.firstMessage.slice(0, 500)}"`,
         temperature,
       })
 
-      const title = text.trim().replace(/^["']|["']$/g, '') // Remove quotes if present
+      // Track AI cost
+      if (result.usage) {
+        const usage = result.usage as { promptTokens?: number; completionTokens?: number };
+        await trackAICost(ctx, {
+          featureKey: 'thread-title',
+          fullModelId: modelId,
+          usage: {
+            promptTokens: usage.promptTokens ?? 0,
+            completionTokens: usage.completionTokens ?? 0,
+            totalTokens: (usage.promptTokens ?? 0) + (usage.completionTokens ?? 0),
+          },
+          threadId: args.threadId.toString(),
+        })
+      }
+
+      const title = result.text.trim().replace(/^["']|["']$/g, '') // Remove quotes if present
 
       await ctx.runMutation(internalRef.chat.updateThreadTitleInternal, {
         threadId: args.threadId,

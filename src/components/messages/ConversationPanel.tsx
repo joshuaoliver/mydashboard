@@ -1,6 +1,6 @@
-import { useState, useCallback, useEffect, useRef, useMemo } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { useNavigate } from '@tanstack/react-router'
-import { usePaginatedQuery, useAction, useQuery } from 'convex/react'
+import { usePaginatedQuery, useAction, useQuery, useMutation } from 'convex/react'
 import { api } from '../../../convex/_generated/api'
 import type { Id } from '../../../convex/_generated/dataModel'
 import { useChatStore } from '@/stores/useChatStore'
@@ -27,16 +27,6 @@ import {
 } from '@/components/ui/dialog'
 import { ScrollArea } from '@/components/ui/scroll-area'
 
-interface OptimisticMessage {
-  id: string
-  text: string
-  timestamp: number
-  sender: string
-  senderName: string
-  isFromUser: boolean
-  isPending?: boolean
-}
-
 export function ConversationPanel() {
   const navigate = useNavigate()
   
@@ -50,9 +40,6 @@ export function ConversationPanel() {
   
   // State for input value (shared between input and suggestions)
   const [inputValue, setInputValue] = useState('')
-  
-  // State for optimistic messages
-  const [optimisticMessages, setOptimisticMessages] = useState<OptimisticMessage[]>([])
   
   // Ref for suggestions panel to trigger regeneration
   const suggestionsRef = useRef<ReplySuggestionsPanelRef>(null)
@@ -100,8 +87,9 @@ export function ConversationPanel() {
     }
   }, [selectedChatId, messagesStatus, cachedMessages?.length])
 
-  // Actions
-  const sendMessageAction = useAction(api.beeperMessages.sendMessage)
+  // Actions and mutations
+  const sendMessageMutation = useMutation(api.beeperMutations.sendMessage)
+  const retryMessageMutation = useMutation(api.beeperMutations.retryMessage)
   const loadFullConversation = useAction(api.beeperMessages.loadFullConversation)
   const loadNewerMessages = useAction(api.beeperPagination.loadNewerMessages)
   const focusChat = useAction(api.beeperMessages.focusChat)
@@ -109,15 +97,20 @@ export function ConversationPanel() {
   const blockChat = useAction(api.chatActions.blockChat)
   const markChatAsRead = useAction(api.chatActions.markChatAsRead)
   const markChatAsUnread = useAction(api.chatActions.markChatAsUnread)
-  const pageLoadSync = useAction(api.beeperSync.pageLoadSync)
   const linkChatToContact = useAction(api.chatActions.linkChatToContact)
-  
-  // Query all contacts for the contact linking dialog
-  const contactsResult = useQuery(api.dexQueries.listContacts, { limit: 200 })
   
   // State for contact linking dialog
   const [showContactDialog, setShowContactDialog] = useState(false)
   const [contactSearchQuery, setContactSearchQuery] = useState('')
+  
+  // Query contacts with search term passed to backend for proper full-database search
+  const contactsResult = useQuery(
+    api.dexQueries.listContacts, 
+    showContactDialog ? { 
+      limit: 50, 
+      searchTerm: contactSearchQuery.trim() || undefined 
+    } : "skip"
+  )
   
   // Helper to get full name from contact
   const getContactFullName = useCallback((contact: { firstName?: string; lastName?: string }) => {
@@ -125,22 +118,8 @@ export function ConversationPanel() {
     return parts.join(' ') || 'Unknown'
   }, [])
   
-  // Filter contacts based on search query
-  const filteredContacts = useMemo(() => {
-    const contacts = contactsResult?.contacts ?? []
-    if (!contactSearchQuery.trim()) return contacts.slice(0, 50)
-    const query = contactSearchQuery.toLowerCase()
-    return contacts.filter(c => {
-      const fullName = getContactFullName(c).toLowerCase()
-      const email = c.emails?.[0]?.email?.toLowerCase() ?? ''
-      const instagram = c.instagram?.toLowerCase() ?? ''
-      return (
-        fullName.includes(query) ||
-        email.includes(query) ||
-        instagram.includes(query)
-      )
-    }).slice(0, 50)
-  }, [contactsResult, contactSearchQuery, getContactFullName])
+  // Contacts are already filtered by backend, just use them directly
+  const filteredContacts = contactsResult?.contacts ?? []
 
   const isLoadingMessages = selectedChatId !== null && messagesStatus === "LoadingFirstPage"
   
@@ -180,59 +159,45 @@ export function ConversationPanel() {
   }, [selectedChatId, loadNewerMessages])
 
   // Handle sending a message
+  // Uses mutation that inserts message directly into DB (instant UI via Convex reactivity)
+  // Backend handles actual Beeper API call asynchronously
   const handleSendMessage = useCallback(async (text: string) => {
     if (!selectedChatId || !selectedChat) return
 
-    // Create optimistic message immediately
-    const optimisticId = `optimistic-${Date.now()}`
-    const optimisticMessage: OptimisticMessage = {
-      id: optimisticId,
-      text,
-      timestamp: Date.now(),
-      sender: 'user',
-      senderName: 'You',
-      isFromUser: true,
-      isPending: true,
-    }
-    
-    // Add optimistic message to state
-    setOptimisticMessages(prev => [...prev, optimisticMessage])
-    
-    // Clear the input value
+    // Clear the input value immediately
     setInputValue('')
 
     try {
       console.log(`📤 Sending message to ${selectedChat.name}: "${text.slice(0, 50)}..."`)
       
-      const result = await sendMessageAction({ 
+      // This mutation inserts the message into the database with status="sending"
+      // and schedules the backend action to send to Beeper API
+      // The message appears instantly in the UI via Convex reactivity
+      await sendMessageMutation({ 
         chatId: selectedChatId, 
         text 
       })
 
-      if (result.success) {
-        console.log(`✅ Message sent! Pending ID: ${result.pendingMessageId}`)
-        
-        // Remove optimistic message (real one will come via sync)
-        setOptimisticMessages(prev => prev.filter(m => m.id !== optimisticId))
-        
-        // Trigger a sync to get the sent message back
-        setTimeout(() => {
-          pageLoadSync()
-        }, 1000)
-      } else {
-        console.error('❌ Failed to send message:', result.error)
-        setError(result.error || 'Failed to send message')
-        // Remove optimistic message on failure
-        setOptimisticMessages(prev => prev.filter(m => m.id !== optimisticId))
-      }
+      console.log(`✅ Message queued for sending`)
     } catch (err) {
       console.error('Failed to send message:', err)
       const errorMessage = err instanceof Error ? err.message : 'Failed to send message'
       setError(errorMessage)
-      // Remove optimistic message on failure
-      setOptimisticMessages(prev => prev.filter(m => m.id !== optimisticId))
     }
-  }, [selectedChatId, selectedChat, sendMessageAction, pageLoadSync])
+  }, [selectedChatId, selectedChat, sendMessageMutation])
+
+  // Handle retrying a failed message
+  const handleRetryMessage = useCallback(async (messageDocId: Id<"beeperMessages">) => {
+    try {
+      console.log(`🔄 Retrying message ${messageDocId}`)
+      await retryMessageMutation({ messageDocId })
+      console.log(`✅ Message retry queued`)
+    } catch (err) {
+      console.error('Failed to retry message:', err)
+      const errorMessage = err instanceof Error ? err.message : 'Failed to retry message'
+      setError(errorMessage)
+    }
+  }, [retryMessageMutation])
 
   // Handle generating AI suggestions with custom context
   const handleGenerateAI = useCallback(async (customContext?: string) => {
@@ -566,10 +531,11 @@ export function ConversationPanel() {
         <>
           {/* Messages */}
           <ChatDetail 
-            messages={[...(cachedMessages || []), ...optimisticMessages]} 
+            messages={cachedMessages || []} 
             isSingleChat={selectedChat?.type === 'single' || selectedChat?.type === undefined}
             messagesStatus={messagesStatus}
             onLoadMore={loadMoreMessages}
+            onRetry={handleRetryMessage}
           />
           
           {/* Message Input */}
@@ -616,9 +582,13 @@ export function ConversationPanel() {
             {/* Contact list */}
             <ScrollArea className="h-72">
               <div className="space-y-1">
-                {filteredContacts.length === 0 ? (
+                {contactsResult === undefined ? (
                   <p className="text-sm text-muted-foreground text-center py-4">
-                    {contactSearchQuery ? 'No contacts found' : 'Loading contacts...'}
+                    Loading contacts...
+                  </p>
+                ) : filteredContacts.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-4">
+                    No contacts found
                   </p>
                 ) : (
                   filteredContacts.map((contact) => {

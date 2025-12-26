@@ -223,8 +223,21 @@ export const KanbanProvider = <
   const [activeCardId, setActiveCardId] = useState<string | null>(null);
 
   const sensors = useSensors(
-    useSensor(MouseSensor),
-    useSensor(TouchSensor),
+    useSensor(MouseSensor, {
+      // Require mouse to move 8px before activating drag
+      // This allows onClick to work for simple clicks
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+    useSensor(TouchSensor, {
+      // Require 250ms delay or 8px movement before activating drag on touch
+      // This allows tap-to-click to work on mobile
+      activationConstraint: {
+        delay: 250,
+        tolerance: 8,
+      },
+    }),
     useSensor(KeyboardSensor)
   );
 

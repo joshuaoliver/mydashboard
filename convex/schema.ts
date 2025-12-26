@@ -139,6 +139,14 @@ export default defineSchema({
       emoji: v.optional(v.boolean()), // Is it an emoji?
       imgURL: v.optional(v.string()), // Reaction image URL
     }))),
+    // Send status tracking (for messages sent from this app)
+    status: v.optional(v.union(
+      v.literal("sending"),    // In queue, awaiting API call
+      v.literal("sent"),       // API confirmed (pendingMessageId received)
+      v.literal("failed")      // Send failed
+    )),
+    pendingMessageId: v.optional(v.string()),  // Beeper's pending message ID
+    errorMessage: v.optional(v.string()),      // Error message if send failed
   })
     .index("by_chat", ["chatId", "timestamp"])  // Get messages for chat, sorted by time
     .index("by_message_id", ["messageId"])      // Lookup by message ID
@@ -222,7 +230,8 @@ export default defineSchema({
   })
     .index("by_dex_id", ["dexId"])
     .index("by_instagram", ["instagram"]) // For matching with Beeper Instagram chats
-    .index("by_whatsapp", ["whatsapp"]), // For matching with Beeper WhatsApp chats
+    .index("by_whatsapp", ["whatsapp"]) // For matching with Beeper WhatsApp chats
+    .index("by_lead_status", ["leadStatus"]), // For dating kanban board filter
     // Note: normalizedPhones is an array field used for fast in-memory matching
     // Convex doesn't support array-contains queries via index, so we filter + includes()
 
@@ -263,6 +272,8 @@ export default defineSchema({
     lastSyncedAt: v.number(),             // Last sync timestamp
     syncSource: v.string(),               // "cron", "manual", or "page_load"
     totalChats: v.number(),               // Total chats in our window
+    syncLockId: v.optional(v.string()),   // ID of sync instance holding lock
+    syncLockAt: v.optional(v.number()),   // Timestamp when lock was acquired
   })
     .index("by_key", ["key"]),
 

@@ -1,4 +1,4 @@
-import { action } from "./_generated/server";
+import { action, internalAction } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { v } from "convex/values";
 import { createBeeperClient } from "./beeperClient";
@@ -257,6 +257,67 @@ export const loadFullConversation = action({
         error: error instanceof Error ? error.message : "Unknown error",
         messagesLoaded: 0,
       };
+    }
+  },
+});
+
+/**
+ * Internal action to send a message to Beeper API
+ * 
+ * Called by the scheduler after a message is inserted into the database.
+ * Updates the message status based on the result.
+ */
+export const sendToBeeper = internalAction({
+  args: {
+    messageDocId: v.id("beeperMessages"),
+    chatId: v.string(),
+    text: v.string(),
+    replyToMessageId: v.optional(v.string()),
+  },
+  handler: async (ctx, args): Promise<void> => {
+    try {
+      console.log(`[sendToBeeper] Sending message to Beeper: "${args.text.slice(0, 50)}..."`);
+
+      // Initialize Beeper SDK client
+      const client = createBeeperClient();
+
+      // Build request body
+      const requestBody: {
+        text: string;
+        replyToMessageID?: string;
+      } = {
+        text: args.text,
+      };
+
+      // Add reply-to if specified
+      if (args.replyToMessageId) {
+        requestBody.replyToMessageID = args.replyToMessageId;
+      }
+
+      // Send message via V1 API
+      const response = await client.post(`/v1/chats/${encodeURIComponent(args.chatId)}/messages`, {
+        body: requestBody,
+      }) as { chatID: string; pendingMessageID: string };
+
+      console.log(`[sendToBeeper] Success! Pending message ID: ${response.pendingMessageID}`);
+
+      // Update message status to "sent"
+      await ctx.runMutation(internal.beeperMutations.updateMessageStatus, {
+        messageDocId: args.messageDocId,
+        status: "sent",
+        pendingMessageId: response.pendingMessageID,
+      });
+
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : "Unknown error";
+      console.error(`[sendToBeeper] Failed: ${errorMsg}`);
+
+      // Update message status to "failed"
+      await ctx.runMutation(internal.beeperMutations.updateMessageStatus, {
+        messageDocId: args.messageDocId,
+        status: "failed",
+        errorMessage: errorMsg,
+      });
     }
   },
 });

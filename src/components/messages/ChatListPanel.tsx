@@ -56,11 +56,21 @@ export function ChatListPanel() {
   }, [allLoadedChats, setChatList])
 
   // Trigger sync on mount (throttled to once every 2 minutes)
+  // Using empty deps + ref to avoid re-running on every render
+  const pageLoadSyncRef = useRef(pageLoadSync)
+  pageLoadSyncRef.current = pageLoadSync
+  
   useEffect(() => {
     const SYNC_THROTTLE_MS = 2 * 60 * 1000 // 2 minutes
     const lastSyncKey = 'beeper_last_sync_timestamp'
+    
+    // Use a flag to prevent double execution in StrictMode
+    let didRun = false
 
     const syncOnLoad = async () => {
+      if (didRun) return
+      didRun = true
+      
       // Check if we've synced recently
       const lastSyncStr = sessionStorage.getItem(lastSyncKey)
       const lastSync = lastSyncStr ? parseInt(lastSyncStr, 10) : 0
@@ -70,13 +80,20 @@ export function ChatListPanel() {
         console.log(`⏭️ Skipping Beeper sync (last sync was ${Math.round((now - lastSync) / 1000)}s ago)`)
         return
       }
+      
+      // Set timestamp BEFORE calling to prevent race conditions
+      sessionStorage.setItem(lastSyncKey, now.toString())
 
       setIsSyncing(true)
       try {
-        const result = await pageLoadSync()
+        const result = await pageLoadSyncRef.current()
         if (result.success) {
-          console.log(`✅ Beeper synced: ${result.syncedChats} chats, ${result.syncedMessages} messages`)
-          sessionStorage.setItem(lastSyncKey, now.toString())
+          const skipped = (result as any).skipped
+          if (skipped) {
+            console.log(`⏭️ Beeper sync skipped: ${(result as any).reason}`)
+          } else {
+            console.log(`✅ Beeper synced: ${result.syncedChats} chats, ${result.syncedMessages} messages`)
+          }
         } else {
           console.warn(`⚠️ Beeper sync failed: ${result.error || 'Unknown error'}`)
         }
@@ -88,7 +105,7 @@ export function ChatListPanel() {
     }
 
     syncOnLoad()
-  }, [pageLoadSync])
+  }, []) // Empty deps - only run once on mount
 
   // Auto-select first chat if none selected
   useEffect(() => {

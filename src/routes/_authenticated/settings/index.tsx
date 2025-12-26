@@ -7,7 +7,7 @@ import { useMutation, useAction } from 'convex/react'
 import { useCachedQuery } from '@/lib/convex-cache'
 import { api } from '../../../../convex/_generated/api'
 import { useState, useEffect, useRef } from 'react'
-import { Trash2, Database, AlertCircle, CheckCircle, Settings as SettingsIcon, Users, RefreshCw, Bot, MessageSquare, MapPin, RotateCcw, Compass, Clock, History, Square, Play, FileText } from 'lucide-react'
+import { Trash2, Database, AlertCircle, CheckCircle, Settings as SettingsIcon, Users, RefreshCw, Bot, MessageSquare, MapPin, RotateCcw, Compass, Clock, History, Square, Play, FileText, DollarSign } from 'lucide-react'
 
 export const Route = createFileRoute('/_authenticated/settings/')({
   component: SettingsPage,
@@ -623,6 +623,16 @@ function SettingsPage() {
               <div>
                 <p className="font-medium group-hover:text-accent-foreground">AI Models</p>
                 <p className="text-xs text-muted-foreground">Configure which models to use</p>
+              </div>
+            </Link>
+            <Link 
+              to="/settings/ai-costs"
+              className="flex items-center gap-3 p-4 rounded-lg bg-muted/50 border hover:border-emerald-500/50 hover:bg-accent transition-all group"
+            >
+              <DollarSign className="h-5 w-5 text-emerald-500 group-hover:text-emerald-400" />
+              <div>
+                <p className="font-medium group-hover:text-accent-foreground">AI Costs</p>
+                <p className="text-xs text-muted-foreground">Track usage & model pricing</p>
               </div>
             </Link>
             <Link 

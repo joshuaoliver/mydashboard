@@ -739,6 +739,31 @@ export const syncChatMessages = internalMutation({
  */
 export const syncBeeperChatsInternal = internalAction({
   handler: async (ctx, args: { syncSource: string; bypassCache?: boolean }) => {
+    // Generate unique ID for this sync instance
+    const syncId = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+    
+    // Try to acquire lock - if another sync is running, skip
+    const lockAcquired = await ctx.runMutation(
+      internal.cursorHelpers.tryAcquireSyncLock,
+      { syncId }
+    );
+    
+    if (!lockAcquired) {
+      console.log(`[Beeper Sync] ⏭️ Skipped - another sync in progress (source: ${args.syncSource}, id: ${syncId.slice(0, 8)})`);
+      return {
+        success: true,
+        syncedChats: 0,
+        syncedMessages: 0,
+        timestamp: Date.now(),
+        source: args.syncSource,
+        skipped: true,
+        reason: "Another sync is in progress",
+      };
+    }
+    
+    console.log(`[Beeper Sync] 🔒 Lock acquired (source: ${args.syncSource}, id: ${syncId.slice(0, 8)})`);
+
+    
     try {
       const now = Date.now();
       
@@ -784,7 +809,7 @@ export const syncBeeperChatsInternal = internalAction({
       // 2. On-demand: Full conversation history via loadFullConversation action
       let hasMore = true;
       let currentPage = 0;
-      const MAX_CATCHUP_PAGES = 5; // Prevent hanging on extremely old cursors
+      const MAX_CATCHUP_PAGES = 20; // Allow catching up on more activity (20 pages × 25 = 500 chats max)
       let lastResponse: any = null;
       
       // Use local variables for pagination so we can update them in the loop
@@ -1020,7 +1045,9 @@ export const syncBeeperChatsInternal = internalAction({
                 }
               );
               
-              if (messageCount > 0 && needsReply) {
+              // Only pre-generate suggestions for single chats where we need to reply
+              // Group chats have too many participants to generate meaningful suggestions
+              if (messageCount > 0 && needsReply && chatType === "single") {
                 await ctx.scheduler.runAfter(0, api.beeperActions.generateReplySuggestions, {
                   chatId: chat.id,
                   chatName: chat.title || "Unknown",
@@ -1083,6 +1110,10 @@ export const syncBeeperChatsInternal = internalAction({
       // Schedule as a separate action so it doesn't block the sync response
       await ctx.scheduler.runAfter(0, api.imageCache.cacheAllProfileImages, {});
 
+      // Release lock before returning
+      await ctx.runMutation(internal.cursorHelpers.releaseSyncLock, { syncId });
+      console.log(`[Beeper Sync] 🔓 Lock released (source: ${args.syncSource}, id: ${syncId.slice(0, 8)})`);
+
       return {
         success: true,
         syncedChats: syncedChatsCount,
@@ -1091,6 +1122,9 @@ export const syncBeeperChatsInternal = internalAction({
         source: args.syncSource,
       };
     } catch (error) {
+      // Always release lock on error
+      await ctx.runMutation(internal.cursorHelpers.releaseSyncLock, { syncId });
+      console.log(`[Beeper Sync] 🔓 Lock released on error (source: ${args.syncSource}, id: ${syncId.slice(0, 8)})`);
       // SDK v4.2.2+ provides specific error types
       let errorMsg = "Unknown error";
       let errorType = "UnknownError";

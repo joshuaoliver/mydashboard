@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { action, internalAction, internalMutation, internalQuery, query } from "./_generated/server";
 import { internal } from "./_generated/api";
+import { trackAICost } from "./costs";
 
 /**
  * Daily Summary Generator
@@ -282,6 +283,21 @@ export const generateSummary = internalAction({
       temperature: 0.7,
       maxOutputTokens: 2000,
     });
+
+    // Track AI cost
+    if (result.usage) {
+      const usage = result.usage as { promptTokens?: number; completionTokens?: number };
+      await trackAICost(ctx, {
+        featureKey: "daily-summary",
+        fullModelId: modelId,
+        usage: {
+          promptTokens: usage.promptTokens ?? 0,
+          completionTokens: usage.completionTokens ?? 0,
+          totalTokens: (usage.promptTokens ?? 0) + (usage.completionTokens ?? 0),
+        },
+        threadId: `daily-summary:${args.date}`,
+      });
+    }
 
     // Parse AI response
     const sections = parseSummaryResponse(result.text);

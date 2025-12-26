@@ -1,4 +1,5 @@
 import { internalMutation, mutation } from "./_generated/server";
+import { internal } from "./_generated/api";
 import { v } from "convex/values";
 
 /**
@@ -294,6 +295,174 @@ export const linkChatToContact = internalMutation({
     console.log(`[linkChatToContact] Linked chat ${args.chatId} to contact ${args.contactId ?? 'none'}`);
 
     return { success: true, chatId: args.chatId, contactId: args.contactId };
+  },
+});
+
+/**
+ * Send a message to a Beeper chat
+ * 
+ * This mutation:
+ * 1. Inserts the message into the database with status="sending" (instant UI update)
+ * 2. Updates the chat's lastActivity and lastMessage
+ * 3. Schedules the backend action to actually send to Beeper API
+ * 
+ * The frontend gets an instant response and the message appears immediately
+ * via Convex reactivity. The actual send happens asynchronously.
+ */
+export const sendMessage = mutation({
+  args: {
+    chatId: v.string(),
+    text: v.string(),
+    replyToMessageId: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const now = Date.now();
+
+    // Create a synthetic messageId for this pending message
+    const syntheticId = `pending_${now}_${Math.random().toString(36).slice(2, 8)}`;
+
+    // Insert message with status="sending"
+    const messageDocId = await ctx.db.insert("beeperMessages", {
+      chatId: args.chatId,
+      messageId: syntheticId,
+      accountID: "local",
+      text: args.text,
+      timestamp: now,
+      sortKey: now.toString(),
+      senderId: "user",
+      senderName: "You",
+      isFromUser: true,
+      status: "sending",
+    });
+
+    // Update chat with last activity and reply tracking
+    const chat = await ctx.db
+      .query("beeperChats")
+      .withIndex("by_chat_id", (q) => q.eq("chatId", args.chatId))
+      .first();
+    
+    if (chat) {
+      await ctx.db.patch(chat._id, {
+        lastActivity: now,
+        lastMessageFrom: "user",
+        needsReply: false,
+        lastMessage: args.text,
+      });
+    }
+
+    // Schedule the backend action to send to Beeper API
+    await ctx.scheduler.runAfter(0, internal.beeperMessages.sendToBeeper, {
+      messageDocId,
+      chatId: args.chatId,
+      text: args.text,
+      replyToMessageId: args.replyToMessageId,
+    });
+
+    console.log(`[sendMessage] Inserted pending message ${syntheticId}, scheduled sendToBeeper`);
+
+    return { 
+      success: true, 
+      messageDocId,
+      messageId: syntheticId,
+    };
+  },
+});
+
+/**
+ * Retry sending a failed message
+ * 
+ * This mutation:
+ * 1. Verifies the message exists and is in a retriable state (failed or stuck sending)
+ * 2. Resets status to "sending" and clears error
+ * 3. Reschedules the sendToBeeper action
+ */
+export const retryMessage = mutation({
+  args: {
+    messageDocId: v.id("beeperMessages"),
+  },
+  handler: async (ctx, args) => {
+    const message = await ctx.db.get(args.messageDocId);
+    
+    if (!message) {
+      throw new Error("Message not found");
+    }
+
+    // Check if message is retriable
+    const STUCK_THRESHOLD_MS = 5 * 60 * 1000; // 5 minutes
+    const isStuck = message.status === "sending" && 
+      (Date.now() - message.timestamp) > STUCK_THRESHOLD_MS;
+    
+    if (message.status !== "failed" && !isStuck) {
+      throw new Error(`Message is not in a retriable state (status: ${message.status})`);
+    }
+
+    // Reset status and clear error
+    await ctx.db.patch(args.messageDocId, {
+      status: "sending",
+      errorMessage: undefined,
+    });
+
+    // Reschedule the send action
+    await ctx.scheduler.runAfter(0, internal.beeperMessages.sendToBeeper, {
+      messageDocId: args.messageDocId,
+      chatId: message.chatId,
+      text: message.text,
+      replyToMessageId: undefined, // We don't store this, so can't retry with reply
+    });
+
+    console.log(`[retryMessage] Retrying message ${message.messageId}`);
+
+    return { success: true };
+  },
+});
+
+/**
+ * Update message status after send attempt
+ * Called by the sendToBeeper action
+ * 
+ * When status is "sent", we update the messageId to the pendingMessageId
+ * returned by Beeper. This prevents duplicates when sync runs later,
+ * since sync checks for existing messages by messageId.
+ */
+export const updateMessageStatus = internalMutation({
+  args: {
+    messageDocId: v.id("beeperMessages"),
+    status: v.union(v.literal("sent"), v.literal("failed")),
+    pendingMessageId: v.optional(v.string()),
+    errorMessage: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const message = await ctx.db.get(args.messageDocId);
+    
+    if (!message) {
+      console.warn(`[updateMessageStatus] Message ${args.messageDocId} not found`);
+      return { success: false };
+    }
+
+    // Build update object
+    const update: {
+      status: "sent" | "failed";
+      pendingMessageId?: string;
+      errorMessage?: string;
+      messageId?: string;
+    } = {
+      status: args.status,
+      pendingMessageId: args.pendingMessageId,
+      errorMessage: args.errorMessage,
+    };
+
+    // When sent successfully, update messageId to the Beeper-assigned ID
+    // This prevents duplicates when sync runs (sync checks by messageId)
+    if (args.status === "sent" && args.pendingMessageId) {
+      update.messageId = args.pendingMessageId;
+      console.log(`[updateMessageStatus] Updated messageId: ${message.messageId} -> ${args.pendingMessageId}`);
+    }
+
+    await ctx.db.patch(args.messageDocId, update);
+
+    console.log(`[updateMessageStatus] Updated message to status=${args.status}`);
+
+    return { success: true };
   },
 });
 

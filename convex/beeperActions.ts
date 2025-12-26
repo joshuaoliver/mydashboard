@@ -7,6 +7,7 @@ import { generateText } from "ai";
 import { createGateway } from "@ai-sdk/gateway";
 import { createBeeperClient } from "./beeperClient";
 import { formatSydneyDateTime } from "./timezone";
+import { trackAICost } from "./costs";
 
 // Beeper API configuration (from environment variables)
 // Using bywave proxy instead of localhost so Convex (cloud-hosted) can access it
@@ -249,6 +250,9 @@ export const generateReplySuggestions = action({
       // Get the last message to check cache
       const lastMessage = messages[messages.length - 1];
       
+      // Track whether user sent the last message - affects suggestion type
+      const userSentLast = lastMessage.isFromUser;
+      
       // Only check cache if no custom context was provided
       // Custom context = user wants fresh suggestions based on their specific input
       if (!args.customContext) {
@@ -456,6 +460,23 @@ ${args.customContext}
         name: "reply-suggestions",
       });
 
+      // Build context about who sent the last message
+      const messageFlowContext = userSentLast
+        ? `<message_flow>
+YOU (Joshua) sent the last message. The suggestions should be FOLLOW-UP messages, not replies.
+Examples of good follow-ups:
+- Adding context or clarification to what you just said
+- Asking a related question
+- Sharing something relevant that came to mind
+- A natural double-text that continues the conversation
+
+DO NOT suggest messages that repeat or rephrase what you just said.
+Your last message was: "${lastMessageText}"
+</message_flow>`
+        : `<message_flow>
+${args.chatName} sent the last message. The suggestions should be REPLIES to their message.
+</message_flow>`;
+
       // Build the prompt from template or fallback to default
       let prompt: string;
       if (promptTemplate) {
@@ -467,15 +488,18 @@ ${args.customContext}
           .replace(/\{\{customContext\}\}/g, customContextSection)
           .replace(/\{\{platform\}\}/g, platform)
           .replace(/\{\{messageCount\}\}/g, messages.length.toString())
-          .replace(/\{\{temporalContext\}\}/g, temporalContext);
+          .replace(/\{\{temporalContext\}\}/g, temporalContext)
+          .replace(/\{\{messageFlowContext\}\}/g, messageFlowContext);
         
-        console.log(`[generateReplySuggestions] Using configured prompt template from database`);
+        console.log(`[generateReplySuggestions] Using configured prompt template from database (userSentLast: ${userSentLast})`);
       } else {
         // Fallback to hardcoded prompt if template not found
         console.warn(`[generateReplySuggestions] Prompt template 'reply-suggestions' not found, using fallback`);
-        prompt = `You are an AI assistant helping Joshua Oliver (26, male, Sydney) craft contextually appropriate replies.
+        prompt = `You are an AI assistant helping Joshua Oliver (26, male, Sydney) craft contextually appropriate messages.
 
 ${temporalContext}
+
+${messageFlowContext}
 
 Contact: ${args.chatName}
 Platform: ${platform}
@@ -485,9 +509,9 @@ ${customContextSection}
 Conversation history (with timestamps):
 ${conversationHistory}
 
-IMPORTANT TEMPORAL CONTEXT: Consider the time difference between when the last message was sent and the current time. If the conversation happened yesterday or earlier, do NOT suggest replies that would have been appropriate at that time (like "have a good sleep" for a tired message from last night). Instead, suggest replies that are appropriate for NOW.
+IMPORTANT TEMPORAL CONTEXT: Consider the time difference between when the last message was sent and the current time. If the conversation happened yesterday or earlier, do NOT suggest messages that would have been appropriate at that time (like "have a good sleep" for a tired message from last night). Instead, suggest messages that are appropriate for NOW.
 
-Suggest 3-4 different reply options representing DIFFERENT conversation pathways. Match the relationship context and be natural.
+Suggest 3-4 different message options representing DIFFERENT conversation pathways. Match the relationship context and be natural.
 
 IMPORTANT: DO NOT use em dashes (—) or en dashes (–). Use ellipsis (...) or split into separate sentences. Write like a real person texting with standard keyboard characters only.
 
@@ -495,7 +519,7 @@ Format as JSON:
 {
   "suggestions": [
     {
-      "reply": "The actual reply text"
+      "reply": "The actual message text"
     }
   ]
 }`;
@@ -521,6 +545,21 @@ Format as JSON:
         prompt: prompt,
         temperature: temperature,
       });
+
+      // Track AI cost
+      if (result.usage) {
+        const usage = result.usage as { promptTokens?: number; completionTokens?: number };
+        await trackAICost(ctx, {
+          featureKey: "reply-suggestions",
+          fullModelId: modelId,
+          usage: {
+            promptTokens: usage.promptTokens ?? 0,
+            completionTokens: usage.completionTokens ?? 0,
+            totalTokens: (usage.promptTokens ?? 0) + (usage.completionTokens ?? 0),
+          },
+          threadId: args.chatId,
+        });
+      }
 
       // Parse the AI response
       let suggestions;

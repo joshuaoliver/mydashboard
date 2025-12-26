@@ -1,5 +1,5 @@
 import { Button } from '@/components/ui/button'
-import { Copy, Check, Sparkles, Send } from 'lucide-react'
+import { Copy, Check, Sparkles, Send, RefreshCw } from 'lucide-react'
 import { useState } from 'react'
 import { Loader } from '@/components/ai-elements/loader'
 
@@ -10,6 +10,7 @@ interface ReplySuggestion {
 interface ReplySuggestionsProps {
   suggestions: ReplySuggestion[]
   isLoading: boolean
+  isRegenerating?: boolean  // True when regenerating with context (keep showing existing suggestions)
   error?: string
   _conversationContext?: {
     lastMessage: string
@@ -26,6 +27,7 @@ interface ReplySuggestionsProps {
 export function ReplySuggestions({
   suggestions,
   isLoading,
+  isRegenerating = false,
   error,
   onGenerateClick,
   selectedIndex = 0,
@@ -51,8 +53,10 @@ export function ReplySuggestions({
     onSendSuggestion?.(text)
   }
 
-  // Loading state
-  if (isLoading) {
+  const hasSuggestions = suggestions && suggestions.length > 0
+
+  // Loading state - only show full spinner if no existing suggestions
+  if (isLoading && !hasSuggestions) {
     return (
       <div className="p-2">
         <div className="flex items-center justify-center py-4">
@@ -62,8 +66,8 @@ export function ReplySuggestions({
     )
   }
 
-  // Error state
-  if (error) {
+  // Error state - only show full error if no existing suggestions
+  if (error && !hasSuggestions) {
     return (
       <div className="p-2">
         <div className="text-center py-3">
@@ -75,7 +79,7 @@ export function ReplySuggestions({
   }
 
   // No suggestions yet - show button to generate
-  if (!suggestions || suggestions.length === 0) {
+  if (!hasSuggestions) {
     return (
       <div className="p-2">
         <div className="text-center py-4">
@@ -94,6 +98,14 @@ export function ReplySuggestions({
 
   return (
     <div className="p-1.5 min-w-0">
+      {/* Regenerating indicator - subtle, at the top */}
+      {isRegenerating && (
+        <div className="flex items-center gap-1.5 text-[10px] text-gray-500 mb-1 px-1">
+          <RefreshCw className="w-3 h-3 animate-spin" />
+          <span>Generating new suggestions...</span>
+        </div>
+      )}
+      
       {/* Suggestion Cards - Full width, stacked */}
       <div className="flex flex-col gap-1 min-w-0">
         {suggestions.map((suggestion, index) => {

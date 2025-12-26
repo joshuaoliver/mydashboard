@@ -375,6 +375,7 @@ export const handleIssueWebhook = internalMutation({
 
 /**
  * Get all uncompleted issues
+ * Uses indexes for efficient filtering by statusType, workspace, and team
  */
 export const getUncompletedIssues = query({
   args: {
@@ -382,21 +383,44 @@ export const getUncompletedIssues = query({
     teamId: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    let issues = await ctx.db.query("linearIssues").collect();
+    // Query active status types using index
+    // statusType can be: "backlog", "unstarted", "started", "completed", "canceled"
+    const activeStatusTypes = ["backlog", "unstarted", "started"] as const;
 
-    // Filter out completed/cancelled
-    issues = issues.filter(
-      (i) => i.statusType !== "completed" && i.statusType !== "canceled"
-    );
+    let issues;
 
-    // Filter by workspace
-    if (args.workspaceId) {
-      issues = issues.filter((i) => i.workspaceId === args.workspaceId);
-    }
-
-    // Filter by team
+    // Use the most specific index available
     if (args.teamId) {
-      issues = issues.filter((i) => i.teamId === args.teamId);
+      // Use by_team index if filtering by team
+      issues = await ctx.db
+        .query("linearIssues")
+        .withIndex("by_team", (q) => q.eq("teamId", args.teamId!))
+        .collect();
+      // Filter by active status types
+      issues = issues.filter((i) =>
+        activeStatusTypes.includes(i.statusType as typeof activeStatusTypes[number])
+      );
+    } else if (args.workspaceId) {
+      // Use by_workspace index if filtering by workspace
+      issues = await ctx.db
+        .query("linearIssues")
+        .withIndex("by_workspace", (q) => q.eq("workspaceId", args.workspaceId!))
+        .collect();
+      // Filter by active status types
+      issues = issues.filter((i) =>
+        activeStatusTypes.includes(i.statusType as typeof activeStatusTypes[number])
+      );
+    } else {
+      // Query each active status type using the index and combine
+      const issuesByStatus = await Promise.all(
+        activeStatusTypes.map((status) =>
+          ctx.db
+            .query("linearIssues")
+            .withIndex("by_status_type", (q) => q.eq("statusType", status))
+            .collect()
+        )
+      );
+      issues = issuesByStatus.flat();
     }
 
     // Sort by priority (higher first) then by updated date
@@ -413,16 +437,23 @@ export const getUncompletedIssues = query({
 
 /**
  * Get issues grouped by workspace
+ * Uses by_status_type index to efficiently fetch only active issues
  */
 export const getIssuesByWorkspace = query({
   args: {},
   handler: async (ctx) => {
-    const issues = await ctx.db.query("linearIssues").collect();
+    // Query active status types using index
+    const activeStatusTypes = ["backlog", "unstarted", "started"] as const;
 
-    // Filter out completed
-    const activeIssues = issues.filter(
-      (i) => i.statusType !== "completed" && i.statusType !== "canceled"
+    const issuesByStatus = await Promise.all(
+      activeStatusTypes.map((status) =>
+        ctx.db
+          .query("linearIssues")
+          .withIndex("by_status_type", (q) => q.eq("statusType", status))
+          .collect()
+      )
     );
+    const activeIssues = issuesByStatus.flat();
 
     // Group by workspace
     const byWorkspace = new Map<

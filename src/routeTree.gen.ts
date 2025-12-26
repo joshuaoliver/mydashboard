@@ -39,6 +39,7 @@ import { Route as AuthenticatedSettingsIntegrationsRouteImport } from './routes/
 import { Route as AuthenticatedSettingsHubstaffRouteImport } from './routes/_authenticated/settings/hubstaff'
 import { Route as AuthenticatedSettingsGmailRouteImport } from './routes/_authenticated/settings/gmail'
 import { Route as AuthenticatedSettingsCalendarRouteImport } from './routes/_authenticated/settings/calendar'
+import { Route as AuthenticatedSettingsAiCostsRouteImport } from './routes/_authenticated/settings/ai-costs'
 import { Route as AuthenticatedSettingsAiRouteImport } from './routes/_authenticated/settings/ai'
 import { Route as AuthenticatedPeopleDatingRouteImport } from './routes/_authenticated/people/dating'
 import { Route as AuthenticatedPeopleContactIdRouteImport } from './routes/_authenticated/people/$contactId'
@@ -212,6 +213,12 @@ const AuthenticatedSettingsCalendarRoute =
     path: '/calendar',
     getParentRoute: () => AuthenticatedSettingsRoute,
   } as any)
+const AuthenticatedSettingsAiCostsRoute =
+  AuthenticatedSettingsAiCostsRouteImport.update({
+    id: '/ai-costs',
+    path: '/ai-costs',
+    getParentRoute: () => AuthenticatedSettingsRoute,
+  } as any)
 const AuthenticatedSettingsAiRoute = AuthenticatedSettingsAiRouteImport.update({
   id: '/ai',
   path: '/ai',
@@ -291,6 +298,7 @@ export interface FileRoutesByFullPath {
   '/people/$contactId': typeof AuthenticatedPeopleContactIdRoute
   '/people/dating': typeof AuthenticatedPeopleDatingRoute
   '/settings/ai': typeof AuthenticatedSettingsAiRoute
+  '/settings/ai-costs': typeof AuthenticatedSettingsAiCostsRoute
   '/settings/calendar': typeof AuthenticatedSettingsCalendarRoute
   '/settings/gmail': typeof AuthenticatedSettingsGmailRoute
   '/settings/hubstaff': typeof AuthenticatedSettingsHubstaffRoute
@@ -327,6 +335,7 @@ export interface FileRoutesByTo {
   '/people/$contactId': typeof AuthenticatedPeopleContactIdRoute
   '/people/dating': typeof AuthenticatedPeopleDatingRoute
   '/settings/ai': typeof AuthenticatedSettingsAiRoute
+  '/settings/ai-costs': typeof AuthenticatedSettingsAiCostsRoute
   '/settings/calendar': typeof AuthenticatedSettingsCalendarRoute
   '/settings/gmail': typeof AuthenticatedSettingsGmailRoute
   '/settings/hubstaff': typeof AuthenticatedSettingsHubstaffRoute
@@ -370,6 +379,7 @@ export interface FileRoutesById {
   '/_authenticated/people/$contactId': typeof AuthenticatedPeopleContactIdRoute
   '/_authenticated/people/dating': typeof AuthenticatedPeopleDatingRoute
   '/_authenticated/settings/ai': typeof AuthenticatedSettingsAiRoute
+  '/_authenticated/settings/ai-costs': typeof AuthenticatedSettingsAiCostsRoute
   '/_authenticated/settings/calendar': typeof AuthenticatedSettingsCalendarRoute
   '/_authenticated/settings/gmail': typeof AuthenticatedSettingsGmailRoute
   '/_authenticated/settings/hubstaff': typeof AuthenticatedSettingsHubstaffRoute
@@ -413,6 +423,7 @@ export interface FileRouteTypes {
     | '/people/$contactId'
     | '/people/dating'
     | '/settings/ai'
+    | '/settings/ai-costs'
     | '/settings/calendar'
     | '/settings/gmail'
     | '/settings/hubstaff'
@@ -449,6 +460,7 @@ export interface FileRouteTypes {
     | '/people/$contactId'
     | '/people/dating'
     | '/settings/ai'
+    | '/settings/ai-costs'
     | '/settings/calendar'
     | '/settings/gmail'
     | '/settings/hubstaff'
@@ -491,6 +503,7 @@ export interface FileRouteTypes {
     | '/_authenticated/people/$contactId'
     | '/_authenticated/people/dating'
     | '/_authenticated/settings/ai'
+    | '/_authenticated/settings/ai-costs'
     | '/_authenticated/settings/calendar'
     | '/_authenticated/settings/gmail'
     | '/_authenticated/settings/hubstaff'
@@ -733,6 +746,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSettingsCalendarRouteImport
       parentRoute: typeof AuthenticatedSettingsRoute
     }
+    '/_authenticated/settings/ai-costs': {
+      id: '/_authenticated/settings/ai-costs'
+      path: '/ai-costs'
+      fullPath: '/settings/ai-costs'
+      preLoaderRoute: typeof AuthenticatedSettingsAiCostsRouteImport
+      parentRoute: typeof AuthenticatedSettingsRoute
+    }
     '/_authenticated/settings/ai': {
       id: '/_authenticated/settings/ai'
       path: '/ai'
@@ -874,6 +894,7 @@ const AuthenticatedSettingsProjectsRouteWithChildren =
 
 interface AuthenticatedSettingsRouteChildren {
   AuthenticatedSettingsAiRoute: typeof AuthenticatedSettingsAiRoute
+  AuthenticatedSettingsAiCostsRoute: typeof AuthenticatedSettingsAiCostsRoute
   AuthenticatedSettingsCalendarRoute: typeof AuthenticatedSettingsCalendarRoute
   AuthenticatedSettingsGmailRoute: typeof AuthenticatedSettingsGmailRoute
   AuthenticatedSettingsHubstaffRoute: typeof AuthenticatedSettingsHubstaffRoute
@@ -888,6 +909,7 @@ interface AuthenticatedSettingsRouteChildren {
 
 const AuthenticatedSettingsRouteChildren: AuthenticatedSettingsRouteChildren = {
   AuthenticatedSettingsAiRoute: AuthenticatedSettingsAiRoute,
+  AuthenticatedSettingsAiCostsRoute: AuthenticatedSettingsAiCostsRoute,
   AuthenticatedSettingsCalendarRoute: AuthenticatedSettingsCalendarRoute,
   AuthenticatedSettingsGmailRoute: AuthenticatedSettingsGmailRoute,
   AuthenticatedSettingsHubstaffRoute: AuthenticatedSettingsHubstaffRoute,

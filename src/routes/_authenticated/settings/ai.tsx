@@ -16,7 +16,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Bot, Sparkles, RefreshCw, Check, FileText } from 'lucide-react'
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 
 export const Route = createFileRoute('/_authenticated/settings/ai')({
   component: AISettingsPage,
@@ -41,6 +41,7 @@ function AISettingsPage() {
   const [promptsResult, setPromptsResult] = useState<{ created: string[], skipped: string[] } | null>(null)
   const [resetResult, setResetResult] = useState<{ deleted: string[], created: string[] } | null>(null)
   const [savedKeys, setSavedKeys] = useState<Set<string>>(new Set())
+  const [localTemperatures, setLocalTemperatures] = useState<Record<string, number>>({})
 
   // Group models by provider
   const modelsByProvider = (availableModels ?? []).reduce((acc, model) => {
@@ -90,10 +91,20 @@ function AISettingsPage() {
     markSaved(settingKey)
   }
 
-  const handleTemperatureChange = async (settingKey: string, temperature: number) => {
+  const handleTemperatureDrag = useCallback((settingKey: string, temperature: number) => {
+    setLocalTemperatures(prev => ({ ...prev, [settingKey]: temperature }))
+  }, [])
+
+  const handleTemperatureCommit = async (settingKey: string, temperature: number) => {
     await updateSetting({
       key: settingKey,
       temperature,
+    })
+    // Clear local state after commit
+    setLocalTemperatures(prev => {
+      const next = { ...prev }
+      delete next[settingKey]
+      return next
     })
     markSaved(settingKey)
   }
@@ -276,16 +287,17 @@ function AISettingsPage() {
                 <div className="flex items-center justify-between">
                   <Label>Temperature</Label>
                   <span className="text-sm font-mono text-muted-foreground">
-                    {(setting.temperature ?? 1).toFixed(1)}
+                    {(localTemperatures[setting.key] ?? setting.temperature ?? 1).toFixed(1)}
                   </span>
                 </div>
                 <Slider
-                  value={[setting.temperature ?? 1]}
+                  value={[localTemperatures[setting.key] ?? setting.temperature ?? 1]}
                   min={0}
                   max={2}
                   step={0.1}
-                  onValueCommit={(value) => handleTemperatureChange(setting.key, value[0])}
-                  className="w-full"
+                  onValueChange={(value) => handleTemperatureDrag(setting.key, value[0])}
+                  onValueCommit={(value) => handleTemperatureCommit(setting.key, value[0])}
+                  className="w-full cursor-pointer"
                 />
                 <p className="text-xs text-muted-foreground">
                   Higher = more creative, Lower = more focused
