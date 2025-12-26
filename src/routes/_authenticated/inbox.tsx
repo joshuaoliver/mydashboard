@@ -20,7 +20,7 @@ import {
 } from '@/components/ui/sheet'
 import { Button } from '@/components/ui/button'
 import { ArrowLeft, User as UserIcon } from 'lucide-react'
-import { Sidebar, SidebarHeader } from '@/components/layout/sidebar'
+import { Sidebar } from '@/components/layout/sidebar'
 import { cn } from '~/lib/utils'
 
 export const Route = createFileRoute('/_authenticated/inbox')({
@@ -33,7 +33,7 @@ export const Route = createFileRoute('/_authenticated/inbox')({
 })
 
 function InboxPage() {
-  const navigate = useNavigate({ from: '/inbox' })
+  const navigate = useNavigate()
   const { chatId } = Route.useSearch()
   const isMobile = useIsMobile()
 

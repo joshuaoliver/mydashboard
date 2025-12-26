@@ -30,7 +30,7 @@ export function ReplySuggestions({
   isRegenerating = false,
   error,
   onGenerateClick,
-  selectedIndex = 0,
+  selectedIndex,
   onSuggestionSelect,
   onSendSuggestion,
 }: ReplySuggestionsProps) {
@@ -97,7 +97,7 @@ export function ReplySuggestions({
   }
 
   return (
-    <div className="p-1.5 min-w-0">
+    <div className="p-1 min-w-0">
       {/* Regenerating indicator - subtle, at the top */}
       {isRegenerating && (
         <div className="flex items-center gap-1.5 text-[10px] text-gray-500 mb-1 px-1">
@@ -109,7 +109,7 @@ export function ReplySuggestions({
       {/* Suggestion Cards - Full width, stacked */}
       <div className="flex flex-col gap-1 min-w-0">
         {suggestions.map((suggestion, index) => {
-          const isSelected = index === selectedIndex
+          const isSelected = selectedIndex !== undefined && index === selectedIndex
           return (
             <div
               key={index}
@@ -117,7 +117,7 @@ export function ReplySuggestions({
               className={`w-full px-2 py-1.5 rounded transition-all cursor-pointer group ${
                 isSelected
                   ? 'bg-blue-50 border border-blue-500'
-                  : 'bg-white border border-gray-200 hover:border-blue-400'
+                  : 'bg-white border border-gray-200 hover:border-gray-300'
               }`}
             >
               <div className="flex items-start gap-2">
@@ -146,7 +146,7 @@ export function ReplySuggestions({
                   </Button>
                   {onSendSuggestion && (
                     <Button
-                      variant={isSelected ? "default" : "outline"}
+                      variant="outline"
                       size="sm"
                       onClick={(e) => {
                         e.stopPropagation()

@@ -47,6 +47,7 @@ import {
   Activity,
   Search,
   Database,
+  AlertTriangle,
 } from 'lucide-react'
 import { useState, useMemo } from 'react'
 
@@ -248,6 +249,40 @@ function AICostsPage() {
           )}
         </Button>
       </div>
+
+      {/* Warning if pricing not synced */}
+      {!isPricingLoading && (allPricing?.length ?? 0) === 0 && (
+        <Card className="border-amber-500/50 bg-amber-500/10">
+          <CardContent className="flex items-center gap-4 py-4">
+            <AlertTriangle className="h-5 w-5 text-amber-500 flex-shrink-0" />
+            <div className="flex-1">
+              <p className="font-medium text-amber-600 dark:text-amber-400">
+                Pricing data not synced
+              </p>
+              <p className="text-sm text-muted-foreground">
+                AI cost tracking requires pricing data from models.dev. Click "Sync Pricing" to enable cost tracking.
+              </p>
+            </div>
+            <Button
+              onClick={handleSyncPricing}
+              disabled={isSyncing}
+              className="bg-amber-500 hover:bg-amber-600 text-white"
+            >
+              {isSyncing ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Syncing...
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                  Sync Now
+                </>
+              )}
+            </Button>
+          </CardContent>
+        </Card>
+      )}
 
       <Tabs defaultValue="usage" className="space-y-6">
         <TabsList>

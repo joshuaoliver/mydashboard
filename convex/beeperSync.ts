@@ -815,6 +815,13 @@ export const syncBeeperChatsInternal = internalAction({
       // Use local variables for pagination so we can update them in the loop
       let currentCursor = cursor;
       let currentDirection = direction;
+      
+      // CYCLE DETECTION: Track cursors we've already seen to prevent infinite loops
+      // This guards against API bugs or cursor corruption that could cause oscillation
+      const seenCursors = new Set<string>();
+      if (currentCursor) {
+        seenCursors.add(currentCursor);
+      }
 
       while (hasMore && currentPage < MAX_CATCHUP_PAGES) {
         currentPage++;
@@ -831,7 +838,9 @@ export const syncBeeperChatsInternal = internalAction({
         
         console.log(
           `[Cursor Sync] Received ${chats.length} chats from API (page ${currentPage}) ` +
-          `(hasMore: ${response.hasMore || false}, newestCursor: ${response.newestCursor?.slice(0, 13)})`
+          `(hasMore: ${response.hasMore || false}, ` +
+          `newestCursor: ${response.newestCursor?.slice(0, 15) || 'none'}, ` +
+          `oldestCursor: ${response.oldestCursor?.slice(0, 15) || 'none'})`
         );
 
         // OPTIMIZATION: If we're doing an incremental sync (direction=after) and the API returns
@@ -839,6 +848,18 @@ export const syncBeeperChatsInternal = internalAction({
         // This prevents re-syncing the same 125 chats over and over when nothing has changed.
         if (currentDirection === "after" && currentCursor && response.newestCursor === currentCursor) {
           console.log(`[Cursor Sync] No new chats (cursor unchanged) - skipping processing`);
+          hasMore = false;
+          break;
+        }
+        
+        // CYCLE DETECTION: If we've seen this cursor before, we're in an infinite loop
+        // This can happen due to API bugs or corrupt cursor data
+        if (response.newestCursor && seenCursors.has(response.newestCursor)) {
+          console.warn(
+            `[Cursor Sync] ⚠️ CYCLE DETECTED: Cursor ${response.newestCursor?.slice(0, 15)} ` +
+            `was already seen. Breaking to prevent infinite loop. ` +
+            `Seen cursors: ${Array.from(seenCursors).map(c => c.slice(0, 10)).join(', ')}`
+          );
           hasMore = false;
           break;
         }
@@ -1064,7 +1085,11 @@ export const syncBeeperChatsInternal = internalAction({
         // Check if we need to fetch another page (forward sync only)
         if (currentDirection === "after" && response.hasMore) {
           currentCursor = response.newestCursor;
-          console.log(`[Cursor Sync] Fetching next page of newer chats (cursor: ${currentCursor?.slice(0, 13)})...`);
+          // Track this cursor to detect cycles on future pages
+          if (currentCursor) {
+            seenCursors.add(currentCursor);
+          }
+          console.log(`[Cursor Sync] Fetching next page of newer chats (cursor: ${currentCursor?.slice(0, 15)})...`);
         } else {
           hasMore = false;
         }
@@ -1076,14 +1101,15 @@ export const syncBeeperChatsInternal = internalAction({
 
       // Store cursor boundaries for next sync using LAST response
       // Only update if we got a valid response from the API
+      // NOTE: Use currentDirection (not direction) since it tracks the actual pagination state
       if (lastResponse) {
         const updateData: any = {
           syncSource: args.syncSource,
         };
 
-        if (direction === "after") {
+        if (currentDirection === "after") {
           updateData.newestCursor = lastResponse.newestCursor;
-        } else if (direction === "before") {
+        } else if (currentDirection === "before") {
           updateData.oldestCursor = lastResponse.oldestCursor;
         } else {
           updateData.newestCursor = lastResponse.newestCursor;

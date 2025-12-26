@@ -805,156 +805,159 @@ export function ContactPanel({ contact, isLoading, searchedUsername, searchedPho
           </div>
         )}
 
-        {/* Tags - Autocomplete dropdown - NO LABEL */}
-        <div>
-          <Popover open={isTagPopoverOpen} onOpenChange={setIsTagPopoverOpen}>
-            <PopoverTrigger asChild>
-              <Button
-                variant="outline"
-                className="w-full justify-start h-auto min-h-[40px] p-2"
-                disabled={isSaving}
-              >
-                <div className="flex flex-wrap gap-1">
-                  {selectedTags.length > 0 ? (
-                    selectedTags.map((tagId) => {
-                      const tag = tags?.find(t => t._id === tagId)
-                      return tag ? (
-                        <Badge key={tagId} variant="secondary" className="gap-1">
-                          {tag.name}
-                          <X
-                            className="w-3 h-3 cursor-pointer hover:text-destructive"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              handleRemoveTag(tagId)
+        {/* Tags and Locations - Side by side, 50% each */}
+        <div className="flex gap-2">
+          {/* Tags - Autocomplete dropdown */}
+          <div className="flex-1">
+            <Popover open={isTagPopoverOpen} onOpenChange={setIsTagPopoverOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className="w-full justify-start h-auto min-h-[40px] p-2"
+                  disabled={isSaving}
+                >
+                  <div className="flex flex-wrap gap-1">
+                    {selectedTags.length > 0 ? (
+                      selectedTags.map((tagId) => {
+                        const tag = tags?.find(t => t._id === tagId)
+                        return tag ? (
+                          <Badge key={tagId} variant="secondary" className="gap-1">
+                            {tag.name}
+                            <X
+                              className="w-3 h-3 cursor-pointer hover:text-destructive"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleRemoveTag(tagId)
+                              }}
+                            />
+                          </Badge>
+                        ) : null
+                      })
+                    ) : (
+                      <span className="text-muted-foreground text-sm">Tags...</span>
+                    )}
+                  </div>
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-full p-0 bg-white" align="start">
+                <Command>
+                  <CommandInput 
+                    placeholder="Search or create tag..." 
+                    value={tagSearch}
+                    onValueChange={setTagSearch}
+                  />
+                  <CommandList>
+                    <CommandEmpty>
+                      <Button
+                        variant="ghost"
+                        className="w-full justify-start text-sm"
+                        onClick={() => {
+                          handleCreateAndSelectTag(tagSearch)
+                          setIsTagPopoverOpen(false)
+                        }}
+                        disabled={!tagSearch.trim()}
+                      >
+                        Create "{tagSearch}"
+                      </Button>
+                    </CommandEmpty>
+                    <CommandGroup>
+                      {tags?.map((tag) => {
+                        const isSelected = selectedTags.includes(tag._id)
+                        return (
+                          <CommandItem
+                            key={tag._id}
+                            onSelect={() => {
+                              handleToggleTag(tag._id)
                             }}
-                          />
-                        </Badge>
-                      ) : null
-                    })
-                  ) : (
-                    <span className="text-muted-foreground text-sm">Select tags...</span>
-                  )}
-                </div>
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-full p-0 bg-white" align="start">
-              <Command>
-                <CommandInput 
-                  placeholder="Search or create tag..." 
-                  value={tagSearch}
-                  onValueChange={setTagSearch}
-                />
-                <CommandList>
-                  <CommandEmpty>
-                    <Button
-                      variant="ghost"
-                      className="w-full justify-start text-sm"
-                      onClick={() => {
-                        handleCreateAndSelectTag(tagSearch)
-                        setIsTagPopoverOpen(false)
-                      }}
-                      disabled={!tagSearch.trim()}
-                    >
-                      Create "{tagSearch}"
-                    </Button>
-                  </CommandEmpty>
-                  <CommandGroup>
-                    {tags?.map((tag) => {
-                      const isSelected = selectedTags.includes(tag._id)
-                      return (
-                        <CommandItem
-                          key={tag._id}
-                          onSelect={() => {
-                            handleToggleTag(tag._id)
-                          }}
-                          className="cursor-pointer"
-                        >
-                          <span className="flex-1">{tag.name}</span>
-                          {isSelected && <Check className="w-4 h-4 text-blue-600" />}
-                        </CommandItem>
-                      )
-                    })}
-                  </CommandGroup>
-                </CommandList>
-              </Command>
-            </PopoverContent>
-          </Popover>
-        </div>
+                            className="cursor-pointer"
+                          >
+                            <span className="flex-1">{tag.name}</span>
+                            {isSelected && <Check className="w-4 h-4 text-blue-600" />}
+                          </CommandItem>
+                        )
+                      })}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
+          </div>
 
-        {/* Location Tags - Autocomplete dropdown - NO LABEL */}
-        <div>
-          <Popover open={isLocationPopoverOpen} onOpenChange={setIsLocationPopoverOpen}>
-            <PopoverTrigger asChild>
-              <Button
-                variant="outline"
-                className="w-full justify-start h-auto min-h-[40px] p-2"
-                disabled={isSaving}
-              >
-                <div className="flex flex-wrap gap-1">
-                  {selectedLocations.length > 0 ? (
-                    selectedLocations.map((locId) => {
-                      const location = locations?.find(l => l._id === locId)
-                      return location ? (
-                        <Badge key={locId} variant="secondary" className="gap-1">
-                          {location.name}
-                          <X
-                            className="w-3 h-3 cursor-pointer hover:text-destructive"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              handleRemoveLocation(locId)
+          {/* Location Tags - Autocomplete dropdown */}
+          <div className="flex-1">
+            <Popover open={isLocationPopoverOpen} onOpenChange={setIsLocationPopoverOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className="w-full justify-start h-auto min-h-[40px] p-2"
+                  disabled={isSaving}
+                >
+                  <div className="flex flex-wrap gap-1">
+                    {selectedLocations.length > 0 ? (
+                      selectedLocations.map((locId) => {
+                        const location = locations?.find(l => l._id === locId)
+                        return location ? (
+                          <Badge key={locId} variant="secondary" className="gap-1">
+                            {location.name}
+                            <X
+                              className="w-3 h-3 cursor-pointer hover:text-destructive"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleRemoveLocation(locId)
+                              }}
+                            />
+                          </Badge>
+                        ) : null
+                      })
+                    ) : (
+                      <span className="text-muted-foreground text-sm">Locations...</span>
+                    )}
+                  </div>
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-full p-0 bg-white" align="start">
+                <Command>
+                  <CommandInput 
+                    placeholder="Search or create location..." 
+                    value={locationSearch}
+                    onValueChange={setLocationSearch}
+                  />
+                  <CommandList>
+                    <CommandEmpty>
+                      <Button
+                        variant="ghost"
+                        className="w-full justify-start text-sm"
+                        onClick={() => {
+                          handleCreateAndSelectLocation(locationSearch)
+                          setIsLocationPopoverOpen(false)
+                        }}
+                        disabled={!locationSearch.trim()}
+                      >
+                        Create "{locationSearch}"
+                      </Button>
+                    </CommandEmpty>
+                    <CommandGroup>
+                      {locations?.map((location) => {
+                        const isSelected = selectedLocations.includes(location._id)
+                        return (
+                          <CommandItem
+                            key={location._id}
+                            onSelect={() => {
+                              handleToggleLocation(location._id)
                             }}
-                          />
-                        </Badge>
-                      ) : null
-                    })
-                  ) : (
-                    <span className="text-muted-foreground text-sm">Select locations...</span>
-                  )}
-                </div>
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-full p-0 bg-white" align="start">
-              <Command>
-                <CommandInput 
-                  placeholder="Search or create location..." 
-                  value={locationSearch}
-                  onValueChange={setLocationSearch}
-                />
-                <CommandList>
-                  <CommandEmpty>
-                    <Button
-                      variant="ghost"
-                      className="w-full justify-start text-sm"
-                      onClick={() => {
-                        handleCreateAndSelectLocation(locationSearch)
-                        setIsLocationPopoverOpen(false)
-                      }}
-                      disabled={!locationSearch.trim()}
-                    >
-                      Create "{locationSearch}"
-                    </Button>
-                  </CommandEmpty>
-                  <CommandGroup>
-                    {locations?.map((location) => {
-                      const isSelected = selectedLocations.includes(location._id)
-                      return (
-                        <CommandItem
-                          key={location._id}
-                          onSelect={() => {
-                            handleToggleLocation(location._id)
-                          }}
-                          className="cursor-pointer"
-                        >
-                          <span className="flex-1">{location.name}</span>
-                          {isSelected && <Check className="w-4 h-4 text-blue-600" />}
-                        </CommandItem>
-                      )
-                    })}
-                  </CommandGroup>
-                </CommandList>
-              </Command>
-            </PopoverContent>
-          </Popover>
+                            className="cursor-pointer"
+                          >
+                            <span className="flex-1">{location.name}</span>
+                            {isSelected && <Check className="w-4 h-4 text-blue-600" />}
+                          </CommandItem>
+                        )
+                      })}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
+          </div>
         </div>
 
         {/* Local Notes Field - Always visible, no title */}
@@ -982,27 +985,53 @@ export function ContactPanel({ contact, isLoading, searchedUsername, searchedPho
 
         {/* Additional contact fields - always visible */}
         <div className="space-y-4">
-          {/* Connection Direction - Multi-select with grayscale emojis, no label */}
-          <div className="flex flex-wrap gap-2">
-            {connectionOptions.map((option) => {
-              const isSelected = selectedConnections.includes(option.value)
-              return (
-                <button
-                  key={option.value}
-                  onClick={() => handleConnectionToggle(option.value)}
-                  disabled={isSaving}
-                  title={option.label}
-                  className={`px-3 py-2 text-lg rounded-lg transition-all border-2 ${
-                    isSelected
-                      ? 'bg-blue-100 border-blue-500 scale-110'
-                      : 'bg-white border-gray-200 hover:border-gray-300 hover:bg-gray-50'
-                  }`}
-                  style={{ filter: 'grayscale(100%)' }}
-                >
-                  {option.emoji}
-                </button>
-              )
-            })}
+          {/* Connection Direction + Sex - Same row, sex right-aligned */}
+          <div className="flex items-center justify-between gap-2">
+            {/* Connection types - left aligned */}
+            <div className="flex flex-wrap gap-1.5">
+              {connectionOptions.map((option) => {
+                const isSelected = selectedConnections.includes(option.value)
+                return (
+                  <button
+                    key={option.value}
+                    onClick={() => handleConnectionToggle(option.value)}
+                    disabled={isSaving}
+                    title={option.label}
+                    className={`px-2 py-1.5 text-base rounded-lg transition-all border-2 ${
+                      isSelected
+                        ? 'bg-blue-100 border-blue-500 scale-110'
+                        : 'bg-white border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                    }`}
+                    style={{ filter: 'grayscale(100%)' }}
+                  >
+                    {option.emoji}
+                  </button>
+                )
+              })}
+            </div>
+            
+            {/* Sex options - right aligned */}
+            <div className="flex gap-1.5 flex-shrink-0">
+              {sexOptions.map((option) => {
+                const isSelected = selectedSex.includes(option.value)
+                return (
+                  <button
+                    key={option.value}
+                    onClick={() => handleSexToggle(option.value)}
+                    disabled={isSaving}
+                    title={option.label}
+                    className={`px-2 py-1.5 text-base rounded-lg transition-all border-2 ${
+                      isSelected
+                        ? 'bg-blue-100 border-blue-500 scale-110'
+                        : 'bg-white border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                    }`}
+                    style={{ filter: 'grayscale(100%)' }}
+                  >
+                    {option.emoji}
+                  </button>
+                )
+              })}
+            </div>
           </div>
 
           {/* Objective Field */}
@@ -1029,29 +1058,6 @@ export function ContactPanel({ contact, isLoading, searchedUsername, searchedPho
                 {isSaving ? 'Saving...' : 'Save Objective'}
               </Button>
             )}
-          </div>
-
-          {/* Sex - Multi-select, no label */}
-          <div className="flex flex-wrap gap-2">
-            {sexOptions.map((option) => {
-              const isSelected = selectedSex.includes(option.value)
-              return (
-                <button
-                  key={option.value}
-                  onClick={() => handleSexToggle(option.value)}
-                  disabled={isSaving}
-                  title={option.label}
-                  className={`px-3 py-2 text-lg rounded-lg transition-all border-2 ${
-                    isSelected
-                      ? 'bg-blue-100 border-blue-500 scale-110'
-                      : 'bg-white border-gray-200 hover:border-gray-300 hover:bg-gray-50'
-                  }`}
-                  style={{ filter: 'grayscale(100%)' }}
-                >
-                  {option.emoji}
-                </button>
-              )
-            })}
           </div>
 
           {/* Lead Status - Button style (in hover section) */}

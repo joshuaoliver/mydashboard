@@ -82,7 +82,7 @@ export function MessageInputPanel({
   }
 
   return (
-    <div className="flex-shrink-0 border-t border-gray-200 px-2 py-1.5 bg-white">
+    <div className="flex-shrink-0 border-t border-gray-200 px-2 py-1 bg-white">
       <PromptInput 
         onSubmit={handleSubmit} 
         className="w-full border border-gray-300 rounded-md hover:border-blue-400 focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-200 transition-all"
@@ -92,7 +92,7 @@ export function MessageInputPanel({
             placeholder="Type your reply..."
             value={messageInputValue}
             onChange={(e) => handleInputChange(e.target.value)}
-            className="text-sm text-gray-900 placeholder:text-gray-500 min-h-[36px] max-h-24 py-1.5"
+            className="text-xs text-gray-900 placeholder:text-gray-500 min-h-[32px] max-h-20 py-1"
           />
         </PromptInputBody>
         <PromptInputToolbar className="py-0.5 px-1">

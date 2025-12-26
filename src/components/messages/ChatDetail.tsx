@@ -83,7 +83,7 @@ export const ChatDetail = memo(function ChatDetail({ messages, isSingleChat = tr
               description="Select a chat and type a message to begin"
             />
           ) : (
-            <div className="px-3 py-1.5 space-y-1">
+            <div className="px-2 py-1 space-y-0.5">
               {/* Load full history button - shown when at the top and all cached messages loaded */}
               {messagesStatus === "Exhausted" && onLoadFullHistory && (
                 <div className="py-3 text-center border-b border-gray-100 mb-2">
@@ -131,7 +131,7 @@ export const ChatDetail = memo(function ChatDetail({ messages, isSingleChat = tr
                   {/* Message bubble */}
                   <div 
                     className={cn(
-                      "max-w-[75%] rounded-2xl px-3 py-2",
+                      "max-w-[75%] rounded-2xl px-2.5 py-1.5",
                       message.isFromUser 
                         ? "bg-blue-500 text-white" 
                         : "bg-gray-100 text-gray-900",
@@ -193,7 +193,7 @@ export const ChatDetail = memo(function ChatDetail({ messages, isSingleChat = tr
                     
                     {/* Render text content */}
                     {message.text && (
-                      <p className="text-[13px] whitespace-pre-wrap break-words leading-relaxed">
+                      <p className="text-xs whitespace-pre-wrap break-words leading-relaxed">
                         {message.text}
                       </p>
                     )}

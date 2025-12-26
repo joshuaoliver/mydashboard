@@ -27,7 +27,7 @@ export const ReplySuggestionsPanel = forwardRef<ReplySuggestionsPanelRef, ReplyS
   onSendMessage,
 }, ref) {
   // Local state for custom regeneration only
-  const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(0)
+  const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState<number | undefined>(undefined)
   const [isRegenerating, setIsRegenerating] = useState(false)
   const [regenerateError, setRegenerateError] = useState<string | null>(null)
   const [customSuggestions, setCustomSuggestions] = useState<ReplySuggestion[] | null>(null)
@@ -43,7 +43,7 @@ export const ReplySuggestionsPanel = forwardRef<ReplySuggestionsPanelRef, ReplyS
 
   // Reset state when chat changes
   useEffect(() => {
-    setSelectedSuggestionIndex(0)
+    setSelectedSuggestionIndex(undefined)
     setCustomSuggestions(null)
     setRegenerateError(null)
   }, [selectedChatId])
@@ -101,7 +101,7 @@ export const ReplySuggestionsPanel = forwardRef<ReplySuggestionsPanelRef, ReplyS
   }, [displaySuggestions, onSuggestionSelect])
 
   return (
-    <div className="flex-shrink-0 border-t border-gray-200 bg-gray-50 min-h-[120px]">
+    <div className="flex-shrink-0 border-t border-gray-200 bg-gray-50">
       <ReplySuggestions
         suggestions={displaySuggestions}
         isLoading={isLoading}
