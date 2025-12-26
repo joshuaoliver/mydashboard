@@ -21,35 +21,49 @@ export const listCachedChats = query({
       v.literal("unreplied"),
       v.literal("unread"),
       v.literal("all"),
-      v.literal("archived")
+      v.literal("archived"),
+      v.literal("blocked")
     )),
   },
   handler: async (ctx, args) => {
     const filter = args.filter || "all";
-    
+
     // Use compound index for type+isArchived+lastActivity (filter AND sort in database)
     // The index "by_type_archived_activity" has fields: ["type", "isArchived", "lastActivity"]
     // This allows us to filter by type/isArchived and sort by lastActivity in a single index scan
     let queryBuilder;
-    
-    if (filter === "archived") {
-      // Use compound index for type=single, isArchived=true, sorted by lastActivity DESC
+
+    if (filter === "blocked") {
+      // Show only blocked chats
       queryBuilder = ctx.db
         .query("beeperChats")
-        .withIndex("by_type_archived_activity", (q) => 
+        .withIndex("by_type_archived_activity", (q) =>
+          q.eq("type", "single")
+        )
+        .filter((q) => q.eq(q.field("isBlocked"), true))
+        .order("desc");
+    } else if (filter === "archived") {
+      // Use compound index for type=single, isArchived=true, sorted by lastActivity DESC
+      // Also filter out blocked chats
+      queryBuilder = ctx.db
+        .query("beeperChats")
+        .withIndex("by_type_archived_activity", (q) =>
           q.eq("type", "single").eq("isArchived", true)
         )
+        .filter((q) => q.neq(q.field("isBlocked"), true))
         .order("desc"); // Sort by lastActivity (last field in index) descending
     } else {
       // All other filters: type=single, isArchived=false, sorted by lastActivity DESC
+      // Filter out blocked chats from main views
       queryBuilder = ctx.db
         .query("beeperChats")
-        .withIndex("by_type_archived_activity", (q) => 
+        .withIndex("by_type_archived_activity", (q) =>
           q.eq("type", "single").eq("isArchived", false)
         )
+        .filter((q) => q.neq(q.field("isBlocked"), true))
         .order("desc"); // Sort by lastActivity (last field in index) descending
     }
-    
+
     // Apply additional filters for unreplied/unread (post-filter on indexed results)
     if (filter === "unreplied") {
       queryBuilder = queryBuilder.filter((q) =>
@@ -60,7 +74,7 @@ export const listCachedChats = query({
         q.gt(q.field("unreadCount"), 0)
       );
     }
-    
+
     // Paginate - results are already sorted by lastActivity DESC from the database
     const result = await queryBuilder.paginate(args.paginationOpts);
     

@@ -135,6 +135,36 @@ export const gatherSummaryData = internalQuery({
       return hour >= 12;
     });
 
+    // Get message snapshots for the day to track messages sent
+    const dateStart = new Date(args.date + 'T00:00:00').getTime();
+    const dateEnd = new Date(args.date + 'T23:59:59').getTime();
+
+    const allSnapshots = await ctx.db.query("messageSnapshots").collect();
+    const daySnapshots = allSnapshots.filter(s =>
+      s.timestamp >= dateStart && s.timestamp <= dateEnd
+    );
+    const messagesSent = daySnapshots.reduce(
+      (sum, s) => sum + (s.messagesSentSinceLastSnapshot ?? 0),
+      0
+    );
+
+    // Get calendar events for the day
+    const calendarEvents = await ctx.db
+      .query("calendarEvents")
+      .withIndex("by_start_time")
+      .collect();
+    const dayEvents = calendarEvents.filter(e =>
+      e.startTime >= dateStart && e.startTime <= dateEnd
+    );
+
+    // Get todos completed today
+    const completedTodos = await ctx.db
+      .query("completedTodos")
+      .collect();
+    const todosCompletedToday = completedTodos.filter(t =>
+      t.completedAt >= dateStart && t.completedAt <= dateEnd
+    );
+
     return {
       date: args.date,
       formattedDate: formatDateForDisplay(args.date),
@@ -160,6 +190,17 @@ export const gatherSummaryData = internalQuery({
         byType,
         morningCount: morningWork.length,
         afternoonCount: afternoonWork.length,
+      },
+      communication: {
+        messagesSent,
+      },
+      calendar: {
+        eventsCount: dayEvents.length,
+        eventTitles: dayEvents.map(e => e.summary),
+      },
+      todos: {
+        completedCount: todosCompletedToday.length,
+        completedTitles: todosCompletedToday.map(t => t.text).slice(0, 10), // Limit for prompt
       },
       planId: plan?._id,
     };
@@ -391,6 +432,17 @@ interface SummaryData {
     morningCount: number;
     afternoonCount: number;
   };
+  communication: {
+    messagesSent: number;
+  };
+  calendar: {
+    eventsCount: number;
+    eventTitles: string[];
+  };
+  todos: {
+    completedCount: number;
+    completedTitles: string[];
+  };
 }
 
 function buildSummaryPrompt(data: SummaryData): string {
@@ -429,6 +481,27 @@ TIME DISTRIBUTION:
 `
     : "No work sessions recorded.";
 
+  const communicationSection = data.communication.messagesSent > 0
+    ? `
+COMMUNICATION:
+- Messages sent: ${data.communication.messagesSent}
+`
+    : "";
+
+  const calendarSection = data.calendar.eventsCount > 0
+    ? `
+CALENDAR EVENTS (${data.calendar.eventsCount} total):
+${data.calendar.eventTitles.slice(0, 5).map(t => `- ${t}`).join('\n')}${data.calendar.eventsCount > 5 ? `\n- ... and ${data.calendar.eventsCount - 5} more` : ''}
+`
+    : "";
+
+  const todosSection = data.todos.completedCount > 0
+    ? `
+TODOS COMPLETED (${data.todos.completedCount} total):
+${data.todos.completedTitles.map(t => `- ${t}`).join('\n')}
+`
+    : "";
+
   return `You are generating a daily reflection summary for a personal productivity system. The tone should be supportive, neutral, and focused on patterns rather than judgment.
 
 DATE: ${data.formattedDate}
@@ -438,6 +511,9 @@ ${contextSection}
 ${momentumSection}
 
 ${sessionsSection}
+${communicationSection}
+${calendarSection}
+${todosSection}
 
 Generate a daily summary with these exact sections (use the headers exactly as shown):
 

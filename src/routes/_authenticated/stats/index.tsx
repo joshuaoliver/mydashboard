@@ -14,6 +14,7 @@ import {
   TrendingUp,
   MessageSquare,
   Reply,
+  Send,
 } from 'lucide-react'
 
 export const Route = createFileRoute('/_authenticated/stats/')({
@@ -44,6 +45,7 @@ function StatsOverviewPage() {
 
   // Message stats (always available - uses Beeper data, with caching)
   const messageSnapshot = useCachedQuery(api.messageStats.getLatestSnapshot, {})
+  const messageStats = useCachedQuery(api.messageStats.getStats, {})
 
   const gmailConfigured = gmailSettings?.isConfigured ?? false
   const hubstaffConfigured = hubstaffSettings?.isConfigured ?? false
@@ -91,8 +93,9 @@ function StatsOverviewPage() {
                     </div>
                   </div>
                   <div className="flex items-center justify-between text-sm text-gray-500">
-                    <span>
-                      {messageSnapshot.archivedChats} archived
+                    <span className="flex items-center gap-1">
+                      <Send className="w-3 h-3" />
+                      {messageStats?.totalMessagesSent ?? 0} sent
                     </span>
                     <ArrowRight className="w-4 h-4" />
                   </div>

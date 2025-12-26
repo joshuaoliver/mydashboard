@@ -438,6 +438,7 @@ export function ConversationPanel() {
             selectedChatName={selectedChat.name}
             username={selectedChat.username}
             onSuggestionSelect={handleSuggestionSelect}
+            onSendMessage={handleSendMessage}
           />
         </>
       )}

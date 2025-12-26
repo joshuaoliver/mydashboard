@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 
-type TabFilter = 'unreplied' | 'unread' | 'all' | 'archived'
+type TabFilter = 'unreplied' | 'unread' | 'all' | 'archived' | 'blocked'
 
 interface ChatListItem {
   id: string

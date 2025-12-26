@@ -104,6 +104,7 @@ interface WorkItem {
   source?: Record<string, unknown>
   status?: string
   projectName?: string
+  isFrog?: boolean
 }
 
 // Extended calendar event data stored in the CalendarEvent.data field
@@ -130,8 +131,7 @@ interface WorkPoolPanelProps {
   onAddAdhoc: (text: string) => void
   onToggleAdhoc: (id: Id<"adhocItems">) => void
   onDeleteAdhoc: (id: Id<"adhocItems">) => void
-  frogTaskId?: string
-  onSetFrog: (taskId: string | undefined) => void
+  onToggleFrog: (taskId: string, taskType: 'todo' | 'linear') => void
   onDragStart: (item: WorkItem) => void
   onAddToToday: (item: WorkItem) => void
 }
@@ -143,8 +143,7 @@ function WorkPoolPanel({
   onAddAdhoc,
   onToggleAdhoc,
   onDeleteAdhoc,
-  frogTaskId,
-  onSetFrog,
+  onToggleFrog,
   onDragStart,
   onAddToToday,
 }: WorkPoolPanelProps) {
@@ -279,7 +278,7 @@ function WorkPoolPanel({
                 className={cn(
                   "group flex items-start gap-1.5 p-2 rounded-lg border bg-background cursor-grab active:cursor-grabbing",
                   "hover:bg-accent/50 hover:shadow-sm transition-all",
-                  frogTaskId === item.id && "ring-2 ring-amber-400 bg-amber-50/50"
+                  item.isFrog && "ring-2 ring-amber-400 bg-amber-50/50"
                 )}
               >
                 {/* Drag handle */}
@@ -329,21 +328,23 @@ function WorkPoolPanel({
                   >
                     <Plus className="w-3 h-3" />
                   </Button>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className={cn(
-                      "h-5 w-5",
-                      frogTaskId === item.id && "text-amber-600"
-                    )}
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      onSetFrog(frogTaskId === item.id ? undefined : item.id)
-                    }}
-                    title={frogTaskId === item.id ? "Remove frog" : "Set as frog"}
-                  >
-                    🐸
-                  </Button>
+                  {(item.type === 'todo' || item.type === 'linear') && (
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className={cn(
+                        "h-5 w-5",
+                        item.isFrog && "text-amber-600"
+                      )}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        onToggleFrog(item.id, item.type as 'todo' | 'linear')
+                      }}
+                      title={item.isFrog ? "Remove frog" : "Mark as frog (task you've been avoiding)"}
+                    >
+                      🐸
+                    </Button>
+                  )}
                   {item.type === 'linear' && item.source && 'url' in item.source && (
                     <a
                       href={item.source.url as string}
@@ -362,38 +363,148 @@ function WorkPoolPanel({
         </div>
       </ScrollArea>
 
-      {/* Email blocks section */}
-      <div className="p-2 border-t bg-blue-50/50 dark:bg-blue-950/20 flex-shrink-0">
-        <div className="flex items-center gap-1 mb-1.5">
-          <Mail className="w-3 h-3 text-blue-600" />
-          <span className="text-[10px] font-semibold text-blue-700 dark:text-blue-400">
-            Email Blocks
-          </span>
-        </div>
-        <div className="grid grid-cols-2 gap-1">
-          {[
-            { title: 'Triage', duration: 20 },
-            { title: 'Reply 5', duration: 15 },
-          ].map((block) => (
-            <button
-              key={block.title}
-              draggable
-              onDragStart={(e) => {
-                const emailItem: WorkItem = {
-                  type: 'email',
-                  id: `email-${block.title.toLowerCase().replace(' ', '-')}`,
-                  title: block.title,
-                  priority: 3,
-                  estimatedDuration: block.duration,
-                }
-                e.dataTransfer.setData('application/json', JSON.stringify(emailItem))
-              }}
-              className="text-left p-1.5 rounded bg-background/50 hover:bg-background text-[10px] cursor-grab"
-            >
-              <span className="font-medium">{block.title}</span>
-              <span className="text-muted-foreground ml-0.5">({block.duration}m)</span>
-            </button>
-          ))}
+      {/* Quick Blocks section */}
+      <div className="p-2 border-t bg-muted/30 flex-shrink-0">
+        <div className="space-y-2">
+          {/* Email blocks */}
+          <div>
+            <div className="flex items-center gap-1 mb-1">
+              <Mail className="w-3 h-3 text-blue-600" />
+              <span className="text-[10px] font-semibold text-blue-700 dark:text-blue-400">
+                Email
+              </span>
+            </div>
+            <div className="grid grid-cols-2 gap-1">
+              {[
+                { title: 'Triage', duration: 20 },
+                { title: 'Reply 5', duration: 15 },
+              ].map((block) => (
+                <button
+                  key={block.title}
+                  draggable
+                  onDragStart={(e) => {
+                    const emailItem: WorkItem = {
+                      type: 'email',
+                      id: `email-${block.title.toLowerCase().replace(' ', '-')}`,
+                      title: block.title,
+                      priority: 3,
+                      estimatedDuration: block.duration,
+                    }
+                    e.dataTransfer.setData('application/json', JSON.stringify(emailItem))
+                  }}
+                  className="text-left p-1.5 rounded bg-blue-50/50 hover:bg-blue-100 dark:bg-blue-950/30 dark:hover:bg-blue-950/50 text-[10px] cursor-grab"
+                >
+                  <span className="font-medium">{block.title}</span>
+                  <span className="text-muted-foreground ml-0.5">({block.duration}m)</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Messaging blocks */}
+          <div>
+            <div className="flex items-center gap-1 mb-1">
+              <MessageSquare className="w-3 h-3 text-green-600" />
+              <span className="text-[10px] font-semibold text-green-700 dark:text-green-400">
+                Messaging
+              </span>
+            </div>
+            <div className="grid grid-cols-2 gap-1">
+              {[
+                { title: 'Reply All', duration: 30 },
+                { title: 'Quick Check', duration: 10 },
+              ].map((block) => (
+                <button
+                  key={block.title}
+                  draggable
+                  onDragStart={(e) => {
+                    const item: WorkItem = {
+                      type: 'adhoc',
+                      id: `messaging-${block.title.toLowerCase().replace(' ', '-')}`,
+                      title: `Messages: ${block.title}`,
+                      priority: 3,
+                      estimatedDuration: block.duration,
+                    }
+                    e.dataTransfer.setData('application/json', JSON.stringify(item))
+                  }}
+                  className="text-left p-1.5 rounded bg-green-50/50 hover:bg-green-100 dark:bg-green-950/30 dark:hover:bg-green-950/50 text-[10px] cursor-grab"
+                >
+                  <span className="font-medium">{block.title}</span>
+                  <span className="text-muted-foreground ml-0.5">({block.duration}m)</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Social/Calendar blocks */}
+          <div>
+            <div className="flex items-center gap-1 mb-1">
+              <CalendarIcon className="w-3 h-3 text-purple-600" />
+              <span className="text-[10px] font-semibold text-purple-700 dark:text-purple-400">
+                Social Planning
+              </span>
+            </div>
+            <div className="grid grid-cols-2 gap-1">
+              {[
+                { title: 'Plan Week', duration: 20 },
+                { title: 'Reach Out', duration: 15 },
+              ].map((block) => (
+                <button
+                  key={block.title}
+                  draggable
+                  onDragStart={(e) => {
+                    const item: WorkItem = {
+                      type: 'adhoc',
+                      id: `social-${block.title.toLowerCase().replace(' ', '-')}`,
+                      title: `Social: ${block.title}`,
+                      priority: 3,
+                      estimatedDuration: block.duration,
+                    }
+                    e.dataTransfer.setData('application/json', JSON.stringify(item))
+                  }}
+                  className="text-left p-1.5 rounded bg-purple-50/50 hover:bg-purple-100 dark:bg-purple-950/30 dark:hover:bg-purple-950/50 text-[10px] cursor-grab"
+                >
+                  <span className="font-medium">{block.title}</span>
+                  <span className="text-muted-foreground ml-0.5">({block.duration}m)</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Gym/Wellness blocks */}
+          <div>
+            <div className="flex items-center gap-1 mb-1">
+              <Dumbbell className="w-3 h-3 text-orange-600" />
+              <span className="text-[10px] font-semibold text-orange-700 dark:text-orange-400">
+                Gym & Wellness
+              </span>
+            </div>
+            <div className="grid grid-cols-2 gap-1">
+              {[
+                { title: 'Workout', duration: 60 },
+                { title: 'Stretch', duration: 15 },
+              ].map((block) => (
+                <button
+                  key={block.title}
+                  draggable
+                  onDragStart={(e) => {
+                    const item: WorkItem = {
+                      type: 'adhoc',
+                      id: `gym-${block.title.toLowerCase().replace(' ', '-')}`,
+                      title: `Gym: ${block.title}`,
+                      priority: 3,
+                      estimatedDuration: block.duration,
+                    }
+                    e.dataTransfer.setData('application/json', JSON.stringify(item))
+                  }}
+                  className="text-left p-1.5 rounded bg-orange-50/50 hover:bg-orange-100 dark:bg-orange-950/30 dark:hover:bg-orange-950/50 text-[10px] cursor-grab"
+                >
+                  <span className="font-medium">{block.title}</span>
+                  <span className="text-muted-foreground ml-0.5">({block.duration}m)</span>
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -722,13 +833,17 @@ function TodayPlanPage() {
   const calendarSettings = useConvexQuery(api.googleCalendar.getSettings, {})
   const isCalendarConnected = calendarSettings?.isConfigured === true
 
+  // Frog queries
+  const frogLinearIssues = useConvexQuery(api.todayPlan.getFrogLinearIssues, {})
+
   // Mutations
   const getOrCreatePlan = useMutation(api.todayPlan.getOrCreateTodayPlan)
   const refreshFreeBlocks = useMutation(api.todayPlan.refreshFreeBlocks)
   const addAdhocItem = useMutation(api.todayPlan.addAdhocItem)
   const updateAdhocItem = useMutation(api.todayPlan.updateAdhocItem)
   const deleteAdhocItem = useMutation(api.todayPlan.deleteAdhocItem)
-  const setFrogTask = useMutation(api.todayPlan.setFrogTask)
+  const toggleTodoFrog = useMutation(api.todayPlan.toggleTodoFrog)
+  const toggleLinearFrog = useMutation(api.todayPlan.toggleLinearFrog)
   const setMorningContext = useMutation(api.operatorAI.setMorningContext)
   const addContextNote = useMutation(api.operatorAI.addContextNote)
   const createPlannedTask = useMutation(api.plannedTasks.createPlannedTask)
@@ -815,10 +930,13 @@ function TodayPlanPage() {
     await deleteAdhocItem({ id })
   }, [deleteAdhocItem])
 
-  const handleSetFrog = useCallback(async (taskId: string | undefined) => {
-    if (!plan) return
-    await setFrogTask({ planId: plan._id, taskId })
-  }, [plan, setFrogTask])
+  const handleSetFrog = useCallback(async (taskId: string, taskType: 'todo' | 'linear') => {
+    if (taskType === 'todo') {
+      await toggleTodoFrog({ todoId: taskId as Id<"todoItems"> })
+    } else if (taskType === 'linear') {
+      await toggleLinearFrog({ linearId: taskId })
+    }
+  }, [toggleTodoFrog, toggleLinearFrog])
 
   const handleRefreshBlocks = useCallback(async () => {
     if (!plan) return
@@ -875,16 +993,30 @@ function TodayPlanPage() {
     }
   }, [updatePlannedTask])
 
-  // Enrich work items with project names (must be before conditional returns)
+  // Enrich work items with project names and frog status (must be before conditional returns)
   const enrichedWorkItems = useMemo(() => {
     if (!workPool) return []
-    return workPool.map((item) => ({
-      ...item,
-      projectName: item.source && 'teamName' in item.source 
-        ? (item.source.teamName as string)
-        : undefined,
-    }))
-  }, [workPool])
+    return workPool.map((item) => {
+      // Determine if item is a frog
+      let isFrog = false
+      if (item.type === 'todo' && item.source && 'isFrog' in item.source) {
+        isFrog = !!item.source.isFrog
+      } else if (item.type === 'linear') {
+        isFrog = frogLinearIssues?.includes(item.id) ?? false
+      }
+
+      return {
+        ...item,
+        isFrog,
+        projectName: item.source && 'teamName' in item.source
+          ? (item.source.teamName as string)
+          : undefined,
+      }
+    })
+  }, [workPool, frogLinearIssues])
+
+  // Count total frogs for header badge
+  const frogCount = enrichedWorkItems.filter(item => item.isFrog).length
 
   // Loading state
   if (planLoading) {
@@ -919,9 +1051,9 @@ function TodayPlanPage() {
                   />
                 </div>
                 <div className="flex items-center gap-2">
-                  {plan?.frogTaskId && (
+                  {frogCount > 0 && (
                     <Badge variant="secondary" className="bg-amber-100 text-amber-700 text-xs">
-                      🐸 Frog set
+                      🐸 {frogCount} frog{frogCount > 1 ? 's' : ''} marked
                     </Badge>
                   )}
                   <Button variant="outline" size="sm" onClick={handleRefreshBlocks}>
@@ -994,6 +1126,7 @@ function TodayPlanPage() {
                   initialDate={currentDate}
                   firstDayOfWeek="monday"
                   timeFormat="12-hour"
+                  headerComponent={<></>}
                   onDateChange={(date) => setCurrentDate(date.toDate())}
                   onEventClick={(event) => {
                     console.log('Clicked event:', event)
@@ -1029,8 +1162,7 @@ function TodayPlanPage() {
             onAddAdhoc={handleAddAdhoc}
             onToggleAdhoc={handleToggleAdhoc}
             onDeleteAdhoc={handleDeleteAdhoc}
-            frogTaskId={plan?.frogTaskId}
-            onSetFrog={handleSetFrog}
+            onToggleFrog={handleSetFrog}
             onDragStart={handleDragStart}
             onAddToToday={handleAddToToday}
           />

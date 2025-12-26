@@ -41,14 +41,18 @@ import {
   BarChart3,
   ListTodo,
   Timer,
+  Mic,
+  MicOff,
+  Loader2,
 } from "lucide-react"
 import { ModeToggle } from "@/components/ui/mode-toggle"
 import { Link, useNavigate } from '@tanstack/react-router'
 import { useAuthActions } from '@convex-dev/auth/react'
-import { useQuery as useConvexQuery } from 'convex/react'
+import { useQuery as useConvexQuery, useMutation } from 'convex/react'
 import { api } from '../../../convex/_generated/api'
 import { cn } from "~/lib/utils"
 import * as React from 'react'
+import { toast } from 'sonner'
 
 // ==========================================
 // Active Session Timer Component
@@ -134,6 +138,167 @@ function ActiveSessionTimer() {
   )
 }
 
+// ==========================================
+// Audio Record Button Component
+// ==========================================
+
+function AudioRecordButton() {
+  const navigate = useNavigate()
+  const [isRecording, setIsRecording] = React.useState(false)
+  const [isProcessing, setIsProcessing] = React.useState(false)
+  const [mediaRecorder, setMediaRecorder] = React.useState<MediaRecorder | null>(null)
+  const chunksRef = React.useRef<Blob[]>([])
+  const streamRef = React.useRef<MediaStream | null>(null)
+  const acknowledgedRef = React.useRef<Set<string>>(new Set())
+
+  const generateUploadUrl = useMutation(api.voiceNotes.generateUploadUrl)
+  const startChatFromRecording = useMutation(api.voiceNotes.startChatFromRecording)
+  const acknowledgeTranscription = useMutation(api.voiceNotes.acknowledgeTranscription)
+  const pendingTranscriptions = useConvexQuery(api.voiceNotes.getPendingTranscriptions)
+
+  // Watch for completed/failed transcriptions and show toasts
+  React.useEffect(() => {
+    if (!pendingTranscriptions) return
+
+    for (const t of pendingTranscriptions) {
+      const id = t._id.toString()
+
+      // Skip if we've already shown a toast for this one
+      if (acknowledgedRef.current.has(id)) continue
+
+      if (t.status === 'completed' && t.threadId) {
+        acknowledgedRef.current.add(id)
+        toast.success('Voice note transcribed!', {
+          description: t.transcription?.slice(0, 60) + (t.transcription && t.transcription.length > 60 ? '...' : ''),
+          action: {
+            label: 'View Chat',
+            onClick: () => {
+              navigate({ to: '/chat', search: { threadId: t.threadId } })
+            },
+          },
+          duration: 10000,
+        })
+        // Clean up the record
+        acknowledgeTranscription({ transcriptionId: t._id })
+      } else if (t.status === 'failed') {
+        acknowledgedRef.current.add(id)
+        toast.error('Transcription failed', {
+          description: t.errorMessage || 'Unknown error occurred',
+          duration: 5000,
+        })
+        // Clean up the record
+        acknowledgeTranscription({ transcriptionId: t._id })
+      }
+    }
+  }, [pendingTranscriptions, navigate, acknowledgeTranscription])
+
+  const handleStartRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      streamRef.current = stream
+      const recorder = new MediaRecorder(stream)
+      chunksRef.current = []
+
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) {
+          chunksRef.current.push(e.data)
+        }
+      }
+
+      recorder.onstop = async () => {
+        setIsProcessing(true)
+        const blob = new Blob(chunksRef.current, { type: 'audio/webm' })
+
+        // Stop all tracks
+        if (streamRef.current) {
+          streamRef.current.getTracks().forEach(track => track.stop())
+          streamRef.current = null
+        }
+
+        try {
+          // Upload the audio to Convex storage
+          const uploadUrl = await generateUploadUrl()
+          const uploadResponse = await fetch(uploadUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'audio/webm' },
+            body: blob,
+          })
+
+          if (!uploadResponse.ok) {
+            throw new Error('Failed to upload audio')
+          }
+
+          const { storageId } = await uploadResponse.json()
+
+          // Start the transcription and chat creation in background
+          await startChatFromRecording({ storageId })
+
+          // Show toast that transcription is in progress
+          toast.info('Transcribing voice note...', {
+            description: 'A new chat will be created when ready',
+            duration: 3000,
+          })
+        } catch (err) {
+          console.error('Error processing recording:', err)
+          toast.error('Failed to process recording', {
+            description: 'Please try again',
+          })
+        }
+
+        setIsProcessing(false)
+        setMediaRecorder(null)
+        chunksRef.current = []
+      }
+
+      recorder.start()
+      setMediaRecorder(recorder)
+      setIsRecording(true)
+    } catch (err) {
+      console.error('Error accessing microphone:', err)
+      toast.error('Microphone access denied', {
+        description: 'Please grant microphone permission to record',
+      })
+    }
+  }
+
+  const handleStopRecording = () => {
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+      mediaRecorder.stop()
+      setIsRecording(false)
+    }
+  }
+
+  const handleClick = () => {
+    if (isRecording) {
+      handleStopRecording()
+    } else {
+      handleStartRecording()
+    }
+  }
+
+  return (
+    <Button
+      variant="ghost"
+      size="sm"
+      onClick={handleClick}
+      disabled={isProcessing}
+      className={cn(
+        "text-slate-300 hover:text-white hover:bg-slate-800/80 h-9 w-9 p-0",
+        isRecording && "text-red-400 hover:text-red-300 animate-pulse"
+      )}
+      title={isRecording ? "Stop recording" : "Start voice note (transcribes and creates chat)"}
+    >
+      {isProcessing ? (
+        <Loader2 className="h-4 w-4 animate-spin" />
+      ) : isRecording ? (
+        <MicOff className="h-4 w-4" />
+      ) : (
+        <Mic className="h-4 w-4" />
+      )}
+    </Button>
+  )
+}
+
 interface DashboardLayoutProps {
   children: React.ReactNode
 }
@@ -141,8 +306,9 @@ interface DashboardLayoutProps {
 // Keyboard shortcuts for navigation
 // Only active when no input/textarea is focused
 const KEYBOARD_SHORTCUTS: Record<string, { to: string; search?: Record<string, unknown> }> = {
-  't': { to: '/' },           // 't' for Today
-  'f': { to: '/focus' },      // 'f' for Focus
+  'd': { to: '/' },           // 'd' for Dashboard
+  't': { to: '/today-plan' }, // 't' for Today's Plan
+  'f': { to: '/today-plan' }, // 'f' for Focus (Today's Plan)
   'n': { to: '/notes' },      // 'n' for Notes
   'a': { to: '/chat' },       // 'a' for AI/Agent chat
   'i': { to: '/inbox', search: { chatId: undefined } },  // 'i' for Inbox
@@ -435,10 +601,10 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
           <div className="hidden lg:flex items-center gap-1">
             <NavigationMenu viewport={false}>
               <NavigationMenuList className="gap-1">
-                {/* Today - direct link */}
+                {/* Home/Dashboard - direct link */}
                 <NavigationMenuItem>
-                  <Link 
-                    to="/" 
+                  <Link
+                    to="/"
                     className={cn(
                       "inline-flex items-center gap-2 px-3 py-2 rounded-md",
                       "text-sm font-medium transition-all",
@@ -446,9 +612,10 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                       "[&.active]:bg-slate-800 [&.active]:text-white"
                     )}
                     activeProps={{ className: "active" }}
+                    activeOptions={{ exact: true }}
                   >
                     <CalendarDays className="h-4 w-4" />
-                    <span><span className="underline decoration-slate-500">T</span>oday</span>
+                    <span><span className="underline decoration-slate-500">D</span>ashboard</span>
                   </Link>
                 </NavigationMenuItem>
 
@@ -484,17 +651,17 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                     <ul className="grid w-[180px] gap-1 p-2">
                       <li>
                         <NavigationMenuLink asChild>
-                          <Link to="/focus" className="w-full">
-                            <Timer className="h-4 w-4 flex-shrink-0" />
-                            <span>Focus Timer</span>
+                          <Link to="/today-plan" className="w-full">
+                            <ListTodo className="h-4 w-4 flex-shrink-0" />
+                            <span>Today's Plan</span>
                           </Link>
                         </NavigationMenuLink>
                       </li>
                       <li>
                         <NavigationMenuLink asChild>
-                          <Link to="/" className="w-full">
-                            <ListTodo className="h-4 w-4 flex-shrink-0" />
-                            <span>Today's Plan</span>
+                          <Link to="/focus" className="w-full">
+                            <Timer className="h-4 w-4 flex-shrink-0" />
+                            <span>Focus Timer</span>
                           </Link>
                         </NavigationMenuLink>
                       </li>
@@ -502,21 +669,37 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                   </NavigationMenuContent>
                 </NavigationMenuItem>
 
-                {/* Notes - direct link */}
+                {/* Notes - dropdown with Notes and Todos */}
                 <NavigationMenuItem>
-                  <Link
-                    to="/notes"
-                    className={cn(
-                      "inline-flex items-center gap-2 px-3 py-2 rounded-md",
-                      "text-sm font-medium transition-all",
-                      "text-slate-300 hover:text-white hover:bg-slate-800/80",
-                      "[&.active]:bg-slate-800 [&.active]:text-white"
-                    )}
-                    activeProps={{ className: "active" }}
-                  >
+                  <NavigationMenuTrigger className={cn(
+                    "inline-flex items-center gap-2 px-3 py-2 rounded-md",
+                    "text-sm font-medium transition-all",
+                    "text-slate-300 hover:text-white hover:bg-slate-800/80 data-[state=open]:bg-slate-800 data-[state=open]:text-white",
+                    "bg-transparent"
+                  )}>
                     <FileText className="h-4 w-4" />
                     <span><span className="underline decoration-slate-500">N</span>otes</span>
-                  </Link>
+                  </NavigationMenuTrigger>
+                  <NavigationMenuContent className="z-[100]">
+                    <ul className="grid w-[180px] gap-1 p-2">
+                      <li>
+                        <NavigationMenuLink asChild>
+                          <Link to="/notes" className="w-full">
+                            <FileText className="h-4 w-4 flex-shrink-0" />
+                            <span>Notes</span>
+                          </Link>
+                        </NavigationMenuLink>
+                      </li>
+                      <li>
+                        <NavigationMenuLink asChild>
+                          <Link to="/todos" className="w-full">
+                            <ListTodo className="h-4 w-4 flex-shrink-0" />
+                            <span>Todos</span>
+                          </Link>
+                        </NavigationMenuLink>
+                      </li>
+                    </ul>
+                  </NavigationMenuContent>
                 </NavigationMenuItem>
 
                 {/* Inbox - direct link */}
@@ -658,9 +841,10 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
             <h1 className="text-lg font-semibold text-white">Dashboard</h1>
           </div>
 
-          {/* Right side - Active session timer + Theme toggle + User menu */}
+          {/* Right side - Active session timer + Audio record + Theme toggle + User menu */}
           <div className="flex items-center gap-2">
             <ActiveSessionTimer />
+            <AudioRecordButton />
             <ModeToggle />
             <DropdownMenu>
               <DropdownMenuTrigger asChild>

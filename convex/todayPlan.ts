@@ -111,14 +111,72 @@ export const updateFreeBlocks = mutation({
 });
 
 /**
- * Set the frog task for today
+ * Toggle frog status on a todo item
+ */
+export const toggleTodoFrog = mutation({
+  args: {
+    todoId: v.id("todoItems"),
+  },
+  handler: async (ctx, args) => {
+    const todo = await ctx.db.get(args.todoId);
+    if (!todo) return;
+
+    await ctx.db.patch(args.todoId, {
+      isFrog: !todo.isFrog,
+      updatedAt: Date.now(),
+    });
+  },
+});
+
+/**
+ * Toggle frog status on a Linear issue
+ */
+export const toggleLinearFrog = mutation({
+  args: {
+    linearId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    // Check if already marked as frog
+    const existing = await ctx.db
+      .query("frogLinearIssues")
+      .withIndex("by_linear_id", (q) => q.eq("linearId", args.linearId))
+      .first();
+
+    if (existing) {
+      // Remove frog status
+      await ctx.db.delete(existing._id);
+    } else {
+      // Add frog status
+      await ctx.db.insert("frogLinearIssues", {
+        linearId: args.linearId,
+        markedAt: Date.now(),
+      });
+    }
+  },
+});
+
+/**
+ * Get all frog Linear issue IDs
+ */
+export const getFrogLinearIssues = query({
+  args: {},
+  handler: async (ctx) => {
+    const frogs = await ctx.db.query("frogLinearIssues").collect();
+    return frogs.map(f => f.linearId);
+  },
+});
+
+/**
+ * @deprecated - kept for backwards compatibility
+ * Use toggleTodoFrog or toggleLinearFrog instead
  */
 export const setFrogTask = mutation({
   args: {
     planId: v.id("todayPlans"),
-    taskId: v.optional(v.string()), // null to clear
+    taskId: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    // Legacy: just update the plan's frogTaskId for old code paths
     await ctx.db.patch(args.planId, {
       frogTaskId: args.taskId,
       updatedAt: Date.now(),

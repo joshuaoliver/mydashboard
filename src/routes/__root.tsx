@@ -7,6 +7,7 @@ import {
 import { QueryClient } from '@tanstack/react-query'
 import { useConvexAuth } from 'convex/react'
 import * as React from 'react'
+import { Toaster } from 'sonner'
 
 export const Route = createRootRouteWithContext<{
   queryClient: QueryClient
@@ -83,7 +84,12 @@ function RootComponent() {
 
   // For callback routes/popups, skip auth and render immediately
   if (shouldBypassAuth) {
-    return <Outlet />
+    return (
+      <>
+        <Outlet />
+        <Toaster richColors position="bottom-right" />
+      </>
+    )
   }
 
   // Show loading while checking auth
@@ -98,5 +104,10 @@ function RootComponent() {
     )
   }
 
-  return <Outlet />
+  return (
+    <>
+      <Outlet />
+      <Toaster richColors position="bottom-right" />
+    </>
+  )
 }

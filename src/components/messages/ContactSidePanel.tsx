@@ -61,13 +61,14 @@ export function ContactSidePanel() {
   }, [selectedChatId, selectedChat, contactByDirectLink, contactByInstagram, contactByPhone])
 
   return (
-    <ContactPanel 
-      contact={contactData} 
+    <ContactPanel
+      contact={contactData}
       isLoading={isLoading}
       searchedUsername={selectedChat?.username}
       searchedPhoneNumber={selectedChat?.phoneNumber}
       participantName={selectedChat?.name}
       participantImageUrl={selectedChat?.contactImageUrl}
+      chatId={selectedChatId ?? undefined}
     />
   )
 }
