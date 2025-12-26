@@ -307,6 +307,7 @@ export const getStats = query({
         totalSnapshots: 0,
         oldestSnapshot: null,
         newestSnapshot: null,
+        totalMessagesSent: 0,
         currentStats: null,
       };
     }
@@ -317,10 +318,17 @@ export const getStats = query({
     const oldest = snapshots[0];
     const newest = snapshots[snapshots.length - 1];
 
+    // Sum up all messages sent across all snapshots
+    const totalMessagesSent = snapshots.reduce(
+      (sum, s) => sum + (s.messagesSentSinceLastSnapshot ?? 0),
+      0
+    );
+
     return {
       totalSnapshots: snapshots.length,
       oldestSnapshot: oldest.timestamp,
       newestSnapshot: newest.timestamp,
+      totalMessagesSent,
       currentStats: {
         totalChats: newest.totalChats,
         activeChats: newest.activeChats,

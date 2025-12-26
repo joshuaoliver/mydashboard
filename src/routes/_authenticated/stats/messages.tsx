@@ -20,6 +20,7 @@ import {
   Trash2,
   TrendingUp,
   TrendingDown,
+  Send,
 } from 'lucide-react'
 import { useState } from 'react'
 import type { Id } from '../../../../convex/_generated/dataModel'
@@ -121,7 +122,7 @@ function MessageStatsPage() {
 
       {/* Current Stats */}
       {latestSnapshot && (
-        <div className="grid gap-4 md:grid-cols-4 mb-6">
+        <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-5 mb-6">
           <Card>
             <CardHeader className="pb-2">
               <CardDescription>Total Chats</CardDescription>
@@ -173,6 +174,22 @@ function MessageStatsPage() {
                   </span>
                 )}
               </CardTitle>
+            </CardHeader>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardDescription className="flex items-center gap-1">
+                <Send className="w-3 h-3" />
+                Messages Sent
+              </CardDescription>
+              <CardTitle className="text-4xl text-blue-600">
+                {stats?.totalMessagesSent ?? 0}
+              </CardTitle>
+              {latestSnapshot.messagesSentSinceLastSnapshot !== undefined && latestSnapshot.messagesSentSinceLastSnapshot > 0 && (
+                <p className="text-xs text-gray-500 mt-1">
+                  +{latestSnapshot.messagesSentSinceLastSnapshot} since last capture
+                </p>
+              )}
             </CardHeader>
           </Card>
         </div>
