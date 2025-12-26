@@ -7,7 +7,7 @@ import { MessageInputPanel } from './MessageInputPanel'
 import { ReplySuggestionsPanel } from './ReplySuggestionsPanel'
 import { ChatDebugPanel } from './ChatDebugPanel'
 import { Button } from '@/components/ui/button'
-import { RefreshCw, ExternalLink, Mail, MailOpen, Archive, MessageCircle, Bug, History } from 'lucide-react'
+import { RefreshCw, ExternalLink, Mail, MailOpen, Archive, MessageCircle, Bug, History, Ban } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 
 export function ConversationPanel() {
@@ -68,6 +68,7 @@ export function ConversationPanel() {
   const loadNewerMessages = useAction(api.beeperPagination.loadNewerMessages)
   const focusChat = useAction(api.beeperMessages.focusChat)
   const archiveChat = useAction(api.chatActions.archiveChat)
+  const blockChat = useAction(api.chatActions.blockChat)
   const markChatAsRead = useAction(api.chatActions.markChatAsRead)
   const markChatAsUnread = useAction(api.chatActions.markChatAsUnread)
   const pageLoadSync = useAction(api.beeperSync.pageLoadSync)
@@ -230,6 +231,18 @@ export function ConversationPanel() {
     }
   }, [selectedChatId, archiveChat])
 
+  // Handle block
+  const handleBlock = useCallback(async () => {
+    if (!selectedChatId) return
+
+    try {
+      await blockChat({ chatId: selectedChatId })
+    } catch (err) {
+      console.error('Failed to block chat:', err)
+      setError(err instanceof Error ? err.message : 'Failed to block chat')
+    }
+  }, [selectedChatId, blockChat])
+
   // Handle mark as read/unread
   const handleToggleRead = useCallback(async () => {
     if (!selectedChatId || !selectedChat) return
@@ -385,6 +398,14 @@ export function ConversationPanel() {
             title="Archive chat"
           >
             <Archive className="w-4 h-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleBlock}
+            title="Block chat"
+          >
+            <Ban className="w-4 h-4" />
           </Button>
           <Button
             variant="ghost"

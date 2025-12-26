@@ -44,6 +44,8 @@ import {
   Mic,
   MicOff,
   Loader2,
+  Download,
+  CheckSquare,
 } from "lucide-react"
 import { ModeToggle } from "@/components/ui/mode-toggle"
 import { Link, useNavigate } from '@tanstack/react-router'
@@ -442,20 +444,51 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                   Today's Plan
                 </Link>
 
-                {/* Notes */}
+                {/* Notes Section */}
+                <div className="px-4 py-2 text-xs font-semibold text-slate-500 uppercase tracking-wide mt-2">
+                  Notes
+                </div>
                 <Link
                   to="/notes"
                   onClick={() => setMobileMenuOpen(false)}
                   className={cn(
-                    "flex items-center gap-3 px-4 py-3 rounded-md mt-2",
-                    "text-base font-medium transition-all",
+                    "flex items-center gap-3 px-4 py-2 rounded-md ml-2",
+                    "text-sm font-medium transition-all",
                     "text-slate-300 hover:text-white hover:bg-slate-800/80",
                     "[&.active]:bg-slate-800 [&.active]:text-white"
                   )}
                   activeProps={{ className: "active" }}
                 >
-                  <FileText className="h-5 w-5" />
+                  <FileText className="h-4 w-4" />
                   Notes
+                </Link>
+                <Link
+                  to="/todos"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={cn(
+                    "flex items-center gap-3 px-4 py-2 rounded-md ml-2",
+                    "text-sm font-medium transition-all",
+                    "text-slate-300 hover:text-white hover:bg-slate-800/80",
+                    "[&.active]:bg-slate-800 [&.active]:text-white"
+                  )}
+                  activeProps={{ className: "active" }}
+                >
+                  <ListTodo className="h-4 w-4" />
+                  Todos
+                </Link>
+                <Link
+                  to="/todos-list"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={cn(
+                    "flex items-center gap-3 px-4 py-2 rounded-md ml-2",
+                    "text-sm font-medium transition-all",
+                    "text-slate-300 hover:text-white hover:bg-slate-800/80",
+                    "[&.active]:bg-slate-800 [&.active]:text-white"
+                  )}
+                  activeProps={{ className: "active" }}
+                >
+                  <CheckSquare className="h-4 w-4" />
+                  All Todos
                 </Link>
 
                 {/* Inbox */}
@@ -569,6 +602,14 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                   >
                     <Bot className="h-5 w-5" />
                     AI Settings
+                  </Link>
+                  <Link 
+                    to="/settings/sample-outputs"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex items-center gap-3 px-4 py-3 rounded-md text-base text-slate-300 hover:text-white hover:bg-slate-800/80 transition-all"
+                  >
+                    <Download className="h-5 w-5" />
+                    Sample Outputs
                   </Link>
                   <Link 
                     to="/settings"
@@ -698,6 +739,14 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                           </Link>
                         </NavigationMenuLink>
                       </li>
+                      <li>
+                        <NavigationMenuLink asChild>
+                          <Link to="/todos-list" className="w-full">
+                            <CheckSquare className="h-4 w-4 flex-shrink-0" />
+                            <span>All Todos</span>
+                          </Link>
+                        </NavigationMenuLink>
+                      </li>
                     </ul>
                   </NavigationMenuContent>
                 </NavigationMenuItem>
@@ -818,6 +867,14 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                           <Link to="/settings/ai" className="w-full">
                             <Bot className="h-4 w-4 flex-shrink-0" />
                             <span>AI Settings</span>
+                          </Link>
+                        </NavigationMenuLink>
+                      </li>
+                      <li>
+                        <NavigationMenuLink asChild>
+                          <Link to="/settings/sample-outputs" className="w-full">
+                            <Download className="h-4 w-4 flex-shrink-0" />
+                            <span>Sample Outputs</span>
                           </Link>
                         </NavigationMenuLink>
                       </li>

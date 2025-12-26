@@ -26,7 +26,7 @@ import { useState } from 'react'
 import type { Id } from '../../../../convex/_generated/dataModel'
 import { formatSydneyDateTime } from '@/lib/timezone'
 
-export const Route = createFileRoute('/_authenticated/stats/messages')({
+export const Route = createFileRoute('/_authenticated/reflect/stats/messages')({
   component: MessageStatsPage,
 })
 

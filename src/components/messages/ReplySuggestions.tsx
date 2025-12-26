@@ -54,8 +54,8 @@ export function ReplySuggestions({
   // Loading state
   if (isLoading) {
     return (
-      <div className="p-4">
-        <div className="flex items-center justify-center py-8">
+      <div className="p-2">
+        <div className="flex items-center justify-center py-4">
           <Loader />
         </div>
       </div>
@@ -65,10 +65,10 @@ export function ReplySuggestions({
   // Error state
   if (error) {
     return (
-      <div className="p-4">
-        <div className="text-center py-6">
-          <p className="text-red-600 text-sm mb-1">Failed to generate suggestions</p>
-          <p className="text-xs text-gray-500">{error}</p>
+      <div className="p-2">
+        <div className="text-center py-3">
+          <p className="text-red-600 text-xs mb-0.5">Failed to generate suggestions</p>
+          <p className="text-[10px] text-gray-500">{error}</p>
         </div>
       </div>
     )
@@ -77,13 +77,13 @@ export function ReplySuggestions({
   // No suggestions yet - show button to generate
   if (!suggestions || suggestions.length === 0) {
     return (
-      <div className="p-4">
-        <div className="text-center py-8">
-          <Sparkles className="w-10 h-10 mx-auto mb-3 text-purple-400" />
-          <p className="text-gray-600 text-sm mb-4">Ready to generate smart replies?</p>
+      <div className="p-2">
+        <div className="text-center py-4">
+          <Sparkles className="w-6 h-6 mx-auto mb-2 text-purple-400" />
+          <p className="text-gray-600 text-xs mb-2">Ready to generate smart replies?</p>
           {onGenerateClick && (
-            <Button onClick={() => onGenerateClick()} size="sm" className="gap-2">
-              <Sparkles className="w-4 h-4" />
+            <Button onClick={() => onGenerateClick()} size="sm" className="gap-1.5 h-7 text-xs">
+              <Sparkles className="w-3.5 h-3.5" />
               Generate Suggestions
             </Button>
           )}
@@ -93,29 +93,29 @@ export function ReplySuggestions({
   }
 
   return (
-    <div className="p-2 sm:p-4 min-w-0">
+    <div className="p-1.5 min-w-0">
       {/* Suggestion Cards - Full width, stacked */}
-      <div className="flex flex-col gap-2 min-w-0">
+      <div className="flex flex-col gap-1 min-w-0">
         {suggestions.map((suggestion, index) => {
           const isSelected = index === selectedIndex
           return (
             <div
               key={index}
               onClick={() => onSuggestionSelect?.(index)}
-              className={`w-full p-3 rounded-lg transition-all cursor-pointer group ${
+              className={`w-full px-2 py-1.5 rounded transition-all cursor-pointer group ${
                 isSelected
-                  ? 'bg-blue-50 border-2 border-blue-500 shadow-sm'
-                  : 'bg-white border-2 border-gray-300 hover:border-blue-400 hover:shadow-sm'
+                  ? 'bg-blue-50 border border-blue-500'
+                  : 'bg-white border border-gray-200 hover:border-blue-400'
               }`}
             >
-              <div className="flex items-start gap-3">
+              <div className="flex items-start gap-2">
                 {/* Reply text */}
-                <div className="flex-1 text-sm text-gray-900 leading-relaxed break-words overflow-hidden whitespace-pre-wrap">
+                <div className="flex-1 text-xs text-gray-900 leading-relaxed break-words overflow-hidden whitespace-pre-wrap">
                   {suggestion.reply}
                 </div>
 
                 {/* Action buttons - always visible */}
-                <div className="flex items-center gap-1 flex-shrink-0">
+                <div className="flex items-center gap-0.5 flex-shrink-0">
                   <Button
                     variant="ghost"
                     size="sm"
@@ -123,13 +123,13 @@ export function ReplySuggestions({
                       e.stopPropagation()
                       handleCopy(suggestion.reply, index)
                     }}
-                    className="h-8 px-2 text-xs"
+                    className="h-6 w-6 p-0"
                     title="Copy to clipboard"
                   >
                     {copiedIndex === index ? (
-                      <Check className="w-4 h-4 text-green-600" />
+                      <Check className="w-3 h-3 text-green-600" />
                     ) : (
-                      <Copy className="w-4 h-4" />
+                      <Copy className="w-3 h-3" />
                     )}
                   </Button>
                   {onSendSuggestion && (
@@ -140,11 +140,10 @@ export function ReplySuggestions({
                         e.stopPropagation()
                         handleSend(suggestion.reply, index)
                       }}
-                      className="h-8 px-3 text-xs gap-1"
+                      className="h-6 w-6 p-0"
                       title="Send this reply"
                     >
-                      <Send className="w-4 h-4" />
-                      Send
+                      <Send className="w-3 h-3" />
                     </Button>
                   )}
                 </div>

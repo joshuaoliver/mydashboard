@@ -34,7 +34,7 @@ export const listCachedChats = query({
     let queryBuilder;
 
     if (filter === "blocked") {
-      // Show only blocked chats
+      // Show only blocked chats (single chats only - groups can't be blocked)
       queryBuilder = ctx.db
         .query("beeperChats")
         .withIndex("by_type_archived_activity", (q) =>
@@ -43,25 +43,37 @@ export const listCachedChats = query({
         .filter((q) => q.eq(q.field("isBlocked"), true))
         .order("desc");
     } else if (filter === "archived") {
-      // Use compound index for type=single, isArchived=true, sorted by lastActivity DESC
-      // Also filter out blocked chats
+      // Show archived chats - both single and group chats
+      // Use by_activity index since we want all types, filter by isArchived
       queryBuilder = ctx.db
         .query("beeperChats")
-        .withIndex("by_type_archived_activity", (q) =>
-          q.eq("type", "single").eq("isArchived", true)
-        )
-        .filter((q) => q.neq(q.field("isBlocked"), true))
-        .order("desc"); // Sort by lastActivity (last field in index) descending
+        .withIndex("by_activity")
+        .filter((q) => q.and(
+          q.eq(q.field("isArchived"), true),
+          q.neq(q.field("isBlocked"), true)
+        ))
+        .order("desc");
+    } else if (filter === "all") {
+      // Show ALL chats (both single and group) that are not archived/blocked
+      // Use by_activity index since we want all types
+      queryBuilder = ctx.db
+        .query("beeperChats")
+        .withIndex("by_activity")
+        .filter((q) => q.and(
+          q.eq(q.field("isArchived"), false),
+          q.neq(q.field("isBlocked"), true)
+        ))
+        .order("desc");
     } else {
-      // All other filters: type=single, isArchived=false, sorted by lastActivity DESC
-      // Filter out blocked chats from main views
+      // unreplied/unread filters: single chats only (groups don't have reply tracking)
+      // Use compound index for type=single, isArchived=false, sorted by lastActivity DESC
       queryBuilder = ctx.db
         .query("beeperChats")
         .withIndex("by_type_archived_activity", (q) =>
           q.eq("type", "single").eq("isArchived", false)
         )
         .filter((q) => q.neq(q.field("isBlocked"), true))
-        .order("desc"); // Sort by lastActivity (last field in index) descending
+        .order("desc");
     }
 
     // Apply additional filters for unreplied/unread (post-filter on indexed results)

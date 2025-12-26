@@ -7,29 +7,28 @@ import {
   Mail,
   Clock,
   LayoutList,
-  ArrowRight,
   Inbox,
   AlertCircle,
   CheckCircle2,
   TrendingUp,
   MessageSquare,
   Reply,
-  Send,
+  ArrowRight,
 } from 'lucide-react'
 
-export const Route = createFileRoute('/_authenticated/stats/')({
-  component: StatsOverviewPage,
+export const Route = createFileRoute('/_authenticated/reflect/stats/')({
+  component: ReflectStatsPage,
 })
 
-function StatsOverviewPage() {
-  // Gmail stats (with caching) - use "skip" for conditional queries
+function ReflectStatsPage() {
+  // Gmail stats (with caching)
   const gmailSettings = useCachedQuery(api.settingsStore.getGmailSettings, {})
   const gmailSnapshot = useCachedQuery(
     api.gmailSync.getLatestSnapshot,
     gmailSettings?.isConfigured ? {} : "skip"
   )
 
-  // Hubstaff stats (with caching) - use "skip" for conditional queries
+  // Hubstaff stats (with caching)
   const hubstaffSettings = useCachedQuery(api.settingsStore.getHubstaffSettings, {})
   const hubstaffToday = useCachedQuery(
     api.hubstaffSync.getTodayStats,
@@ -43,9 +42,8 @@ function StatsOverviewPage() {
   // Linear stats (with caching)
   const linearStats = useCachedQuery(api.linearSync.getStats, {})
 
-  // Message stats (always available - uses Beeper data, with caching)
+  // Message stats (with caching)
   const messageSnapshot = useCachedQuery(api.messageStats.getLatestSnapshot, {})
-  const messageStats = useCachedQuery(api.messageStats.getStats, {})
 
   const gmailConfigured = gmailSettings?.isConfigured ?? false
   const hubstaffConfigured = hubstaffSettings?.isConfigured ?? false
@@ -62,8 +60,8 @@ function StatsOverviewPage() {
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
         {/* Messages Card */}
-        <Link to="/stats/messages" className="block">
-          <Card className="h-full hover:shadow-md transition-shadow cursor-pointer">
+        <Link to="/reflect/stats/messages" className="block">
+          <Card className="h-full hover:border-blue-300 transition-colors cursor-pointer">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-lg font-medium flex items-center gap-2">
                 <MessageSquare className="w-5 h-5 text-blue-500" />
@@ -93,17 +91,14 @@ function StatsOverviewPage() {
                     </div>
                   </div>
                   <div className="flex items-center justify-between text-sm text-gray-500">
-                    <span className="flex items-center gap-1">
-                      <Send className="w-3 h-3" />
-                      {messageStats?.totalMessagesSent ?? 0} sent
-                    </span>
+                    <span>{messageSnapshot.archivedChats} archived</span>
                     <ArrowRight className="w-4 h-4" />
                   </div>
                 </div>
               ) : (
                 <div className="py-4 text-center text-gray-500">
                   <MessageSquare className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                  <p className="text-sm">No data yet - waiting for first capture</p>
+                  <p className="text-sm">No data yet</p>
                 </div>
               )}
             </CardContent>
@@ -111,8 +106,8 @@ function StatsOverviewPage() {
         </Link>
 
         {/* Gmail Card */}
-        <Link to="/stats/gmail" className="block">
-          <Card className="h-full hover:shadow-md transition-shadow cursor-pointer">
+        <Link to="/reflect/stats/gmail" className="block">
+          <Card className="h-full hover:border-red-300 transition-colors cursor-pointer">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-lg font-medium flex items-center gap-2">
                 <Mail className="w-5 h-5 text-red-500" />
@@ -146,10 +141,7 @@ function StatsOverviewPage() {
                     </div>
                   </div>
                   <div className="flex items-center justify-between text-sm text-gray-500">
-                    <span>
-                      Last updated:{' '}
-                      {new Date(gmailSnapshot.timestamp).toLocaleTimeString()}
-                    </span>
+                    <span>Updated: {new Date(gmailSnapshot.timestamp).toLocaleTimeString()}</span>
                     <ArrowRight className="w-4 h-4" />
                   </div>
                 </div>
@@ -168,8 +160,8 @@ function StatsOverviewPage() {
         </Link>
 
         {/* Hubstaff Card */}
-        <Link to="/stats/hubstaff" className="block">
-          <Card className="h-full hover:shadow-md transition-shadow cursor-pointer">
+        <Link to="/reflect/stats/hubstaff" className="block">
+          <Card className="h-full hover:border-green-300 transition-colors cursor-pointer">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-lg font-medium flex items-center gap-2">
                 <Clock className="w-5 h-5 text-green-500" />
@@ -205,9 +197,7 @@ function StatsOverviewPage() {
                     </div>
                   </div>
                   <div className="flex items-center justify-between text-sm text-gray-500">
-                    <span>
-                      {hubstaffSettings?.selectedUserName || 'Tracking time'}
-                    </span>
+                    <span>{hubstaffSettings?.selectedUserName || 'Tracking time'}</span>
                     <ArrowRight className="w-4 h-4" />
                   </div>
                 </div>
@@ -222,60 +212,58 @@ function StatsOverviewPage() {
         </Link>
 
         {/* Linear Card */}
-        <Link to="/stats/linear" className="block">
-          <Card className="h-full hover:shadow-md transition-shadow cursor-pointer">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-lg font-medium flex items-center gap-2">
-                <LayoutList className="w-5 h-5 text-purple-500" />
-                Linear
-              </CardTitle>
-              {linearConfigured ? (
-                <Badge className="bg-green-100 text-green-800">
-                  <CheckCircle2 className="w-3 h-3 mr-1" />
-                  Connected
-                </Badge>
-              ) : (
-                <Badge className="bg-gray-100 text-gray-800">
-                  <AlertCircle className="w-3 h-3 mr-1" />
-                  Not Set Up
-                </Badge>
-              )}
-            </CardHeader>
-            <CardContent>
-              {linearConfigured && linearStats ? (
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-3xl font-bold">{linearStats.totalIssues}</p>
-                      <p className="text-sm text-gray-500">Open Issues</p>
-                    </div>
-                    <div className="text-right space-y-1">
-                      {linearStats.byPriority.urgent > 0 && (
-                        <Badge className="bg-red-100 text-red-800">
-                          {linearStats.byPriority.urgent} Urgent
-                        </Badge>
-                      )}
-                      {linearStats.byPriority.high > 0 && (
-                        <Badge className="bg-orange-100 text-orange-800">
-                          {linearStats.byPriority.high} High
-                        </Badge>
-                      )}
-                    </div>
+        <Link to="/reflect/stats/linear" className="block">
+          <Card className="h-full hover:border-purple-300 transition-colors cursor-pointer">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-lg font-medium flex items-center gap-2">
+              <LayoutList className="w-5 h-5 text-purple-500" />
+              Linear
+            </CardTitle>
+            {linearConfigured ? (
+              <Badge className="bg-green-100 text-green-800">
+                <CheckCircle2 className="w-3 h-3 mr-1" />
+                Connected
+              </Badge>
+            ) : (
+              <Badge className="bg-gray-100 text-gray-800">
+                <AlertCircle className="w-3 h-3 mr-1" />
+                Not Set Up
+              </Badge>
+            )}
+          </CardHeader>
+          <CardContent>
+            {linearConfigured && linearStats ? (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-3xl font-bold">{linearStats.totalIssues}</p>
+                    <p className="text-sm text-gray-500">Open Issues</p>
                   </div>
-                  <div className="flex items-center justify-between text-sm text-gray-500">
-                    <span>
-                      {linearStats.byStatusType.started} in progress
-                    </span>
-                    <ArrowRight className="w-4 h-4" />
+                  <div className="text-right space-y-1">
+                    {linearStats.byPriority.urgent > 0 && (
+                      <Badge className="bg-red-100 text-red-800">
+                        {linearStats.byPriority.urgent} Urgent
+                      </Badge>
+                    )}
+                    {linearStats.byPriority.high > 0 && (
+                      <Badge className="bg-orange-100 text-orange-800">
+                        {linearStats.byPriority.high} High
+                      </Badge>
+                    )}
                   </div>
                 </div>
-              ) : (
-                <div className="py-4 text-center text-gray-500">
-                  <LayoutList className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                  <p className="text-sm">Connect Linear in settings</p>
+                <div className="flex items-center justify-between text-sm text-gray-500">
+                  <span>{linearStats.byStatusType.started} in progress</span>
+                  <ArrowRight className="w-4 h-4" />
                 </div>
-              )}
-            </CardContent>
+              </div>
+            ) : (
+              <div className="py-4 text-center text-gray-500">
+                <LayoutList className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                <p className="text-sm">Connect Linear in settings</p>
+              </div>
+            )}
+          </CardContent>
           </Card>
         </Link>
       </div>
@@ -286,7 +274,7 @@ function StatsOverviewPage() {
         <div className="flex flex-wrap gap-3">
           {!gmailConfigured && (
             <Link
-              to="/settings/gmail"
+              to="/settings/integrations"
               className="inline-flex items-center gap-2 px-4 py-2 bg-red-50 text-red-700 rounded-lg hover:bg-red-100 transition-colors"
             >
               <Mail className="w-4 h-4" />
@@ -295,7 +283,7 @@ function StatsOverviewPage() {
           )}
           {!hubstaffConfigured && (
             <Link
-              to="/settings/hubstaff"
+              to="/settings/integrations"
               className="inline-flex items-center gap-2 px-4 py-2 bg-green-50 text-green-700 rounded-lg hover:bg-green-100 transition-colors"
             >
               <Clock className="w-4 h-4" />
@@ -304,7 +292,7 @@ function StatsOverviewPage() {
           )}
           {!linearConfigured && (
             <Link
-              to="/settings/linear"
+              to="/settings/integrations"
               className="inline-flex items-center gap-2 px-4 py-2 bg-purple-50 text-purple-700 rounded-lg hover:bg-purple-100 transition-colors"
             >
               <LayoutList className="w-4 h-4" />
@@ -323,3 +311,4 @@ function StatsOverviewPage() {
     </div>
   )
 }
+

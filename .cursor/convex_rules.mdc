@@ -797,4 +797,3 @@ const conditionalData = useCachedQuery(
   someCondition ? { arg: "value" } : "skip"
 )
 ```
-

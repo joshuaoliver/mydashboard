@@ -165,7 +165,8 @@ export const upsertChat = internalMutation({
         // Note: We still return shouldSyncMessages which may be true if lastActivity > lastMessagesSyncedAt.
         // This is intentional - the caller will sync messages and syncChatMessages() will update lastMessagesSyncedAt.
         // This handles the case where chat metadata is unchanged but messages haven't been synced yet.
-        return { chatDocId, shouldSyncMessages };
+        // chatWasUpdated: false tells the caller to skip upserting participants (nothing changed)
+        return { chatDocId, shouldSyncMessages, chatWasUpdated: false };
       }
       
       // DEBUG: Log what triggered the update so we can identify unnecessary writes
@@ -279,6 +280,9 @@ export const upsertChat = internalMutation({
       }
       
       await ctx.db.patch(existingChat._id, updates);
+      
+      // Return that this chat was updated (not new, but changed)
+      return { chatDocId, shouldSyncMessages, chatWasUpdated: true };
     } else {
       // New chat - include contactId in initial insert
       const insertData = {
@@ -290,9 +294,10 @@ export const upsertChat = internalMutation({
       // New chat - always sync messages
       shouldSyncMessages = true;
       console.log(`[upsertChat] New chat ${args.chatData.chatId}: will sync messages, contactId=${contactId || 'none'}`);
+      
+      // Return that this is a new chat
+      return { chatDocId, shouldSyncMessages, chatWasUpdated: true };
     }
-
-    return { chatDocId, shouldSyncMessages };
   },
 });
 
@@ -794,8 +799,17 @@ export const syncBeeperChatsInternal = internalAction({
         
         console.log(
           `[Cursor Sync] Received ${chats.length} chats from API (page ${currentPage}) ` +
-          `(hasMore: ${response.hasMore || false})`
+          `(hasMore: ${response.hasMore || false}, newestCursor: ${response.newestCursor?.slice(0, 13)})`
         );
+
+        // OPTIMIZATION: If we're doing an incremental sync (direction=after) and the API returns
+        // the same cursor we sent, it means there are no NEW chats - skip processing entirely.
+        // This prevents re-syncing the same 125 chats over and over when nothing has changed.
+        if (currentDirection === "after" && currentCursor && response.newestCursor === currentCursor) {
+          console.log(`[Cursor Sync] No new chats (cursor unchanged) - skipping processing`);
+          hasMore = false;
+          break;
+        }
 
         // Process each chat in this page
       for (const chat of chats) {
@@ -889,13 +903,14 @@ export const syncBeeperChatsInternal = internalAction({
         };
 
           // Upsert chat via mutation
-        const { chatDocId, shouldSyncMessages } = await ctx.runMutation(
+        const { chatDocId, shouldSyncMessages, chatWasUpdated } = await ctx.runMutation(
           internal.beeperSync.upsertChat,
           { chatData }
         );
 
-          // Sync participants
-        if (chat.participants?.items && chat.participants.items.length > 0) {
+          // Sync participants - ONLY if the chat was new or updated
+          // Skip if nothing changed to avoid unnecessary database operations
+        if (chatWasUpdated && chat.participants?.items && chat.participants.items.length > 0) {
           await ctx.runMutation(
             internal.beeperSync.upsertParticipants,
             {

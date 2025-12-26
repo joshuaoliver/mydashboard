@@ -20,7 +20,7 @@ import {
 import { useState } from 'react'
 import { formatSydneyDateTime } from '@/lib/timezone'
 
-export const Route = createFileRoute('/_authenticated/stats/linear')({
+export const Route = createFileRoute('/_authenticated/reflect/stats/linear')({
   component: LinearStatsPage,
 })
 

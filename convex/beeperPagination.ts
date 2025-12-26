@@ -522,6 +522,17 @@ export const loadOlderChats = action({
         `(hasMore: ${response.hasMore || false})`
       );
       
+      // OPTIMIZATION: If cursor unchanged, no older chats available - skip processing
+      if (response.oldestCursor === syncState.oldestCursor) {
+        console.log(`[Load Older] No older chats available (cursor unchanged)`);
+        return {
+          success: true,
+          chatsLoaded: 0,
+          hasMore: false,
+          timestamp: Date.now(),
+        };
+      }
+      
       // Process and store chats using existing sync logic
       let syncedChatsCount = 0;
       const now = Date.now();
@@ -812,6 +823,16 @@ export const loadNewerMessages = action({
         `(hasMore: ${response.hasMore || false})`
       );
       
+      // OPTIMIZATION: If cursor unchanged, no new messages - skip processing
+      if (response.newestCursor === chat.newestMessageSortKey) {
+        console.log(`[Load Newer Messages] No new messages (cursor unchanged)`);
+        return {
+          success: true,
+          messagesLoaded: 0,
+          hasMore: false,
+        };
+      }
+      
       if (messages.length === 0) {
         return {
           success: true,
@@ -980,6 +1001,24 @@ export const loadOlderMessages = action({
         `(hasMore: ${response.hasMore || false})`
       );
       
+      // OPTIMIZATION: If cursor unchanged, no older messages - mark complete and skip
+      if (response.oldestCursor === chat.oldestMessageSortKey) {
+        console.log(`[Load Older Messages] No older messages (cursor unchanged) - marking complete`);
+        await ctx.runMutation(
+          internal.cursorHelpers.updateChatMessageCursors,
+          {
+            chatDocId: chat._id,
+            hasCompleteHistory: true,
+          }
+        );
+        return {
+          success: true,
+          messagesLoaded: 0,
+          hasMore: false,
+          timestamp: Date.now(),
+        };
+      }
+      
       // Transform and store messages - match API spec exactly
       const messagesToSync = messages
         .map((msg: any) => {
@@ -1110,6 +1149,17 @@ export const loadOlderChatsInternal = internalAction({
       }) as any;
       
       const chats = response.items || [];
+      
+      // OPTIMIZATION: If cursor unchanged, no older chats available - skip processing
+      if (response.oldestCursor === syncState.oldestCursor) {
+        return {
+          success: true,
+          chatsLoaded: 0,
+          hasMore: false,
+          timestamp: Date.now(),
+        };
+      }
+      
       let syncedChatsCount = 0;
       const now = Date.now();
       
@@ -1350,6 +1400,11 @@ export const loadNewerMessagesInternal = internalAction({
       
       const messages = response.items || [];
       
+      // OPTIMIZATION: If cursor unchanged, no new messages - skip processing
+      if (response.newestCursor === chat.newestMessageSortKey) {
+        return { success: true, messagesLoaded: 0, hasMore: false };
+      }
+      
       if (messages.length === 0) {
         return { success: true, messagesLoaded: 0, hasMore: false };
       }
@@ -1489,6 +1544,18 @@ export const loadOlderMessagesInternal = internalAction({
       ) as any;
       
       const messages = response.items || [];
+      
+      // OPTIMIZATION: If cursor unchanged, no older messages - mark complete and skip
+      if (response.oldestCursor === chat.oldestMessageSortKey) {
+        await ctx.runMutation(
+          internal.cursorHelpers.updateChatMessageCursors,
+          {
+            chatDocId: chat._id,
+            hasCompleteHistory: true,
+          }
+        );
+        return { success: true, messagesLoaded: 0, hasMore: false };
+      }
       
       const messagesToSync = messages
         .map((msg: any) => {

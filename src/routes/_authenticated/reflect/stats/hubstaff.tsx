@@ -22,7 +22,7 @@ import {
 } from 'lucide-react'
 import { useState } from 'react'
 
-export const Route = createFileRoute('/_authenticated/stats/hubstaff')({
+export const Route = createFileRoute('/_authenticated/reflect/stats/hubstaff')({
   component: HubstaffStatsPage,
 })
 

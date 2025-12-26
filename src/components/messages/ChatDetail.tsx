@@ -73,52 +73,52 @@ export const ChatDetail = memo(function ChatDetail({ messages, isSingleChat = tr
               description="Select a chat and type a message to begin"
             />
           ) : (
-            <div className="px-4 py-2 space-y-1">
+            <div className="px-3 py-1.5 space-y-0.5">
               {/* Loading indicator for older messages */}
               {messagesStatus === "LoadingMore" && (
-                <div className="py-3 text-center">
-                  <RefreshCw className="w-4 h-4 text-gray-400 animate-spin mx-auto" />
-                  <p className="text-xs text-gray-500 mt-1">Loading older messages...</p>
+                <div className="py-2 text-center">
+                  <RefreshCw className="w-3 h-3 text-gray-400 animate-spin mx-auto" />
+                  <p className="text-[10px] text-gray-500 mt-0.5">Loading older messages...</p>
                 </div>
               )}
               
               {messages.map((message) => (
                 <div key={message.id} className={cn('flex group', message.isFromUser ? 'justify-end' : 'justify-start')}>
                   <AIMessage from={message.isFromUser ? 'user' : 'assistant'}>
-                    <MessageContent variant="contained">
+                    <MessageContent variant="contained" className="px-2.5 py-1.5">
                       {/* Only show sender name in group chats */}
                       {!isSingleChat && !message.isFromUser && (
-                        <div className="text-xs font-semibold mb-1 opacity-90">
+                        <div className="text-[10px] font-semibold mb-0.5 opacity-90">
                           {message.senderName}
                         </div>
                       )}
                       
                       {/* Render image attachments */}
                       {message.attachments && message.attachments.length > 0 && (
-                        <div className="mb-2 space-y-2">
+                        <div className="mb-1.5 space-y-1.5">
                           {message.attachments.map((att, idx) => (
                             att.type === 'img' ? (
-                              <div key={idx} className="rounded-lg overflow-hidden">
+                              <div key={idx} className="rounded overflow-hidden">
                                 <ProxiedImage
                                   src={att.srcURL}
                                   alt={att.fileName || 'Image attachment'}
-                                  className="max-w-full h-auto max-h-96 rounded-lg"
+                                  className="max-w-full h-auto max-h-64 rounded"
                                   mimeType={att.mimeType}
                                 />
                                 {att.isSticker && (
-                                  <div className="text-xs text-gray-500 mt-1">Sticker</div>
+                                  <div className="text-[10px] text-gray-500 mt-0.5">Sticker</div>
                                 )}
                               </div>
                             ) : att.type === 'video' ? (
-                              <div key={idx} className="p-3 bg-gray-100 rounded text-sm">
+                              <div key={idx} className="p-2 bg-gray-100 rounded text-xs">
                                 🎥 Video: {att.fileName || 'Video attachment'}
                               </div>
                             ) : att.type === 'audio' ? (
-                              <div key={idx} className="p-3 bg-gray-100 rounded text-sm">
+                              <div key={idx} className="p-2 bg-gray-100 rounded text-xs">
                                 🎵 Audio: {att.fileName || 'Audio attachment'}
                               </div>
                             ) : (
-                              <div key={idx} className="p-3 bg-gray-100 rounded text-sm">
+                              <div key={idx} className="p-2 bg-gray-100 rounded text-xs">
                                 📎 {att.fileName || 'Attachment'}
                               </div>
                             )
@@ -127,14 +127,14 @@ export const ChatDetail = memo(function ChatDetail({ messages, isSingleChat = tr
                       )}
                       
                       {/* Render text content with timestamp */}
-                      <div className="flex items-end gap-2">
+                      <div className="flex items-end gap-1.5">
                         {message.text && (
-                          <p className="text-sm whitespace-pre-wrap break-words flex-1">
+                          <p className="text-xs whitespace-pre-wrap break-words flex-1">
                             {message.text}
                           </p>
                         )}
                         {/* Timestamp inside bubble - shown on hover */}
-                        <div className="text-[10px] text-gray-500 opacity-0 group-hover:opacity-70 transition-opacity select-none whitespace-nowrap self-end">
+                        <div className="text-[9px] text-gray-500 opacity-0 group-hover:opacity-70 transition-opacity select-none whitespace-nowrap self-end">
                           {formatMessageTime(message.timestamp)}
                         </div>
                       </div>

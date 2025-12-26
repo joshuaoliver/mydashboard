@@ -79,7 +79,7 @@ export function ReplySuggestionsPanel({
   }, [replySuggestions, onSuggestionSelect])
 
   return (
-    <div className="flex-shrink-0 border-t-2 border-gray-300 bg-gray-50">
+    <div className="flex-shrink-0 border-t border-gray-200 bg-gray-50">
       <ReplySuggestions
         suggestions={replySuggestions}
         isLoading={isLoading}

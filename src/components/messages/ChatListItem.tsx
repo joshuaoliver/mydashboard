@@ -1,5 +1,5 @@
 import { cn } from '@/lib/utils'
-import { Archive, ArchiveRestore, Instagram, MessageCircle, Phone, Mail, Ban, CircleSlash } from 'lucide-react'
+import { Archive, ArchiveRestore, Instagram, MessageCircle, Phone, Mail } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { memo } from 'react'
 
@@ -42,9 +42,7 @@ interface ChatListItemProps {
   onClick: () => void
   onHover?: (chatId: string) => void  // Preload on hover
   onArchive?: (chatId: string) => void
-  onBlock?: (chatId: string) => void
   isArchived?: boolean
-  isBlocked?: boolean
   contactImageUrl?: string // From DEX integration
 }
 
@@ -61,9 +59,7 @@ export const ChatListItem = memo(function ChatListItem({
   onClick,
   onHover,
   onArchive,
-  onBlock,
   isArchived = false,
-  isBlocked = false,
   contactImageUrl,
 }: ChatListItemProps) {
   // Smart timestamp formatting
@@ -95,11 +91,6 @@ export const ChatListItem = memo(function ChatListItem({
   const handleArchiveClick = (e: React.MouseEvent) => {
     e.stopPropagation() // Prevent selecting the chat
     onArchive?.(id)
-  }
-
-  const handleBlockClick = (e: React.MouseEvent) => {
-    e.stopPropagation() // Prevent selecting the chat
-    onBlock?.(id)
   }
 
   const handleMouseEnter = () => {
@@ -192,39 +183,22 @@ export const ChatListItem = memo(function ChatListItem({
         </div>
       </button>
       
-      {/* Action buttons - shown on hover */}
-      {(onArchive || onBlock) && (
-        <div className="absolute right-1 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-0.5">
-          {onBlock && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleBlockClick}
-              className="h-7 w-7 p-0"
-              title={isBlocked ? "Unblock chat" : "Block chat (hide permanently)"}
-            >
-              {isBlocked ? (
-                <CircleSlash className="h-3.5 w-3.5" />
-              ) : (
-                <Ban className="h-3.5 w-3.5 text-red-500" />
-              )}
-            </Button>
-          )}
-          {onArchive && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleArchiveClick}
-              className="h-7 w-7 p-0"
-              title={isArchived ? "Unarchive chat" : "Archive chat"}
-            >
-              {isArchived ? (
-                <ArchiveRestore className="h-3.5 w-3.5" />
-              ) : (
-                <Archive className="h-3.5 w-3.5" />
-              )}
-            </Button>
-          )}
+      {/* Archive button - shown on hover */}
+      {onArchive && (
+        <div className="absolute right-1 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleArchiveClick}
+            className="h-7 w-7 p-0"
+            title={isArchived ? "Unarchive chat" : "Archive chat"}
+          >
+            {isArchived ? (
+              <ArchiveRestore className="h-3.5 w-3.5" />
+            ) : (
+              <Archive className="h-3.5 w-3.5" />
+            )}
+          </Button>
         </div>
       )}
     </div>

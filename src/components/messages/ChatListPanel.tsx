@@ -7,8 +7,14 @@ import { useChatStore } from '@/stores/useChatStore'
 import { ChatListItem } from './ChatListItem'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { RefreshCw, AlertCircle } from 'lucide-react'
+import { RefreshCw, AlertCircle, ChevronDown, Archive, Ban, Check } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 
 export function ChatListPanel() {
   const navigate = useNavigate()
@@ -41,8 +47,6 @@ export function ChatListPanel() {
   const manualSync = useAction(api.beeperSync.manualSync)
   const archiveChatAction = useAction(api.chatActions.archiveChat)
   const unarchiveChatAction = useAction(api.chatActions.unarchiveChat)
-  const blockChatAction = useAction(api.chatActions.blockChat)
-  const unblockChatAction = useAction(api.chatActions.unblockChat)
 
   // Sync chat list to store for keyboard navigation
   useEffect(() => {
@@ -140,30 +144,6 @@ export function ChatListPanel() {
     }
   }, [archiveChatAction, unarchiveChatAction, tabFilter, selectedChatId, navigate])
 
-  // Handle block/unblock toggle
-  const handleBlockChat = useCallback(async (chatId: string) => {
-    try {
-      // If viewing blocked tab, unblock; otherwise block
-      if (tabFilter === 'blocked') {
-        await unblockChatAction({ chatId })
-      } else {
-        await blockChatAction({ chatId })
-        // Navigate to next conversation when blocking the currently selected chat
-        if (selectedChatId === chatId) {
-          const nextChatId = useChatStore.getState().getNextChatId()
-          if (nextChatId && nextChatId !== chatId) {
-            navigate({ to: '/messages', search: { chatId: nextChatId } })
-          } else {
-            navigate({ to: '/messages', search: { chatId: undefined } })
-          }
-        }
-      }
-    } catch (err) {
-      console.error('Failed to block/unblock chat:', err)
-      setError(err instanceof Error ? err.message : 'Failed to block/unblock chat')
-    }
-  }, [blockChatAction, unblockChatAction, tabFilter, selectedChatId, navigate])
-
   // Handle manual refresh
   const handleRefresh = useCallback(async () => {
     setIsSyncing(true)
@@ -226,7 +206,7 @@ export function ChatListPanel() {
       {/* Header */}
       <div className="flex-shrink-0 px-2 py-2 border-b border-gray-200">
         <div className="flex items-center gap-1">
-          {/* Tab Filter - compact buttons */}
+          {/* Primary Filter Tabs */}
           <div className="flex items-center gap-0.5 bg-gray-100 rounded-md p-0.5 flex-1 min-w-0">
             <button
               onClick={() => setTabFilter('unreplied')}
@@ -257,32 +237,56 @@ export function ChatListPanel() {
                   ? 'bg-white text-gray-900 shadow-sm'
                   : 'text-gray-600 hover:text-gray-900'
               }`}
-              title="All"
+              title="All (including groups)"
             >
               All
             </button>
-            <button
-              onClick={() => setTabFilter('archived')}
-              className={`flex-1 px-1.5 py-1 text-[10px] font-medium rounded transition-colors ${
-                tabFilter === 'archived'
-                  ? 'bg-white text-gray-900 shadow-sm'
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
-              title="Archived"
-            >
-              📦
-            </button>
-            <button
-              onClick={() => setTabFilter('blocked')}
-              className={`flex-1 px-1.5 py-1 text-[10px] font-medium rounded transition-colors ${
-                tabFilter === 'blocked'
-                  ? 'bg-white text-gray-900 shadow-sm'
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
-              title="Blocked"
-            >
-              🚫
-            </button>
+            
+            {/* More Filters Dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  className={`flex-shrink-0 px-1.5 py-1 text-[10px] font-medium rounded transition-colors flex items-center gap-0.5 ${
+                    tabFilter === 'archived' || tabFilter === 'blocked'
+                      ? 'bg-white text-gray-900 shadow-sm'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                  title="More filters"
+                >
+                  {tabFilter === 'archived' ? (
+                    <>
+                      <Archive className="w-3 h-3" />
+                      <span className="hidden sm:inline">Archived</span>
+                    </>
+                  ) : tabFilter === 'blocked' ? (
+                    <>
+                      <Ban className="w-3 h-3" />
+                      <span className="hidden sm:inline">Blocked</span>
+                    </>
+                  ) : (
+                    <ChevronDown className="w-3 h-3" />
+                  )}
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-40">
+                <DropdownMenuItem 
+                  onClick={() => setTabFilter('archived')}
+                  className="flex items-center gap-2 text-xs"
+                >
+                  <Archive className="w-3.5 h-3.5" />
+                  Archived
+                  {tabFilter === 'archived' && <Check className="w-3.5 h-3.5 ml-auto" />}
+                </DropdownMenuItem>
+                <DropdownMenuItem 
+                  onClick={() => setTabFilter('blocked')}
+                  className="flex items-center gap-2 text-xs"
+                >
+                  <Ban className="w-3.5 h-3.5" />
+                  Blocked
+                  {tabFilter === 'blocked' && <Check className="w-3.5 h-3.5 ml-auto" />}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
           
           {/* Refresh Button */}
@@ -352,9 +356,7 @@ export function ChatListPanel() {
                 onClick={() => handleChatSelect(chat.id)}
                 onHover={handleChatHover}
                 onArchive={handleArchiveChat}
-                onBlock={handleBlockChat}
                 isArchived={tabFilter === 'archived'}
-                isBlocked={tabFilter === 'blocked'}
                 contactImageUrl={chat.contactImageUrl}
               />
             ))}

@@ -25,7 +25,7 @@ import { useState } from 'react'
 import type { Id } from '../../../../convex/_generated/dataModel'
 import { formatSydneyDateTime } from '@/lib/timezone'
 
-export const Route = createFileRoute('/_authenticated/stats/gmail')({
+export const Route = createFileRoute('/_authenticated/reflect/stats/gmail')({
   component: GmailStatsPage,
 })
 
