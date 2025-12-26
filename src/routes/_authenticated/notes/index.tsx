@@ -5,6 +5,7 @@ import { useMutation } from 'convex/react'
 import { api } from '../../../../convex/_generated/api'
 import { FileText, Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { useEffect } from 'react'
 
 export const Route = createFileRoute('/_authenticated/notes/')({
   component: NotesIndexPage,
@@ -16,6 +17,17 @@ function NotesIndexPage() {
     convexQuery(api.todoDocuments.listDocuments, {})
   )
   const createDocument = useMutation(api.todoDocuments.createDocument)
+
+  // Auto-navigate to first note if available
+  useEffect(() => {
+    if (documents && documents.length > 0) {
+      navigate({
+        to: '/notes/$documentId',
+        params: { documentId: documents[0]._id },
+        replace: true
+      })
+    }
+  }, [documents, navigate])
 
   const handleCreateDocument = async () => {
     const id = await createDocument({ title: 'Untitled Note' })

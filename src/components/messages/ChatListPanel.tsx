@@ -86,6 +86,18 @@ export function ChatListPanel() {
     syncOnLoad()
   }, [pageLoadSync])
 
+  // Auto-select first chat if none selected
+  useEffect(() => {
+    if (!selectedChatId && allLoadedChats && allLoadedChats.length > 0) {
+      const firstChat = allLoadedChats[0]
+      navigate({
+        to: '/inbox',
+        search: { chatId: firstChat.id },
+        replace: true
+      })
+    }
+  }, [selectedChatId, allLoadedChats, navigate])
+
   // Infinite scroll handler
   const handleScroll = useCallback((event: React.UIEvent<HTMLDivElement>) => {
     if (status !== "CanLoadMore") return
