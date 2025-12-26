@@ -169,20 +169,22 @@ export const fetchCalendars = internalAction({
   handler: async (ctx): Promise<{ success: boolean; count?: number; error?: string }> => {
     const settings = await ctx.runQuery(internal.googleCalendar.getSettingsInternal, {});
 
-    if (!settings?.isConfigured || !settings?.accessToken) {
+    if (!settings?.isConfigured) {
       return { success: false, error: "Calendar not configured" };
     }
 
     try {
-      if (settings.tokenExpiresAt < Date.now()) {
-        return { success: false, error: "Token expired - please re-authenticate" };
+      // Get a valid access token (auto-refreshes if expired)
+      const tokenResult = await ctx.runAction(internal.googleCalendar.getValidAccessToken, {});
+      if (!tokenResult.success || !tokenResult.accessToken) {
+        return { success: false, error: tokenResult.error || "Failed to get access token" };
       }
 
       const response = await fetch(
         "https://www.googleapis.com/calendar/v3/users/me/calendarList",
         {
           headers: {
-            Authorization: `Bearer ${settings.accessToken}`,
+            Authorization: `Bearer ${tokenResult.accessToken}`,
           },
         }
       );
@@ -331,6 +333,105 @@ export const updateAccessToken = internalMutation({
       accessToken: args.accessToken,
       tokenExpiresAt: Date.now() + args.expiresIn * 1000,
     });
+  },
+});
+
+/**
+ * Refresh the access token using the refresh token
+ * Returns the new access token on success, or null if refresh failed
+ */
+export const refreshAccessToken = internalAction({
+  args: {},
+  handler: async (ctx): Promise<{ success: boolean; accessToken?: string; error?: string }> => {
+    // Get stored tokens
+    const calendarSettings = await ctx.runQuery(internal.googleCalendar.getSettingsInternal, {});
+    if (!calendarSettings?.refreshToken) {
+      return { success: false, error: "No refresh token available" };
+    }
+
+    // Get OAuth credentials from settings store
+    const oauthSettings = await ctx.runQuery(internal.settingsStore.getCalendarSettingsInternal, {});
+    if (!oauthSettings?.clientId || !oauthSettings?.clientSecret) {
+      return { success: false, error: "OAuth credentials not configured" };
+    }
+
+    try {
+      console.log("[Calendar Token Refresh] Refreshing access token...");
+
+      const response = await fetch("https://oauth2.googleapis.com/token", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: new URLSearchParams({
+          client_id: oauthSettings.clientId,
+          client_secret: oauthSettings.clientSecret,
+          refresh_token: calendarSettings.refreshToken,
+          grant_type: "refresh_token",
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`[Calendar Token Refresh] Failed: ${response.status}`, errorText);
+
+        // If refresh token is invalid, user needs to re-authenticate
+        if (response.status === 400 || response.status === 401) {
+          return { success: false, error: "Refresh token invalid - please re-authenticate" };
+        }
+
+        return { success: false, error: `Token refresh failed: ${response.status}` };
+      }
+
+      const tokens = await response.json();
+
+      // Update the access token in the database
+      await ctx.runMutation(internal.googleCalendar.updateAccessToken, {
+        accessToken: tokens.access_token,
+        expiresIn: tokens.expires_in,
+      });
+
+      console.log("[Calendar Token Refresh] ✅ Access token refreshed successfully");
+
+      return { success: true, accessToken: tokens.access_token };
+    } catch (error) {
+      console.error("[Calendar Token Refresh] Error:", error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : "Unknown error"
+      };
+    }
+  },
+});
+
+/**
+ * Helper action to get a valid access token
+ * Automatically refreshes if expired
+ */
+export const getValidAccessToken = internalAction({
+  args: {},
+  handler: async (ctx): Promise<{ success: boolean; accessToken?: string; error?: string }> => {
+    const settings = await ctx.runQuery(internal.googleCalendar.getSettingsInternal, {});
+
+    if (!settings?.accessToken) {
+      return { success: false, error: "Calendar not configured" };
+    }
+
+    // Check if token is still valid (with 5 minute buffer)
+    const bufferMs = 5 * 60 * 1000;
+    if (settings.tokenExpiresAt > Date.now() + bufferMs) {
+      return { success: true, accessToken: settings.accessToken };
+    }
+
+    // Token expired or about to expire, refresh it
+    console.log("[Calendar] Access token expired, refreshing...");
+    const refreshResult = await ctx.runAction(internal.googleCalendar.refreshAccessToken, {});
+
+    if (refreshResult.success && refreshResult.accessToken) {
+      return { success: true, accessToken: refreshResult.accessToken };
+    }
+
+    return { success: false, error: refreshResult.error || "Token refresh failed" };
   },
 });
 
@@ -514,17 +615,18 @@ export const syncCalendarEvents = internalAction({
   handler: async (ctx, args): Promise<{ success: boolean; count?: number; error?: string; deletedCount?: number }> => {
     const settings = await ctx.runQuery(internal.googleCalendar.getSettingsInternal, {});
 
-    if (!settings?.isConfigured || !settings?.accessToken) {
+    if (!settings?.isConfigured) {
       return { success: false, error: "Calendar not configured" };
     }
 
     try {
-      // Check if token needs refresh
-      if (settings.tokenExpiresAt < Date.now()) {
-        // Token refresh would happen here
-        // For now, return error indicating re-auth needed
-        return { success: false, error: "Token expired - please re-authenticate" };
+      // Get a valid access token (auto-refreshes if expired)
+      const tokenResult = await ctx.runAction(internal.googleCalendar.getValidAccessToken, {});
+      if (!tokenResult.success || !tokenResult.accessToken) {
+        return { success: false, error: tokenResult.error || "Failed to get access token" };
       }
+
+      const accessToken = tokenResult.accessToken;
 
       // Get date range
       const targetDate = args.date ?? new Date().toISOString().split("T")[0];
@@ -539,9 +641,9 @@ export const syncCalendarEvents = internalAction({
 
       // Get enabled calendars (or fall back to primary/settings calendar)
       const enabledCalendars = await ctx.runQuery(internal.googleCalendar.getEnabledCalendarsInternal, {});
-      
+
       // If no calendars are configured, use the legacy calendarId
-      const calendarsToSync = enabledCalendars.length > 0 
+      const calendarsToSync = enabledCalendars.length > 0
         ? enabledCalendars.map(c => c.calendarId)
         : [settings.calendarId];
 
@@ -574,7 +676,7 @@ export const syncCalendarEvents = internalAction({
             }),
           {
             headers: {
-              Authorization: `Bearer ${settings.accessToken}`,
+              Authorization: `Bearer ${accessToken}`,
             },
           }
         );
