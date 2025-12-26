@@ -4,7 +4,7 @@ import { ChatListPanel } from '@/components/messages/ChatListPanel'
 import { ConversationPanel } from '@/components/messages/ConversationPanel'
 import { ContactSidePanel } from '@/components/messages/ContactSidePanel'
 import { useChatStore } from '@/stores/useChatStore'
-import { useEffect } from 'react'
+import { useEffect, useCallback } from 'react'
 import {
   ResizableHandle,
   ResizablePanel,
@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/resizable'
 import { useIsMobile } from '@/lib/hooks/use-mobile'
 import { useChatKeyboardShortcuts } from '@/lib/hooks/use-chat-keyboard-shortcuts'
+import { useSwipeBack } from '@/lib/hooks/use-swipe-back'
 import {
   Sheet,
   SheetContent,
@@ -66,10 +67,23 @@ function InboxPage() {
   }, [isMobile, selectedChatId, setSheetOpen])
 
   // Handle closing sheet on mobile
-  const handleCloseSheet = () => {
+  const handleCloseSheet = useCallback(() => {
     setSheetOpen(false)
     navigate({ search: { chatId: undefined } })
-  }
+  }, [setSheetOpen, navigate])
+
+  // Handle closing contact panel
+  const handleCloseContactPanel = useCallback(() => {
+    setContactPanelOpen(false)
+  }, [setContactPanelOpen])
+
+  // Enable swipe-from-left-edge to go back on mobile
+  // When contact panel is open, swipe closes contact panel
+  // When only conversation is open, swipe closes conversation
+  useSwipeBack({
+    onSwipeBack: contactPanelOpen ? handleCloseContactPanel : handleCloseSheet,
+    enabled: isMobile && (sheetOpen || contactPanelOpen),
+  })
 
   return (
     <FullWidthContent>
@@ -107,7 +121,7 @@ function InboxPage() {
 
           {/* Mobile Chat Sheet */}
           <Sheet open={sheetOpen} onOpenChange={(open) => !open && handleCloseSheet()}>
-            <SheetContent side="right" className="w-full sm:max-w-2xl p-0 flex flex-col overflow-hidden [&>button]:hidden">
+            <SheetContent side="right" className="w-full sm:max-w-2xl px-0 flex flex-col overflow-hidden [&>button]:hidden gap-0">
               <SheetHeader className="px-4 py-3 border-b flex-shrink-0">
                 <div className="flex items-center gap-2">
                   <Button
@@ -141,7 +155,7 @@ function InboxPage() {
 
           {/* Mobile Contact Panel Sheet */}
           <Sheet open={contactPanelOpen} onOpenChange={setContactPanelOpen}>
-            <SheetContent side="right" className="w-full sm:max-w-md p-0 [&>button]:hidden">
+            <SheetContent side="right" className="w-full sm:max-w-md px-0 gap-0 [&>button]:hidden">
               <SheetHeader className="px-4 py-3 border-b">
                 <div className="flex items-center gap-3">
                   <Button

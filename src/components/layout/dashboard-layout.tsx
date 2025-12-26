@@ -949,9 +949,26 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
             </NavigationMenu>
           </div>
 
-          {/* Center - App title (mobile only) */}
+          {/* Center - App title (mobile only) - shows page name based on current route */}
           <div className="lg:hidden flex-1 text-center">
-            <h1 className="text-lg font-semibold text-white">Dashboard</h1>
+            <h1 className="text-lg font-semibold text-white">
+              {(() => {
+                // Map routes to display titles
+                if (currentPath === '/') return 'Dashboard'
+                if (currentPath.startsWith('/inbox')) return 'Inbox'
+                if (currentPath.startsWith('/chat')) return 'Chat'
+                if (currentPath.startsWith('/focus')) return 'Focus'
+                if (currentPath.startsWith('/today-plan')) return "Today's Plan"
+                if (currentPath.startsWith('/notes')) return 'Notes'
+                if (currentPath.startsWith('/todos')) return 'Todos'
+                if (currentPath.startsWith('/people/dating')) return 'Dating'
+                if (currentPath.startsWith('/people')) return 'People'
+                if (currentPath.startsWith('/reflect/stats')) return 'Stats'
+                if (currentPath.startsWith('/reflect')) return 'Reflect'
+                if (currentPath.startsWith('/settings')) return 'Settings'
+                return 'Dashboard'
+              })()}
+            </h1>
           </div>
 
           {/* Right side - Active session timer + Audio record + Theme toggle + User menu */}
@@ -992,8 +1009,8 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
         </div>
       </header>
 
-      {/* Main content */}
-      <main className="flex-1 overflow-auto">
+      {/* Main content - safe-area-bottom adds padding for iOS home indicator */}
+      <main className="flex-1 overflow-auto safe-area-bottom">
         {children}
       </main>
     </div>

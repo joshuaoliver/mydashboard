@@ -12,12 +12,20 @@
     @apply h-full overflow-hidden text-gray-900 bg-gray-50 dark:bg-gray-950 dark:text-gray-200;
   }
 
-  /* Safe area insets for iPhone notch/dynamic island */
+  /* Safe area insets for iPhone notch/dynamic island
+   * - Top padding on header handles the notch/dynamic island
+   * - Bottom padding on main content handles home indicator
+   * - Left/right for landscape mode on notched devices
+   */
   html {
     padding-top: env(safe-area-inset-top);
-    padding-bottom: env(safe-area-inset-bottom);
     padding-left: env(safe-area-inset-left);
     padding-right: env(safe-area-inset-right);
+  }
+  
+  /* Bottom safe area for main scrollable content areas */
+  .safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
   }
 
   .using-mouse * {
