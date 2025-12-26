@@ -41,6 +41,8 @@ export function ChatListPanel() {
   const manualSync = useAction(api.beeperSync.manualSync)
   const archiveChatAction = useAction(api.chatActions.archiveChat)
   const unarchiveChatAction = useAction(api.chatActions.unarchiveChat)
+  const blockChatAction = useAction(api.chatActions.blockChat)
+  const unblockChatAction = useAction(api.chatActions.unblockChat)
 
   // Sync chat list to store for keyboard navigation
   useEffect(() => {
@@ -49,14 +51,28 @@ export function ChatListPanel() {
     }
   }, [allLoadedChats, setChatList])
 
-  // Trigger sync on mount
+  // Trigger sync on mount (throttled to once every 2 minutes)
   useEffect(() => {
+    const SYNC_THROTTLE_MS = 2 * 60 * 1000 // 2 minutes
+    const lastSyncKey = 'beeper_last_sync_timestamp'
+
     const syncOnLoad = async () => {
+      // Check if we've synced recently
+      const lastSyncStr = sessionStorage.getItem(lastSyncKey)
+      const lastSync = lastSyncStr ? parseInt(lastSyncStr, 10) : 0
+      const now = Date.now()
+
+      if (now - lastSync < SYNC_THROTTLE_MS) {
+        console.log(`⏭️ Skipping Beeper sync (last sync was ${Math.round((now - lastSync) / 1000)}s ago)`)
+        return
+      }
+
       setIsSyncing(true)
       try {
         const result = await pageLoadSync()
         if (result.success) {
           console.log(`✅ Beeper synced: ${result.syncedChats} chats, ${result.syncedMessages} messages`)
+          sessionStorage.setItem(lastSyncKey, now.toString())
         } else {
           console.warn(`⚠️ Beeper sync failed: ${result.error || 'Unknown error'}`)
         }
@@ -96,9 +112,14 @@ export function ChatListPanel() {
         await unarchiveChatAction({ chatId })
       } else {
         await archiveChatAction({ chatId })
-        // Clear selection when archiving from non-archived view
+        // Navigate to next conversation when archiving the currently selected chat
         if (selectedChatId === chatId) {
-          navigate({ to: '/messages', search: { chatId: undefined } })
+          const nextChatId = useChatStore.getState().getNextChatId()
+          if (nextChatId && nextChatId !== chatId) {
+            navigate({ to: '/messages', search: { chatId: nextChatId } })
+          } else {
+            navigate({ to: '/messages', search: { chatId: undefined } })
+          }
         }
       }
     } catch (err) {
@@ -106,6 +127,30 @@ export function ChatListPanel() {
       setError(err instanceof Error ? err.message : 'Failed to archive/unarchive chat')
     }
   }, [archiveChatAction, unarchiveChatAction, tabFilter, selectedChatId, navigate])
+
+  // Handle block/unblock toggle
+  const handleBlockChat = useCallback(async (chatId: string) => {
+    try {
+      // If viewing blocked tab, unblock; otherwise block
+      if (tabFilter === 'blocked') {
+        await unblockChatAction({ chatId })
+      } else {
+        await blockChatAction({ chatId })
+        // Navigate to next conversation when blocking the currently selected chat
+        if (selectedChatId === chatId) {
+          const nextChatId = useChatStore.getState().getNextChatId()
+          if (nextChatId && nextChatId !== chatId) {
+            navigate({ to: '/messages', search: { chatId: nextChatId } })
+          } else {
+            navigate({ to: '/messages', search: { chatId: undefined } })
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Failed to block/unblock chat:', err)
+      setError(err instanceof Error ? err.message : 'Failed to block/unblock chat')
+    }
+  }, [blockChatAction, unblockChatAction, tabFilter, selectedChatId, navigate])
 
   // Handle manual refresh
   const handleRefresh = useCallback(async () => {
@@ -215,6 +260,17 @@ export function ChatListPanel() {
             >
               📦
             </button>
+            <button
+              onClick={() => setTabFilter('blocked')}
+              className={`flex-1 px-1.5 py-1 text-[10px] font-medium rounded transition-colors ${
+                tabFilter === 'blocked'
+                  ? 'bg-white text-gray-900 shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+              title="Blocked"
+            >
+              🚫
+            </button>
           </div>
           
           {/* Refresh Button */}
@@ -284,7 +340,9 @@ export function ChatListPanel() {
                 onClick={() => handleChatSelect(chat.id)}
                 onHover={handleChatHover}
                 onArchive={handleArchiveChat}
+                onBlock={handleBlockChat}
                 isArchived={tabFilter === 'archived'}
+                isBlocked={tabFilter === 'blocked'}
                 contactImageUrl={chat.contactImageUrl}
               />
             ))}

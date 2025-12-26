@@ -362,38 +362,148 @@ function WorkPoolPanel({
         </div>
       </ScrollArea>
 
-      {/* Email blocks section */}
-      <div className="p-2 border-t bg-blue-50/50 dark:bg-blue-950/20 flex-shrink-0">
-        <div className="flex items-center gap-1 mb-1.5">
-          <Mail className="w-3 h-3 text-blue-600" />
-          <span className="text-[10px] font-semibold text-blue-700 dark:text-blue-400">
-            Email Blocks
-          </span>
-        </div>
-        <div className="grid grid-cols-2 gap-1">
-          {[
-            { title: 'Triage', duration: 20 },
-            { title: 'Reply 5', duration: 15 },
-          ].map((block) => (
-            <button
-              key={block.title}
-              draggable
-              onDragStart={(e) => {
-                const emailItem: WorkItem = {
-                  type: 'email',
-                  id: `email-${block.title.toLowerCase().replace(' ', '-')}`,
-                  title: block.title,
-                  priority: 3,
-                  estimatedDuration: block.duration,
-                }
-                e.dataTransfer.setData('application/json', JSON.stringify(emailItem))
-              }}
-              className="text-left p-1.5 rounded bg-background/50 hover:bg-background text-[10px] cursor-grab"
-            >
-              <span className="font-medium">{block.title}</span>
-              <span className="text-muted-foreground ml-0.5">({block.duration}m)</span>
-            </button>
-          ))}
+      {/* Quick Blocks section */}
+      <div className="p-2 border-t bg-muted/30 flex-shrink-0">
+        <div className="space-y-2">
+          {/* Email blocks */}
+          <div>
+            <div className="flex items-center gap-1 mb-1">
+              <Mail className="w-3 h-3 text-blue-600" />
+              <span className="text-[10px] font-semibold text-blue-700 dark:text-blue-400">
+                Email
+              </span>
+            </div>
+            <div className="grid grid-cols-2 gap-1">
+              {[
+                { title: 'Triage', duration: 20 },
+                { title: 'Reply 5', duration: 15 },
+              ].map((block) => (
+                <button
+                  key={block.title}
+                  draggable
+                  onDragStart={(e) => {
+                    const emailItem: WorkItem = {
+                      type: 'email',
+                      id: `email-${block.title.toLowerCase().replace(' ', '-')}`,
+                      title: block.title,
+                      priority: 3,
+                      estimatedDuration: block.duration,
+                    }
+                    e.dataTransfer.setData('application/json', JSON.stringify(emailItem))
+                  }}
+                  className="text-left p-1.5 rounded bg-blue-50/50 hover:bg-blue-100 dark:bg-blue-950/30 dark:hover:bg-blue-950/50 text-[10px] cursor-grab"
+                >
+                  <span className="font-medium">{block.title}</span>
+                  <span className="text-muted-foreground ml-0.5">({block.duration}m)</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Messaging blocks */}
+          <div>
+            <div className="flex items-center gap-1 mb-1">
+              <MessageSquare className="w-3 h-3 text-green-600" />
+              <span className="text-[10px] font-semibold text-green-700 dark:text-green-400">
+                Messaging
+              </span>
+            </div>
+            <div className="grid grid-cols-2 gap-1">
+              {[
+                { title: 'Reply All', duration: 30 },
+                { title: 'Quick Check', duration: 10 },
+              ].map((block) => (
+                <button
+                  key={block.title}
+                  draggable
+                  onDragStart={(e) => {
+                    const item: WorkItem = {
+                      type: 'adhoc',
+                      id: `messaging-${block.title.toLowerCase().replace(' ', '-')}`,
+                      title: `Messages: ${block.title}`,
+                      priority: 3,
+                      estimatedDuration: block.duration,
+                    }
+                    e.dataTransfer.setData('application/json', JSON.stringify(item))
+                  }}
+                  className="text-left p-1.5 rounded bg-green-50/50 hover:bg-green-100 dark:bg-green-950/30 dark:hover:bg-green-950/50 text-[10px] cursor-grab"
+                >
+                  <span className="font-medium">{block.title}</span>
+                  <span className="text-muted-foreground ml-0.5">({block.duration}m)</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Social/Calendar blocks */}
+          <div>
+            <div className="flex items-center gap-1 mb-1">
+              <CalendarIcon className="w-3 h-3 text-purple-600" />
+              <span className="text-[10px] font-semibold text-purple-700 dark:text-purple-400">
+                Social Planning
+              </span>
+            </div>
+            <div className="grid grid-cols-2 gap-1">
+              {[
+                { title: 'Plan Week', duration: 20 },
+                { title: 'Reach Out', duration: 15 },
+              ].map((block) => (
+                <button
+                  key={block.title}
+                  draggable
+                  onDragStart={(e) => {
+                    const item: WorkItem = {
+                      type: 'adhoc',
+                      id: `social-${block.title.toLowerCase().replace(' ', '-')}`,
+                      title: `Social: ${block.title}`,
+                      priority: 3,
+                      estimatedDuration: block.duration,
+                    }
+                    e.dataTransfer.setData('application/json', JSON.stringify(item))
+                  }}
+                  className="text-left p-1.5 rounded bg-purple-50/50 hover:bg-purple-100 dark:bg-purple-950/30 dark:hover:bg-purple-950/50 text-[10px] cursor-grab"
+                >
+                  <span className="font-medium">{block.title}</span>
+                  <span className="text-muted-foreground ml-0.5">({block.duration}m)</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Gym/Wellness blocks */}
+          <div>
+            <div className="flex items-center gap-1 mb-1">
+              <Dumbbell className="w-3 h-3 text-orange-600" />
+              <span className="text-[10px] font-semibold text-orange-700 dark:text-orange-400">
+                Gym & Wellness
+              </span>
+            </div>
+            <div className="grid grid-cols-2 gap-1">
+              {[
+                { title: 'Workout', duration: 60 },
+                { title: 'Stretch', duration: 15 },
+              ].map((block) => (
+                <button
+                  key={block.title}
+                  draggable
+                  onDragStart={(e) => {
+                    const item: WorkItem = {
+                      type: 'adhoc',
+                      id: `gym-${block.title.toLowerCase().replace(' ', '-')}`,
+                      title: `Gym: ${block.title}`,
+                      priority: 3,
+                      estimatedDuration: block.duration,
+                    }
+                    e.dataTransfer.setData('application/json', JSON.stringify(item))
+                  }}
+                  className="text-left p-1.5 rounded bg-orange-50/50 hover:bg-orange-100 dark:bg-orange-950/30 dark:hover:bg-orange-950/50 text-[10px] cursor-grab"
+                >
+                  <span className="font-medium">{block.title}</span>
+                  <span className="text-muted-foreground ml-0.5">({block.duration}m)</span>
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
     </div>

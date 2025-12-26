@@ -141,8 +141,9 @@ interface DashboardLayoutProps {
 // Keyboard shortcuts for navigation
 // Only active when no input/textarea is focused
 const KEYBOARD_SHORTCUTS: Record<string, { to: string; search?: Record<string, unknown> }> = {
-  't': { to: '/' },           // 't' for Today
-  'f': { to: '/focus' },      // 'f' for Focus
+  'd': { to: '/' },           // 'd' for Dashboard
+  't': { to: '/today-plan' }, // 't' for Today's Plan
+  'f': { to: '/today-plan' }, // 'f' for Focus (Today's Plan)
   'n': { to: '/notes' },      // 'n' for Notes
   'a': { to: '/chat' },       // 'a' for AI/Agent chat
   'i': { to: '/inbox', search: { chatId: undefined } },  // 'i' for Inbox
@@ -435,10 +436,10 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
           <div className="hidden lg:flex items-center gap-1">
             <NavigationMenu viewport={false}>
               <NavigationMenuList className="gap-1">
-                {/* Today - direct link */}
+                {/* Home/Dashboard - direct link */}
                 <NavigationMenuItem>
-                  <Link 
-                    to="/" 
+                  <Link
+                    to="/"
                     className={cn(
                       "inline-flex items-center gap-2 px-3 py-2 rounded-md",
                       "text-sm font-medium transition-all",
@@ -446,9 +447,10 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                       "[&.active]:bg-slate-800 [&.active]:text-white"
                     )}
                     activeProps={{ className: "active" }}
+                    activeOptions={{ exact: true }}
                   >
                     <CalendarDays className="h-4 w-4" />
-                    <span><span className="underline decoration-slate-500">T</span>oday</span>
+                    <span><span className="underline decoration-slate-500">D</span>ashboard</span>
                   </Link>
                 </NavigationMenuItem>
 
@@ -484,17 +486,17 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                     <ul className="grid w-[180px] gap-1 p-2">
                       <li>
                         <NavigationMenuLink asChild>
-                          <Link to="/focus" className="w-full">
-                            <Timer className="h-4 w-4 flex-shrink-0" />
-                            <span>Focus Timer</span>
+                          <Link to="/today-plan" className="w-full">
+                            <ListTodo className="h-4 w-4 flex-shrink-0" />
+                            <span>Today's Plan</span>
                           </Link>
                         </NavigationMenuLink>
                       </li>
                       <li>
                         <NavigationMenuLink asChild>
-                          <Link to="/" className="w-full">
-                            <ListTodo className="h-4 w-4 flex-shrink-0" />
-                            <span>Today's Plan</span>
+                          <Link to="/focus" className="w-full">
+                            <Timer className="h-4 w-4 flex-shrink-0" />
+                            <span>Focus Timer</span>
                           </Link>
                         </NavigationMenuLink>
                       </li>
@@ -502,21 +504,37 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                   </NavigationMenuContent>
                 </NavigationMenuItem>
 
-                {/* Notes - direct link */}
+                {/* Notes - dropdown with Notes and Todos */}
                 <NavigationMenuItem>
-                  <Link
-                    to="/notes"
-                    className={cn(
-                      "inline-flex items-center gap-2 px-3 py-2 rounded-md",
-                      "text-sm font-medium transition-all",
-                      "text-slate-300 hover:text-white hover:bg-slate-800/80",
-                      "[&.active]:bg-slate-800 [&.active]:text-white"
-                    )}
-                    activeProps={{ className: "active" }}
-                  >
+                  <NavigationMenuTrigger className={cn(
+                    "inline-flex items-center gap-2 px-3 py-2 rounded-md",
+                    "text-sm font-medium transition-all",
+                    "text-slate-300 hover:text-white hover:bg-slate-800/80 data-[state=open]:bg-slate-800 data-[state=open]:text-white",
+                    "bg-transparent"
+                  )}>
                     <FileText className="h-4 w-4" />
                     <span><span className="underline decoration-slate-500">N</span>otes</span>
-                  </Link>
+                  </NavigationMenuTrigger>
+                  <NavigationMenuContent className="z-[100]">
+                    <ul className="grid w-[180px] gap-1 p-2">
+                      <li>
+                        <NavigationMenuLink asChild>
+                          <Link to="/notes" className="w-full">
+                            <FileText className="h-4 w-4 flex-shrink-0" />
+                            <span>Notes</span>
+                          </Link>
+                        </NavigationMenuLink>
+                      </li>
+                      <li>
+                        <NavigationMenuLink asChild>
+                          <Link to="/todos" className="w-full">
+                            <ListTodo className="h-4 w-4 flex-shrink-0" />
+                            <span>Todos</span>
+                          </Link>
+                        </NavigationMenuLink>
+                      </li>
+                    </ul>
+                  </NavigationMenuContent>
                 </NavigationMenuItem>
 
                 {/* Inbox - direct link */}

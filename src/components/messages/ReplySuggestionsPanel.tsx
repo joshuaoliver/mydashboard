@@ -12,6 +12,7 @@ interface ReplySuggestionsPanelProps {
   selectedChatName: string
   username?: string
   onSuggestionSelect: (text: string) => void
+  onSendMessage?: (text: string) => void
 }
 
 export function ReplySuggestionsPanel({
@@ -19,6 +20,7 @@ export function ReplySuggestionsPanel({
   selectedChatName,
   username,
   onSuggestionSelect,
+  onSendMessage,
 }: ReplySuggestionsPanelProps) {
   // Local state - isolated from parent
   const [replySuggestions, setReplySuggestions] = useState<ReplySuggestion[]>([])
@@ -85,6 +87,7 @@ export function ReplySuggestionsPanel({
         onGenerateClick={handleGenerateAISuggestions}
         selectedIndex={selectedSuggestionIndex}
         onSuggestionSelect={handleSuggestionSelect}
+        onSendSuggestion={onSendMessage}
       />
     </div>
   )

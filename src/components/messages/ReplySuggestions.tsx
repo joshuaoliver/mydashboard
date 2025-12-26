@@ -1,5 +1,5 @@
 import { Button } from '@/components/ui/button'
-import { Copy, Check, Sparkles } from 'lucide-react'
+import { Copy, Check, Sparkles, Send } from 'lucide-react'
 import { useState } from 'react'
 import { Loader } from '@/components/ai-elements/loader'
 
@@ -20,6 +20,7 @@ interface ReplySuggestionsProps {
   onGenerateClick?: (customContext?: string) => void  // Now accepts custom context
   selectedIndex?: number   // Currently selected suggestion index
   onSuggestionSelect?: (index: number) => void  // Callback when suggestion is clicked
+  onSendSuggestion?: (text: string) => void  // Callback to send a suggestion directly
 }
 
 export function ReplySuggestions({
@@ -29,6 +30,7 @@ export function ReplySuggestions({
   onGenerateClick,
   selectedIndex = 0,
   onSuggestionSelect,
+  onSendSuggestion,
 }: ReplySuggestionsProps) {
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null)
 
@@ -40,6 +42,13 @@ export function ReplySuggestions({
     } catch (err) {
       console.error('Failed to copy text:', err)
     }
+  }
+
+  const handleSend = (text: string, index: number) => {
+    // First select it
+    onSuggestionSelect?.(index)
+    // Then send it
+    onSendSuggestion?.(text)
   }
 
   // Loading state
@@ -85,28 +94,28 @@ export function ReplySuggestions({
 
   return (
     <div className="p-2 sm:p-4 min-w-0">
-      {/* Suggestion Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3 min-w-0">
+      {/* Suggestion Cards - Full width, stacked */}
+      <div className="flex flex-col gap-2 min-w-0">
         {suggestions.map((suggestion, index) => {
           const isSelected = index === selectedIndex
           return (
             <div
               key={index}
               onClick={() => onSuggestionSelect?.(index)}
-              className={`p-2 sm:p-3 rounded-lg transition-all cursor-pointer group min-w-0 ${
+              className={`w-full p-3 rounded-lg transition-all cursor-pointer group ${
                 isSelected
                   ? 'bg-blue-50 border-2 border-blue-500 shadow-sm'
                   : 'bg-white border-2 border-gray-300 hover:border-blue-400 hover:shadow-sm'
               }`}
             >
-              {/* Reply text */}
-              <div className="text-sm text-gray-900 leading-relaxed break-words overflow-hidden whitespace-pre-wrap">
-                {suggestion.reply}
-              </div>
+              <div className="flex items-start gap-3">
+                {/* Reply text */}
+                <div className="flex-1 text-sm text-gray-900 leading-relaxed break-words overflow-hidden whitespace-pre-wrap">
+                  {suggestion.reply}
+                </div>
 
-              {/* Copy button - only show for selected */}
-              {isSelected && (
-                <div className="flex items-center justify-end gap-2 mt-2 sm:mt-3">
+                {/* Action buttons - always visible */}
+                <div className="flex items-center gap-1 flex-shrink-0">
                   <Button
                     variant="ghost"
                     size="sm"
@@ -114,22 +123,32 @@ export function ReplySuggestions({
                       e.stopPropagation()
                       handleCopy(suggestion.reply, index)
                     }}
-                    className="h-7 text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                    className="h-8 px-2 text-xs"
+                    title="Copy to clipboard"
                   >
                     {copiedIndex === index ? (
-                      <>
-                        <Check className="w-3 h-3 mr-1 text-green-600" />
-                        <span className="text-green-600">Copied</span>
-                      </>
+                      <Check className="w-4 h-4 text-green-600" />
                     ) : (
-                      <>
-                        <Copy className="w-3 h-3 mr-1" />
-                        Copy
-                      </>
+                      <Copy className="w-4 h-4" />
                     )}
                   </Button>
+                  {onSendSuggestion && (
+                    <Button
+                      variant={isSelected ? "default" : "outline"}
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleSend(suggestion.reply, index)
+                      }}
+                      className="h-8 px-3 text-xs gap-1"
+                      title="Send this reply"
+                    >
+                      <Send className="w-4 h-4" />
+                      Send
+                    </Button>
+                  )}
                 </div>
-              )}
+              </div>
             </div>
           )
         })}
@@ -137,4 +156,3 @@ export function ReplySuggestions({
     </div>
   )
 }
-
