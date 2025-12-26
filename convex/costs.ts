@@ -43,7 +43,14 @@ export type AIFeatureKey =
   | "chat-agent"
   | "daily-summary"
   | "voice-notes"
+  | "voice-transcription"
   | "thread-title";
+
+/**
+ * Default user ID for single-user dashboard
+ * Used to group all costs under a consistent user for querying
+ */
+export const DASHBOARD_USER_ID = "dashboard-user";
 
 /**
  * Track AI cost for a feature
@@ -63,7 +70,7 @@ export async function trackAICost(
     };
     threadId?: string; // Optional thread context (chatId, agentThreadId, etc.)
     messageId?: string; // Optional message context
-    userId?: string; // Optional user ID for multi-tenant tracking
+    userId?: string; // Optional user ID for multi-tenant tracking (defaults to DASHBOARD_USER_ID)
   }
 ): Promise<void> {
   try {
@@ -77,9 +84,12 @@ export async function trackAICost(
     const messageId =
       args.messageId ?? `${args.featureKey}-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 
+    // Always use DASHBOARD_USER_ID for single-user dashboard unless explicitly provided
+    const userId = args.userId ?? DASHBOARD_USER_ID;
+
     await costs.addAICost(ctx, {
       messageId,
-      userId: args.userId,
+      userId,
       threadId,
       usage: args.usage,
       modelId,
@@ -93,6 +103,64 @@ export async function trackAICost(
   } catch (error) {
     // Cost tracking should never fail the main operation
     console.error(`[costs] Failed to track AI cost:`, error);
+  }
+}
+
+/**
+ * Track transcription cost for voice notes
+ * OpenAI Whisper is priced at $0.006 per minute of audio
+ *
+ * @param ctx - Convex action context
+ * @param args - Transcription tracking parameters
+ */
+export async function trackTranscriptionCost(
+  ctx: ActionCtx,
+  args: {
+    durationSeconds: number;
+    threadId?: string;
+    messageId?: string;
+    userId?: string;
+  }
+): Promise<void> {
+  try {
+    // Whisper pricing: $0.006 per minute = $0.0001 per second
+    // We'll approximate this as "tokens" for the neutral-cost component
+    // 1 second ≈ 1 "token" for tracking purposes, with cost calculated separately
+    const durationMinutes = args.durationSeconds / 60;
+    const estimatedCost = durationMinutes * 0.006;
+
+    // Generate a unique messageId if not provided
+    const messageId =
+      args.messageId ??
+      `voice-transcription-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+
+    // Always use DASHBOARD_USER_ID for single-user dashboard unless explicitly provided
+    const userId = args.userId ?? DASHBOARD_USER_ID;
+
+    const threadId = args.threadId ?? "feature:voice-transcription";
+
+    // Track as AI cost using pseudo-tokens based on duration
+    // Using totalTokens = seconds to give a sense of scale
+    await costs.addAICost(ctx, {
+      messageId,
+      userId,
+      threadId,
+      usage: {
+        promptTokens: Math.round(args.durationSeconds),
+        completionTokens: 0,
+        totalTokens: Math.round(args.durationSeconds),
+      },
+      modelId: "whisper-1",
+      providerId: "openai",
+    });
+
+    console.log(
+      `[costs] Tracked transcription cost: duration=${args.durationSeconds}s, ` +
+        `estimatedCost=$${estimatedCost.toFixed(4)}, thread=${threadId}`
+    );
+  } catch (error) {
+    // Cost tracking should never fail the main operation
+    console.error(`[costs] Failed to track transcription cost:`, error);
   }
 }
 

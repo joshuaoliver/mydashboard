@@ -1,8 +1,6 @@
 import { useMemo, useState, useEffect } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
-import { useQuery } from '@tanstack/react-query'
-import { convexQuery } from '@convex-dev/react-query'
-import { useQuery as useConvexQuery, useMutation } from 'convex/react'
+import { useQuery, useMutation } from 'convex/react'
 import type { Id } from '../../../../convex/_generated/dataModel'
 import { api } from '../../../../convex/_generated/api'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -110,7 +108,7 @@ function DatingPage() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(Array.from(visibleColumns)))
   }, [visibleColumns])
 
-  const { data } = useQuery(convexQuery(api.dexQueries.listContactsWithLeadStatus, {}))
+  const data = useQuery(api.dexQueries.listContactsWithLeadStatus, {})
   const updateLeadStatus = useMutation(api.contactMutations.updateLeadStatus)
 
   // Data comes pre-filtered and sorted from backend
@@ -129,7 +127,7 @@ function DatingPage() {
     return LEAD_STATUS_METADATA.filter(col => visibleColumns.has(col.id))
   }, [visibleColumns])
 
-  const selectedContact = useConvexQuery(api.dexQueries.getContactById, selectedContactId ? { contactId: selectedContactId } : 'skip')
+  const selectedContact = useQuery(api.dexQueries.getContactById, selectedContactId ? { contactId: selectedContactId } : 'skip')
 
   const handleOpenContact = (contactId: Id<'contacts'>) => { setSelectedContactId(contactId); setSheetOpen(true) }
   const handleCloseSheet = () => { setSheetOpen(false); setSelectedContactId(null) }
@@ -159,6 +157,8 @@ function DatingPage() {
 
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event
+    // Save draggedOverColumn before clearing it (for fallback logic)
+    const savedDraggedOverColumn = draggedOverColumn
     setDraggedOverColumn(null)
     
     if (!over || active.id === over.id) return
@@ -171,15 +171,19 @@ function DatingPage() {
       if (overItem) targetColumn = LEAD_STATUS_METADATA.find((col) => col.id === overItem.column)
     }
     // Fallback to the column we were dragging over
-    if (!targetColumn && draggedOverColumn) {
-      targetColumn = LEAD_STATUS_METADATA.find((col) => col.id === draggedOverColumn)
+    if (!targetColumn && savedDraggedOverColumn) {
+      targetColumn = LEAD_STATUS_METADATA.find((col) => col.id === savedDraggedOverColumn)
     }
     
     if (!targetColumn) return
     
-    // Check if already in this column
-    const activeItem = kanbanData.find((item) => item.id === active.id)
-    if (activeItem && activeItem.column === targetColumn.id) return
+    // Get the ORIGINAL lead status from the Convex data, not the mutated kanbanData
+    // The Kanban component mutates kanbanData during drag, so we need to check the source data
+    const activeContact = datingContacts.find((c) => c._id === active.id)
+    const currentLeadStatus = activeContact?.leadStatus
+    
+    // Check if already in this column (using original data, not mutated)
+    if (currentLeadStatus === targetColumn.key) return
     
     // Update the lead status in the database
     const newStatus = targetColumn.key === 'NoStatus' ? null : (targetColumn.key as LeadStatus)

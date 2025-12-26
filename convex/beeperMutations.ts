@@ -64,14 +64,22 @@ export const toggleArchiveChat = internalMutation({
       .query("beeperChats")
       .withIndex("by_chat_id", (q) => q.eq("chatId", args.chatId))
       .first();
-    
+
     if (!chat) {
       throw new Error(`Chat ${args.chatId} not found`);
     }
 
-    await ctx.db.patch(chat._id, {
+    // When archiving, also clear the stale reply importance
+    const patch: { isArchived: boolean; replyImportance?: undefined; replyImportanceUpdatedAt?: undefined } = {
       isArchived: args.isArchived,
-    });
+    };
+    
+    if (args.isArchived) {
+      patch.replyImportance = undefined;
+      patch.replyImportanceUpdatedAt = undefined;
+    }
+
+    await ctx.db.patch(chat._id, patch);
 
     return { success: true, chatId: args.chatId, isArchived: args.isArchived };
   },
@@ -454,11 +462,12 @@ export const updateMessageStatus = internalMutation({
     // When sent successfully, update messageId to the Beeper-assigned ID
     // This prevents duplicates when sync runs (sync checks by messageId)
     if (args.status === "sent" && args.pendingMessageId) {
+      const pendingId = args.pendingMessageId; // TypeScript narrowing
       // Check if sync already inserted a message with this ID (race condition)
       // If so, delete the sync'd duplicate - we keep ours since it has status tracking
       const existingFromSync = await ctx.db
         .query("beeperMessages")
-        .withIndex("by_message_id", (q) => q.eq("messageId", args.pendingMessageId))
+        .withIndex("by_message_id", (q) => q.eq("messageId", pendingId))
         .first();
       
       if (existingFromSync && existingFromSync._id !== args.messageDocId) {

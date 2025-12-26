@@ -12,10 +12,15 @@ export const archiveChat = action({
     chatId: v.string(),
   },
   handler: async (ctx, args): Promise<{ success: boolean; beeperSynced: boolean; error?: string }> => {
-    // First, update local database
+    // First, update local database - archive and mark as read
     await ctx.runMutation(internal.beeperMutations.toggleArchiveChat, {
       chatId: args.chatId,
       isArchived: true,
+    });
+    
+    // Also clear unread count when archiving
+    await ctx.runMutation(internal.beeperMutations.markChatAsRead, {
+      chatId: args.chatId,
     });
     
     // Then, try to archive in Beeper as well

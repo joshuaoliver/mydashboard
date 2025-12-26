@@ -79,6 +79,11 @@ const FEATURE_INFO: Record<
     icon: Mic,
     color: 'bg-orange-500',
   },
+  'voice-transcription': {
+    label: 'Voice Transcription',
+    icon: Mic,
+    color: 'bg-amber-500',
+  },
   'thread-title': {
     label: 'Thread Titles',
     icon: Tag,

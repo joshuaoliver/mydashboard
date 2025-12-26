@@ -429,6 +429,21 @@ export const generateResponseWithAttachment = internalAction({
 
     // Consume the stream to ensure completion
     await result.consumeStream()
+
+    // Track AI cost if usage is available
+    const usage = (result as any).usage
+    if (usage && usage.totalTokens) {
+      await trackAICost(ctx, {
+        featureKey: 'chat-agent',
+        fullModelId: modelId,
+        usage: {
+          promptTokens: usage.promptTokens ?? 0,
+          completionTokens: usage.completionTokens ?? 0,
+          totalTokens: usage.totalTokens,
+        },
+        threadId: agentThreadId,
+      })
+    }
   },
 })
 

@@ -360,6 +360,7 @@ export function ChatListPanel() {
                 lastMessage={chat.lastMessage}
                 lastMessageTime={chat.lastMessageTime}
                 unreadCount={chat.unreadCount}
+                replyImportance={chat.replyImportance}
                 isSelected={selectedChatId === chat.id}
                 onClick={() => handleChatSelect(chat.id)}
                 onHover={handleChatHover}

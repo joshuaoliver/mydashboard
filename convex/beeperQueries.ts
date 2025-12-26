@@ -189,6 +189,7 @@ export const listCachedChats = query({
         lastMessageFrom: chat.lastMessageFrom,
         contactImageUrl: profileImageUrl,
         contactId: chat.contactId, // Direct link to contact for ContactSidePanel
+        replyImportance: chat.replyImportance, // AI-assessed importance 1-5 (1=Low, 5=Urgent)
       };
     });
 

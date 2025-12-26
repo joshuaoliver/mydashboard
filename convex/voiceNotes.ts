@@ -4,7 +4,7 @@ import { experimental_transcribe as transcribe } from "ai";
 import { openai } from "@ai-sdk/openai";
 import { internal } from "./_generated/api";
 import { getAuthUserId } from "@convex-dev/auth/server";
-import { trackAICost } from "./costs";
+import { trackAICost, trackTranscriptionCost } from "./costs";
 
 // Note: agentChat imports are done dynamically in processTranscription to avoid
 // loading AI model code for simple database queries like getPendingTranscriptions
@@ -95,6 +95,14 @@ export const transcribeVoiceNote = internalAction({
         model: openai.transcription("whisper-1"),
         audio: new Uint8Array(audioBuffer),
       });
+
+      // Track transcription cost (Whisper is $0.006/minute)
+      if (result.durationInSeconds) {
+        await trackTranscriptionCost(ctx, {
+          durationSeconds: result.durationInSeconds,
+          threadId: voiceNote.threadId,
+        });
+      }
 
       // Update voice note with transcription
       await ctx.runMutation(internalRef.voiceNotes.updateVoiceNoteTranscription, {
@@ -295,6 +303,13 @@ export const transcribeAndStartChat = internalAction({
 
       if (!result.text || result.text.trim().length === 0) {
         throw new Error("No speech detected in recording");
+      }
+
+      // Track transcription cost (Whisper is $0.006/minute)
+      if (result.durationInSeconds) {
+        await trackTranscriptionCost(ctx, {
+          durationSeconds: result.durationInSeconds,
+        });
       }
 
       const transcription = result.text.trim();

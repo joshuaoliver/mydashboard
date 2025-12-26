@@ -5,6 +5,7 @@ import { v } from "convex/values";
 import { generateText } from "ai";
 import { createGateway } from "@ai-sdk/gateway";
 import { extractMessageText } from "./messageHelpers";
+import { trackAICost } from "./costs";
 
 // Beeper API configuration (from environment variables)
 // Using bywave proxy instead of localhost so Convex (cloud-hosted) can access it
@@ -268,7 +269,7 @@ export const generateReplySuggestions = action({
       messageCount: v.number(),
     }),
   }),
-  handler: async (_ctx, args) => {
+  handler: async (ctx, args) => {
     try {
       // Validate Vercel AI Gateway API key
       if (!process.env.VERCEL_AI_GATEWAY_API_KEY) {
@@ -340,11 +341,27 @@ Format your response as JSON with this structure:
         apiKey: process.env.VERCEL_AI_GATEWAY_API_KEY,
       });
 
+      const modelId = "google/gemini-3-flash";
       const result = await generateText({
-        model: gatewayClient("google/gemini-3-flash"), // Frontier intelligence at Flash speed
+        model: gatewayClient(modelId), // Frontier intelligence at Flash speed
         prompt: prompt,
         temperature: 1,
       });
+
+      // Track AI cost
+      if (result.usage) {
+        const usage = result.usage as { promptTokens?: number; completionTokens?: number };
+        await trackAICost(ctx, {
+          featureKey: "reply-suggestions",
+          fullModelId: modelId,
+          usage: {
+            promptTokens: usage.promptTokens ?? 0,
+            completionTokens: usage.completionTokens ?? 0,
+            totalTokens: (usage.promptTokens ?? 0) + (usage.completionTokens ?? 0),
+          },
+          threadId: args.chatId,
+        });
+      }
 
       // Parse the AI response
       try {

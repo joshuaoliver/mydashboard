@@ -38,12 +38,30 @@ interface ChatListItemProps {
   lastMessage: string
   lastMessageTime: number
   unreadCount?: number
+  replyImportance?: number  // AI-assessed importance 1-5 (1=Low, 5=Urgent)
   isSelected: boolean
   onClick: () => void
   onHover?: (chatId: string) => void  // Preload on hover
   onArchive?: (chatId: string) => void
   isArchived?: boolean
   contactImageUrl?: string // From DEX integration
+}
+
+// Get importance-based dot color for avatar indicator
+// Returns Tailwind bg class based on AI-assessed reply importance
+function getImportanceDotColor(importance?: number): string {
+  switch (importance) {
+    case 5: // Urgent
+      return 'bg-red-500'
+    case 4: // High
+      return 'bg-orange-500'
+    case 3: // Moderate
+      return 'bg-yellow-500'
+    case 2: // Normal
+    case 1: // Low
+    default: // No importance assessed yet - subtle
+      return 'bg-slate-300'
+  }
 }
 
 export const ChatListItem = memo(function ChatListItem({
@@ -55,6 +73,7 @@ export const ChatListItem = memo(function ChatListItem({
   lastMessage,
   lastMessageTime,
   unreadCount = 0,
+  replyImportance,
   isSelected,
   onClick,
   onHover,
@@ -87,6 +106,7 @@ export const ChatListItem = memo(function ChatListItem({
   }
 
   const hasUnread = unreadCount > 0
+  const importanceDotColor = getImportanceDotColor(replyImportance)
 
   const handleArchiveClick = (e: React.MouseEvent) => {
     e.stopPropagation() // Prevent selecting the chat
@@ -134,7 +154,7 @@ export const ChatListItem = memo(function ChatListItem({
               </div>
             )}
             {hasUnread && (
-              <div className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-blue-500 rounded-full border-2 border-white"></div>
+              <div className={cn("absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-white", importanceDotColor)}></div>
             )}
           </div>
 
