@@ -487,3 +487,97 @@ export const updateMessageStatus = internalMutation({
   },
 });
 
+/**
+ * Clean up duplicate messages in a chat
+ * 
+ * Finds messages with identical text and timestamps within a tolerance window,
+ * keeping the one with status tracking (sent by us) and deleting the duplicate
+ * (synced from Beeper).
+ * 
+ * Call this mutation for specific chats that have duplicate messages.
+ */
+export const cleanupDuplicateMessages = mutation({
+  args: {
+    chatId: v.string(),
+    dryRun: v.optional(v.boolean()), // If true, only report what would be deleted
+  },
+  handler: async (ctx, args) => {
+    const TIMESTAMP_TOLERANCE_MS = 60 * 1000; // 60 seconds
+
+    // Get all messages for this chat
+    const messages = await ctx.db
+      .query("beeperMessages")
+      .withIndex("by_chat", (q) => q.eq("chatId", args.chatId))
+      .collect();
+
+    // Group messages by text to find potential duplicates
+    const byText = new Map<string, typeof messages>();
+    for (const msg of messages) {
+      const key = msg.text || "";
+      if (!byText.has(key)) {
+        byText.set(key, []);
+      }
+      byText.get(key)!.push(msg);
+    }
+
+    const duplicates: { kept: string; deleted: string; text: string }[] = [];
+
+    for (const [text, group] of byText) {
+      if (group.length < 2) continue;
+
+      // Sort by timestamp
+      group.sort((a, b) => a.timestamp - b.timestamp);
+
+      // Find duplicates within the tolerance window
+      for (let i = 0; i < group.length - 1; i++) {
+        for (let j = i + 1; j < group.length; j++) {
+          const timeDiff = Math.abs(group[i].timestamp - group[j].timestamp);
+          
+          if (timeDiff <= TIMESTAMP_TOLERANCE_MS) {
+            // These are likely duplicates
+            // Keep the one with status tracking (our sent message), delete the synced one
+            const hasStatus = (m: typeof group[0]) => m.status !== undefined;
+            const hasPending = (m: typeof group[0]) => m.messageId.startsWith("pending_") || m.messageId.startsWith("local_");
+            
+            let toDelete = group[j];
+            let toKeep = group[i];
+
+            // Prefer keeping messages with status tracking or pending IDs
+            if (hasStatus(group[j]) && !hasStatus(group[i])) {
+              toDelete = group[i];
+              toKeep = group[j];
+            } else if (hasPending(group[j]) && !hasPending(group[i])) {
+              // Keep the one without pending ID (the synced one is final)
+              toDelete = group[j];
+              toKeep = group[i];
+            }
+
+            duplicates.push({
+              kept: toKeep.messageId,
+              deleted: toDelete.messageId,
+              text: text.slice(0, 50),
+            });
+
+            if (!args.dryRun) {
+              await ctx.db.delete(toDelete._id);
+            }
+
+            // Remove the deleted message from the group to avoid double-deletion
+            group.splice(j, 1);
+            j--;
+          }
+        }
+      }
+    }
+
+    console.log(`[cleanupDuplicateMessages] Chat ${args.chatId}: ${args.dryRun ? "would delete" : "deleted"} ${duplicates.length} duplicates`);
+
+    return {
+      success: true,
+      dryRun: args.dryRun ?? false,
+      duplicatesFound: duplicates.length,
+      duplicates,
+    };
+  },
+});
+

@@ -151,7 +151,8 @@ export default defineSchema({
     .index("by_chat", ["chatId", "timestamp"])  // Get messages for chat, sorted by time
     .index("by_message_id", ["messageId"])      // Lookup by message ID
     .index("by_chat_sortKey", ["chatId", "sortKey"])  // Query by sortKey for cursor pagination
-    .index("by_user_timestamp", ["isFromUser", "timestamp"]),  // User's sent messages by actual send time
+    .index("by_user_timestamp", ["isFromUser", "timestamp"])  // User's sent messages by actual send time
+    .index("by_pending_message_id", ["pendingMessageId"]),  // Lookup by pending message ID (for dedup during sync)
 
   // Beeper participants - full participant data for chats (single and group)
   beeperParticipants: defineTable({

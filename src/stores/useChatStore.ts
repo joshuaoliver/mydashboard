@@ -1,6 +1,17 @@
 import { create } from 'zustand'
 
-type TabFilter = 'unreplied' | 'unread' | 'all' | 'archived' | 'blocked'
+// Lead status values from contacts schema
+export type LeadStatus = 'Potential' | 'Talking' | 'Planning' | 'Dated' | 'Connected' | 'Current' | 'Former'
+
+// Tab filter can be basic filters or lead status filters (prefixed with "lead:")
+export type TabFilter = 
+  | 'unreplied' 
+  | 'unread' 
+  | 'all' 
+  | 'archived' 
+  | 'blocked'
+  | 'groups'
+  | `lead:${LeadStatus}`
 
 interface ChatListItem {
   id: string

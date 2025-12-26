@@ -7,7 +7,8 @@ import { useChatStore } from '@/stores/useChatStore'
 import { ChatListItem } from './ChatListItem'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { RefreshCw, AlertCircle, ChevronDown, Archive, Ban, Check } from 'lucide-react'
+import { RefreshCw, AlertCircle, ChevronDown, Archive, Ban, Check, Users, Heart } from 'lucide-react'
+import type { TabFilter, LeadStatus } from '@/stores/useChatStore'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import {
   DropdownMenu,
@@ -255,7 +256,7 @@ export function ChatListPanel() {
               <DropdownMenuTrigger asChild>
                 <button
                   className={`flex-shrink-0 px-1.5 py-1 text-[10px] font-medium rounded transition-colors flex items-center gap-0.5 ${
-                    tabFilter === 'archived' || tabFilter === 'blocked'
+                    tabFilter === 'archived' || tabFilter === 'blocked' || tabFilter === 'groups' || tabFilter.startsWith('lead:')
                       ? 'bg-white text-gray-900 shadow-sm'
                       : 'text-gray-600 hover:text-gray-900'
                   }`}
@@ -271,12 +272,30 @@ export function ChatListPanel() {
                       <Ban className="w-3 h-3" />
                       <span className="hidden sm:inline">Blocked</span>
                     </>
+                  ) : tabFilter === 'groups' ? (
+                    <>
+                      <Users className="w-3 h-3" />
+                      <span className="hidden sm:inline">Groups</span>
+                    </>
+                  ) : tabFilter.startsWith('lead:') ? (
+                    <>
+                      <Heart className="w-3 h-3" />
+                      <span className="hidden sm:inline">{tabFilter.slice(5)}</span>
+                    </>
                   ) : (
                     <ChevronDown className="w-3 h-3" />
                   )}
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-40">
+              <DropdownMenuContent align="end" className="w-44">
+                <DropdownMenuItem 
+                  onClick={() => setTabFilter('groups')}
+                  className="flex items-center gap-2 text-xs"
+                >
+                  <Users className="w-3.5 h-3.5" />
+                  Groups
+                  {tabFilter === 'groups' && <Check className="w-3.5 h-3.5 ml-auto" />}
+                </DropdownMenuItem>
                 <DropdownMenuItem 
                   onClick={() => setTabFilter('archived')}
                   className="flex items-center gap-2 text-xs"
@@ -293,6 +312,21 @@ export function ChatListPanel() {
                   Blocked
                   {tabFilter === 'blocked' && <Check className="w-3.5 h-3.5 ml-auto" />}
                 </DropdownMenuItem>
+                
+                {/* Lead Status Filters */}
+                <div className="h-px bg-gray-200 my-1" />
+                <div className="px-2 py-1 text-[10px] text-gray-500 font-medium">Lead Status</div>
+                {(['Potential', 'Talking', 'Planning', 'Dated', 'Connected', 'Current', 'Former'] as const).map((status) => (
+                  <DropdownMenuItem 
+                    key={status}
+                    onClick={() => setTabFilter(`lead:${status}` as TabFilter)}
+                    className="flex items-center gap-2 text-xs"
+                  >
+                    <Heart className="w-3.5 h-3.5" />
+                    {status}
+                    {tabFilter === `lead:${status}` && <Check className="w-3.5 h-3.5 ml-auto" />}
+                  </DropdownMenuItem>
+                ))}
               </DropdownMenuContent>
             </DropdownMenu>
           </div>

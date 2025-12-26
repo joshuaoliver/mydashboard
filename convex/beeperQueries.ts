@@ -22,16 +22,43 @@ export const listCachedChats = query({
       v.literal("unread"),
       v.literal("all"),
       v.literal("archived"),
-      v.literal("blocked")
+      v.literal("blocked"),
+      v.literal("groups"),
+      // Lead status filters (prefixed with "lead:")
+      v.literal("lead:Potential"),
+      v.literal("lead:Talking"),
+      v.literal("lead:Planning"),
+      v.literal("lead:Dated"),
+      v.literal("lead:Connected"),
+      v.literal("lead:Current"),
+      v.literal("lead:Former")
     )),
   },
   handler: async (ctx, args) => {
     const filter = args.filter || "all";
+    
+    // Check if this is a lead status filter
+    const isLeadFilter = filter.startsWith("lead:");
+    const leadStatus = isLeadFilter ? filter.slice(5) : null; // Extract status after "lead:"
 
     // Use compound index for type+isArchived+lastActivity (filter AND sort in database)
     // The index "by_type_archived_activity" has fields: ["type", "isArchived", "lastActivity"]
     // This allows us to filter by type/isArchived and sort by lastActivity in a single index scan
     let queryBuilder;
+    
+    // For lead status filters, we need to filter by contact's leadStatus
+    // This requires fetching chats and then filtering by their linked contact
+    let leadStatusContactIds: Set<string> | null = null;
+    
+    if (isLeadFilter && leadStatus) {
+      // First, get all contacts with this lead status
+      const contactsWithStatus = await ctx.db
+        .query("contacts")
+        .withIndex("by_lead_status", (q) => q.eq("leadStatus", leadStatus as any))
+        .collect();
+      
+      leadStatusContactIds = new Set(contactsWithStatus.map(c => c._id));
+    }
 
     if (filter === "blocked") {
       // Show only blocked chats (single chats only - groups can't be blocked)
@@ -53,6 +80,15 @@ export const listCachedChats = query({
           q.neq(q.field("isBlocked"), true)
         ))
         .order("desc");
+    } else if (filter === "groups") {
+      // Show only group chats that are not archived/blocked
+      queryBuilder = ctx.db
+        .query("beeperChats")
+        .withIndex("by_type_archived_activity", (q) =>
+          q.eq("type", "group").eq("isArchived", false)
+        )
+        .filter((q) => q.neq(q.field("isBlocked"), true))
+        .order("desc");
     } else if (filter === "all") {
       // Show ALL chats (both single and group) that are not archived/blocked
       // Use by_activity index since we want all types
@@ -63,6 +99,16 @@ export const listCachedChats = query({
           q.eq(q.field("isArchived"), false),
           q.neq(q.field("isBlocked"), true)
         ))
+        .order("desc");
+    } else if (isLeadFilter) {
+      // Lead status filter: show single chats whose contact has this lead status
+      // Single chats only (groups don't have contacts linked)
+      queryBuilder = ctx.db
+        .query("beeperChats")
+        .withIndex("by_type_archived_activity", (q) =>
+          q.eq("type", "single").eq("isArchived", false)
+        )
+        .filter((q) => q.neq(q.field("isBlocked"), true))
         .order("desc");
     } else {
       // unreplied/unread filters: single chats only (groups don't have reply tracking)
@@ -90,8 +136,17 @@ export const listCachedChats = query({
     // Paginate - results are already sorted by lastActivity DESC from the database
     const result = await queryBuilder.paginate(args.paginationOpts);
     
-    // No in-memory sort needed - database returns results in correct order
-    const sortedPage = result.page;
+    // For lead status filters, we need to filter the page by checking if the chat's contactId
+    // is in the set of contacts with that lead status
+    let sortedPage = result.page;
+    
+    if (leadStatusContactIds !== null) {
+      sortedPage = result.page.filter(chat => {
+        // Chat must have a linked contact that has this lead status
+        if (!chat.contactId) return false;
+        return leadStatusContactIds!.has(chat.contactId);
+      });
+    }
 
     // Batch fetch all contacts for chats that have a pre-computed contactId
     // This is O(1) per contact lookup (using direct get by ID)

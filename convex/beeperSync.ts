@@ -610,6 +610,62 @@ export const syncChatMessages = internalMutation({
         // Message already exists - skip it (messages are immutable)
         skippedCount++;
       } else {
+        // DEDUP CHECK: For user-sent messages, check for duplicates from our local sends
+        if (msg.isFromUser) {
+          // Check 1: Message ID matches any local message's pendingMessageId
+          // This handles: user sends → we get pendingMessageID → sync returns final message
+          const localPendingMessage = await ctx.db
+            .query("beeperMessages")
+            .withIndex("by_pending_message_id", (q) => q.eq("pendingMessageId", msg.messageId))
+            .first();
+
+          if (localPendingMessage) {
+            // Found a match! Update the local message's messageId to the final one
+            console.log(
+              `[syncChatMessages] Matched synced message ${msg.messageId} to local pending message ${localPendingMessage.messageId}`
+            );
+            await ctx.db.patch(localPendingMessage._id, {
+              messageId: msg.messageId,
+              sortKey: msg.sortKey,
+              pendingMessageId: undefined,
+            });
+            skippedCount++;
+            continue;
+          }
+
+          // Check 2: Look for local "sending" messages with same text and similar timestamp
+          // This handles race condition where sync runs before updateMessageStatus completes
+          // We match on: same chat, same text, status="sending", timestamp within 60s
+          const TIMESTAMP_TOLERANCE_MS = 60 * 1000; // 60 seconds
+          const sendingMessages = await ctx.db
+            .query("beeperMessages")
+            .withIndex("by_chat", (q) => q.eq("chatId", args.chatId))
+            .filter((q) => 
+              q.and(
+                q.eq(q.field("status"), "sending"),
+                q.eq(q.field("text"), msg.text),
+                q.gte(q.field("timestamp"), msg.timestamp - TIMESTAMP_TOLERANCE_MS),
+                q.lte(q.field("timestamp"), msg.timestamp + TIMESTAMP_TOLERANCE_MS)
+              )
+            )
+            .first();
+
+          if (sendingMessages) {
+            // Found a likely match! Update the local message
+            console.log(
+              `[syncChatMessages] Matched synced message to local sending message by text/timestamp: ${sendingMessages.messageId} → ${msg.messageId}`
+            );
+            await ctx.db.patch(sendingMessages._id, {
+              messageId: msg.messageId,
+              sortKey: msg.sortKey,
+              status: "sent",
+              pendingMessageId: undefined,
+            });
+            skippedCount++;
+            continue;
+          }
+        }
+
         // Insert new message with all fields from API
         await ctx.db.insert("beeperMessages", {
           chatId: args.chatId,
