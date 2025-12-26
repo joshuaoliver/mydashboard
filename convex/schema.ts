@@ -518,6 +518,7 @@ export default defineSchema({
     projectId: v.optional(v.id("projects")), // Inherited from parent document
     text: v.string(),
     isCompleted: v.boolean(),
+    isFrog: v.optional(v.boolean()),  // Task being avoided - eat the frog first!
     order: v.number(),             // Position in document
     nodeId: v.string(),            // Tiptap node ID for matching
     createdAt: v.number(),
@@ -527,7 +528,15 @@ export default defineSchema({
     .index("by_document", ["documentId"])
     .index("by_completed", ["isCompleted"])
     .index("by_document_order", ["documentId", "order"])
-    .index("by_project", ["projectId"]),
+    .index("by_project", ["projectId"])
+    .index("by_frog", ["isFrog"]),
+
+  // Frog status for Linear issues (separate table since issues are synced from external)
+  frogLinearIssues: defineTable({
+    linearId: v.string(),          // The Linear issue ID
+    markedAt: v.number(),          // When it was marked as a frog
+  })
+    .index("by_linear_id", ["linearId"]),
 
   // Permanent record of completed todos (immutable historical record)
   completedTodos: defineTable({
@@ -609,7 +618,7 @@ export default defineSchema({
       duration: v.number(),                   // Duration in minutes
       label: v.optional(v.string()),          // Optional context label (e.g., "Before meeting")
     })),
-    // The "frog" task ID for today (if set)
+    // @deprecated - use isFrog on todoItems or frogLinearIssues table instead
     frogTaskId: v.optional(v.string()),
     createdAt: v.number(),
     updatedAt: v.number(),
