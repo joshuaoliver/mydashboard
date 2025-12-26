@@ -7,7 +7,7 @@ import {
 } from '@/components/ai-elements/conversation'
 import { Message as AIMessage, MessageContent } from '@/components/ai-elements/message'
 import { ProxiedImage } from './ProxiedImage'
-import { RefreshCw } from 'lucide-react'
+import { RefreshCw, Clock } from 'lucide-react'
 import { memo } from 'react'
 
 interface Attachment {
@@ -30,6 +30,7 @@ interface Message {
   senderName: string
   isFromUser: boolean
   attachments?: Attachment[]
+  isPending?: boolean  // For optimistic messages
 }
 
 interface ChatDetailProps {
@@ -85,7 +86,7 @@ export const ChatDetail = memo(function ChatDetail({ messages, isSingleChat = tr
               {messages.map((message) => (
                 <div key={message.id} className={cn('flex flex-col group', message.isFromUser ? 'items-end' : 'items-start')}>
                   <AIMessage from={message.isFromUser ? 'user' : 'assistant'}>
-                    <MessageContent variant="contained" className="px-2.5 py-1.5">
+                    <MessageContent variant="contained" className={cn("px-2.5 py-1.5", message.isPending && "opacity-70")}>
                       {/* Only show sender name in group chats */}
                       {!isSingleChat && !message.isFromUser && (
                         <div className="text-[10px] font-semibold mb-0.5 opacity-90">
@@ -136,10 +137,13 @@ export const ChatDetail = memo(function ChatDetail({ messages, isSingleChat = tr
                   </AIMessage>
                   {/* Timestamp outside bubble - shown on hover */}
                   <div className={cn(
-                    "text-[9px] text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity select-none mt-0.5 px-1",
-                    message.isFromUser ? "text-right" : "text-left"
+                    "text-[9px] text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity select-none mt-0.5 px-1 flex items-center gap-1",
+                    message.isFromUser ? "text-right justify-end" : "text-left justify-start"
                   )}>
-                    {formatMessageTime(message.timestamp)}
+                    {message.isPending && (
+                      <Clock className="w-2.5 h-2.5 animate-pulse" />
+                    )}
+                    {message.isPending ? 'Sending...' : formatMessageTime(message.timestamp)}
                   </div>
                 </div>
               ))}

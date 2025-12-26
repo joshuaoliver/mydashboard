@@ -133,7 +133,14 @@ export const upsertChat = internalMutation({
       };
       
       const hasNewActivity = args.chatData.lastActivity > (existingChat.lastActivity || 0);
-      const contactChanged = contactId !== undefined && contactId !== existingChat.contactId;
+      // Only update contact if:
+      // 1. We found a new contactId match from auto-matching
+      // 2. The contactId is different from existing
+      // 3. User has NOT manually linked this chat (contactMatchedAt means user-set = permanent)
+      const userManuallyLinked = existingChat.contactMatchedAt !== undefined;
+      const contactChanged = contactId !== undefined && 
+                             contactId !== existingChat.contactId && 
+                             !userManuallyLinked;
       // Only count as changed if we have a NEW value (avoid triggering on undefined -> undefined)
       const usernameChanged = args.chatData.username !== undefined && 
                               args.chatData.username !== existingChat.username;

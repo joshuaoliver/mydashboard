@@ -232,8 +232,10 @@ export default defineSchema({
     latitude: v.optional(v.number()), // Latitude coordinate
     longitude: v.optional(v.number()), // Longitude coordinate
     createdAt: v.number(), // Creation timestamp
+    useCount: v.optional(v.number()), // Track how many times this location is assigned
   })
-    .index("by_name", ["name"]),
+    .index("by_name", ["name"])
+    .index("by_use_count", ["useCount"]),
 
   // Tags - user-defined tags for organizing contacts
   tags: defineTable({

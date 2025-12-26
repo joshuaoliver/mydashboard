@@ -85,6 +85,13 @@ function ActiveSessionTimer() {
 
   // Don't render if no active session
   if (!dbSession || !dbSession.isActive) return null
+  
+  // Don't render if session has significantly exceeded target duration (2x)
+  const maxDuration = dbSession.targetDuration * 60 * 2 // Allow 2x target before hiding
+  if (elapsedSeconds > maxDuration) return null
+  
+  // Don't render if session is older than 24 hours (stale session)
+  if ((Date.now() - dbSession.startedAt) > 24 * 60 * 60 * 1000) return null
 
   const progress = Math.min(100, (elapsedSeconds / (dbSession.targetDuration * 60)) * 100)
   const isPaused = !!dbSession.pausedAt

@@ -1,5 +1,6 @@
 import { v } from "convex/values";
-import { query, mutation, internalQuery } from "./_generated/server";
+import { query, mutation, internalQuery, internalMutation, action } from "./_generated/server";
+import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 
 /**
@@ -932,41 +933,83 @@ export const calculateFreeBlocks = internalQuery({
 });
 
 /**
- * Refresh free blocks for today's plan
+ * Get a plan by ID (internal)
  */
-export const refreshFreeBlocks = mutation({
+export const getPlanById = internalQuery({
+  args: { id: v.id("todayPlans") },
+  handler: async (ctx, args) => {
+    return await ctx.db.get(args.id);
+  },
+});
+
+/**
+ * Update free blocks (internal mutation)
+ */
+export const updateFreeBlocksInternal = internalMutation({
   args: {
     planId: v.id("todayPlans"),
+    freeBlocks: v.array(v.object({
+      id: v.string(),
+      startTime: v.number(),
+      endTime: v.number(),
+      duration: v.number(),
+      label: v.optional(v.string()),
+    })),
   },
   handler: async (ctx, args) => {
-    const plan = await ctx.db.get(args.planId);
-    if (!plan) throw new Error("Plan not found");
-
-    // For now, create sample free blocks if calendar isn't set up
-    // In a real implementation, this would call calculateFreeBlocks
-    const today = getTodayDate();
-    const [year, month, day] = today.split('-').map(Number);
-
-    // Create sample blocks for demo (every hour from 9 AM to 5 PM)
-    const sampleBlocks = [];
-    for (let hour = 9; hour < 17; hour += 2) {
-      const startTime = new Date(year, month - 1, day, hour, 0, 0).getTime();
-      const endTime = new Date(year, month - 1, day, hour + 1, 30, 0).getTime();
-
-      sampleBlocks.push({
-        id: generateBlockId(),
-        startTime,
-        endTime,
-        duration: 90,
-        label: hour === 9 ? "Morning block" : hour === 14 ? "Afternoon focus" : undefined,
-      });
-    }
-
     await ctx.db.patch(args.planId, {
-      freeBlocks: sampleBlocks,
+      freeBlocks: args.freeBlocks,
       updatedAt: Date.now(),
     });
+  },
+});
 
-    return sampleBlocks;
+/**
+ * Refresh free blocks for today's plan
+ * Uses actual calendar events to calculate free time slots
+ */
+export const refreshFreeBlocks = action({
+  args: {
+    planId: v.id("todayPlans"),
+    startHour: v.optional(v.number()), // Defaults to current hour
+    endHour: v.optional(v.number()),   // Defaults to 18 (6pm)
+  },
+  handler: async (ctx, args): Promise<Array<{
+    id: string;
+    startTime: number;
+    endTime: number;
+    duration: number;
+    label?: string;
+  }>> => {
+    const plan = await ctx.runQuery(internal.todayPlan.getPlanById, { id: args.planId });
+    if (!plan) throw new Error("Plan not found");
+
+    // Get current time info
+    const now = new Date();
+    const sydneyTime = new Date(now.toLocaleString('en-US', { timeZone: 'Australia/Sydney' }));
+    const currentHour = sydneyTime.getHours();
+    
+    // Determine time range
+    const startHour = args.startHour ?? currentHour;
+    const endHour = args.endHour ?? 18;
+    
+    // Calculate free blocks from actual calendar events
+    const freeBlocks = await ctx.runQuery(
+      internal.todayPlan.calculateFreeBlocks, 
+      { 
+        date: plan.date, 
+        dayStartHour: startHour, 
+        dayEndHour: endHour,
+        minBlockMinutes: 15,
+      }
+    );
+    
+    // Store the calculated blocks
+    await ctx.runMutation(internal.todayPlan.updateFreeBlocksInternal, {
+      planId: args.planId, 
+      freeBlocks,
+    });
+    
+    return freeBlocks;
   },
 });

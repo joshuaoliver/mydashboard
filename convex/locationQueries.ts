@@ -1,34 +1,46 @@
-import { query } from "./_generated/server";
-
-// Priority locations that should appear at the top of the dropdown
-const PRIORITY_LOCATIONS = ["Sydney", "Melbourne", "Brisbane", "Gold Coast", "Perth"];
+import { v } from "convex/values";
+import { query, mutation } from "./_generated/server";
 
 /**
- * List all locations with priority locations first
+ * List all locations sorted by usage count (most used first)
+ * Falls back to alphabetical if no usage data
  */
 export const listLocations = query({
   handler: async (ctx) => {
     const locations = await ctx.db
       .query("locations")
-      .order("desc")
       .collect();
 
-    // Sort with priority locations first, then alphabetically
+    // Sort by usage count (highest first), then alphabetically for ties
     return locations.sort((a, b) => {
-      const aPriority = PRIORITY_LOCATIONS.indexOf(a.name);
-      const bPriority = PRIORITY_LOCATIONS.indexOf(b.name);
-
-      // Both are priority locations - sort by priority order
-      if (aPriority !== -1 && bPriority !== -1) {
-        return aPriority - bPriority;
+      const aCount = a.useCount ?? 0;
+      const bCount = b.useCount ?? 0;
+      
+      // Sort by usage count descending
+      if (aCount !== bCount) {
+        return bCount - aCount;
       }
-      // Only a is priority - a comes first
-      if (aPriority !== -1) return -1;
-      // Only b is priority - b comes first
-      if (bPriority !== -1) return 1;
-      // Neither is priority - alphabetical
+      
+      // Tie-breaker: alphabetical
       return a.name.localeCompare(b.name);
     });
   },
 });
 
+/**
+ * Increment the usage count for a location
+ * Call this when a location is assigned to a contact
+ */
+export const incrementLocationUse = mutation({
+  args: { 
+    locationId: v.id("locations") 
+  },
+  handler: async (ctx, args) => {
+    const loc = await ctx.db.get(args.locationId);
+    if (loc) {
+      await ctx.db.patch(args.locationId, { 
+        useCount: (loc.useCount ?? 0) + 1 
+      });
+    }
+  },
+});

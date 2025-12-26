@@ -3,8 +3,10 @@ import { v } from "convex/values";
 import { experimental_transcribe as transcribe } from "ai";
 import { openai } from "@ai-sdk/openai";
 import { internal } from "./_generated/api";
-import { createAgentWithModel, getDefaultModelId } from "./agentChat";
 import { getAuthUserId } from "@convex-dev/auth/server";
+
+// Note: agentChat imports are done dynamically in processTranscription to avoid
+// loading AI model code for simple database queries like getPendingTranscriptions
 
 // Type assertion for internal references that may not be in generated types yet
 // Run `npx convex dev` to regenerate types after adding new files
@@ -133,6 +135,9 @@ export const processTranscription = internalAction({
     transcription: v.string(),
   },
   handler: async (ctx, args) => {
+    // Dynamic import to avoid loading agent code for simple database queries
+    const { createAgentWithModel, getDefaultModelId } = await import("./agentChat");
+
     // Get thread info to find the agent thread ID
     const threadInfo = await ctx.runQuery(internalRef.chat.getThreadInfo, {
       threadId: args.threadId,

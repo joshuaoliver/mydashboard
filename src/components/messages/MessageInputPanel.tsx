@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { 
   PromptInput, 
@@ -27,6 +27,10 @@ interface MessageInputPanelProps {
   onGenerateAI: (customContext?: string) => Promise<void>
   onOpenInBeeper: (draftText?: string) => Promise<void>
   isLoadingAI: boolean
+  /** External value to set (e.g., from suggestion click) */
+  externalValue?: string
+  /** Called when the input value changes */
+  onInputChange?: (value: string) => void
 }
 
 export function MessageInputPanel({
@@ -35,10 +39,24 @@ export function MessageInputPanel({
   onGenerateAI,
   onOpenInBeeper,
   isLoadingAI,
+  externalValue,
+  onInputChange,
 }: MessageInputPanelProps) {
   // Local state - isolated from parent, prevents parent re-renders on typing
   const [messageInputValue, setMessageInputValue] = useState('')
   const [isSending, setIsSending] = useState(false)
+
+  // Sync with external value when it changes (e.g., from suggestion click)
+  useEffect(() => {
+    if (externalValue !== undefined && externalValue !== messageInputValue) {
+      setMessageInputValue(externalValue)
+    }
+  }, [externalValue])
+
+  const handleInputChange = (value: string) => {
+    setMessageInputValue(value)
+    onInputChange?.(value)
+  }
 
   const handleSubmit = async (message: { text?: string }) => {
     const text = (message.text || messageInputValue || '').trim()
@@ -49,6 +67,7 @@ export function MessageInputPanel({
       await onSubmit(text)
       // Clear input after successful send
       setMessageInputValue('')
+      onInputChange?.('')
     } finally {
       setIsSending(false)
     }
@@ -72,8 +91,8 @@ export function MessageInputPanel({
           <PromptInputTextarea
             placeholder="Type your reply..."
             value={messageInputValue}
-            onChange={(e) => setMessageInputValue(e.target.value)}
-            className="text-sm text-gray-900 placeholder:text-gray-500 min-h-[36px] max-h-24 py-1.5"
+            onChange={(e) => handleInputChange(e.target.value)}
+            className="text-[13px] text-gray-900 placeholder:text-gray-500 min-h-[36px] max-h-24 py-1.5"
           />
         </PromptInputBody>
         <PromptInputToolbar className="py-0.5 px-1">

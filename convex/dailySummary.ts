@@ -165,6 +165,17 @@ export const gatherSummaryData = internalQuery({
       t.completedAt >= dateStart && t.completedAt <= dateEnd
     );
 
+    // Get Hubstaff time entries for the day
+    const hubstaffEntries = await ctx.db
+      .query("hubstaffTimeEntries")
+      .collect();
+    const dayHubstaff = hubstaffEntries.filter(entry => entry.date === args.date);
+    const hubstaffMinutes = dayHubstaff.reduce(
+      (sum, entry) => sum + (entry.trackedSeconds ?? 0) / 60, // trackedSeconds is in seconds
+      0
+    );
+    const hubstaffProjects = [...new Set(dayHubstaff.map(e => e.hubstaffProjectName).filter(Boolean))];
+
     return {
       date: args.date,
       formattedDate: formatDateForDisplay(args.date),
@@ -201,6 +212,11 @@ export const gatherSummaryData = internalQuery({
       todos: {
         completedCount: todosCompletedToday.length,
         completedTitles: todosCompletedToday.map(t => t.text).slice(0, 10), // Limit for prompt
+      },
+      hubstaff: {
+        trackedMinutes: Math.round(hubstaffMinutes),
+        projects: hubstaffProjects,
+        entriesCount: dayHubstaff.length,
       },
       planId: plan?._id,
     };

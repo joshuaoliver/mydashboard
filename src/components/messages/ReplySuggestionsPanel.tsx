@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useImperativeHandle, forwardRef } from 'react'
 import { useAction } from 'convex/react'
 import { api } from '../../../convex/_generated/api'
 import { ReplySuggestions } from './ReplySuggestions'
@@ -15,13 +15,17 @@ interface ReplySuggestionsPanelProps {
   onSendMessage?: (text: string) => void
 }
 
-export function ReplySuggestionsPanel({
+export interface ReplySuggestionsPanelRef {
+  regenerateWithContext: (context: string) => Promise<void>
+}
+
+export const ReplySuggestionsPanel = forwardRef<ReplySuggestionsPanelRef, ReplySuggestionsPanelProps>(function ReplySuggestionsPanel({
   selectedChatId,
   selectedChatName,
   username,
   onSuggestionSelect,
   onSendMessage,
-}: ReplySuggestionsPanelProps) {
+}, ref) {
   // Local state - isolated from parent
   const [replySuggestions, setReplySuggestions] = useState<ReplySuggestion[]>([])
   const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(0)
@@ -61,6 +65,13 @@ export function ReplySuggestionsPanel({
     }
   }, [selectedChatId, selectedChatName, username, generateReplySuggestions])
 
+  // Expose regeneration method to parent via ref
+  useImperativeHandle(ref, () => ({
+    regenerateWithContext: async (context: string) => {
+      await handleGenerateAISuggestions(context)
+    }
+  }), [handleGenerateAISuggestions])
+
   // Auto-generate suggestions when chat changes
   useEffect(() => {
     if (selectedChatId) {
@@ -91,5 +102,5 @@ export function ReplySuggestionsPanel({
       />
     </div>
   )
-}
+})
 

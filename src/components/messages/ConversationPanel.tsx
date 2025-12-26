@@ -1,16 +1,45 @@
-import { useState, useCallback, useEffect, useRef } from 'react'
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react'
+import { useNavigate } from '@tanstack/react-router'
 import { usePaginatedQuery, useAction, useQuery } from 'convex/react'
 import { api } from '../../../convex/_generated/api'
+import type { Id } from '../../../convex/_generated/dataModel'
 import { useChatStore } from '@/stores/useChatStore'
 import { ChatDetail } from './ChatDetail'
 import { MessageInputPanel } from './MessageInputPanel'
-import { ReplySuggestionsPanel } from './ReplySuggestionsPanel'
+import { ReplySuggestionsPanel, type ReplySuggestionsPanelRef } from './ReplySuggestionsPanel'
 import { ChatDebugPanel } from './ChatDebugPanel'
 import { Button } from '@/components/ui/button'
-import { RefreshCw, ExternalLink, Mail, MailOpen, Archive, MessageCircle, Bug, History, Ban } from 'lucide-react'
+import { Input } from '@/components/ui/input'
+import { RefreshCw, ExternalLink, Mail, MailOpen, Archive, MessageCircle, Bug, History, Ban, MoreVertical, Link2, Search, Check } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { ScrollArea } from '@/components/ui/scroll-area'
+
+interface OptimisticMessage {
+  id: string
+  text: string
+  timestamp: number
+  sender: string
+  senderName: string
+  isFromUser: boolean
+  isPending?: boolean
+}
 
 export function ConversationPanel() {
+  const navigate = useNavigate()
+  
   // Get selected chat from Zustand store
   const selectedChatId = useChatStore((state) => state.selectedChatId)
 
@@ -18,6 +47,15 @@ export function ConversationPanel() {
   const [isLoadingFullConversation, setIsLoadingFullConversation] = useState(false)
   const [_error, setError] = useState<string | null>(null)
   const [showDebugPanel, setShowDebugPanel] = useState(false)
+  
+  // State for input value (shared between input and suggestions)
+  const [inputValue, setInputValue] = useState('')
+  
+  // State for optimistic messages
+  const [optimisticMessages, setOptimisticMessages] = useState<OptimisticMessage[]>([])
+  
+  // Ref for suggestions panel to trigger regeneration
+  const suggestionsRef = useRef<ReplySuggestionsPanelRef>(null)
 
   // Query the selected chat directly by ID (not from paginated list!)
   const selectedChat = useQuery(
@@ -72,6 +110,37 @@ export function ConversationPanel() {
   const markChatAsRead = useAction(api.chatActions.markChatAsRead)
   const markChatAsUnread = useAction(api.chatActions.markChatAsUnread)
   const pageLoadSync = useAction(api.beeperSync.pageLoadSync)
+  const linkChatToContact = useAction(api.chatActions.linkChatToContact)
+  
+  // Query all contacts for the contact linking dialog
+  const contactsResult = useQuery(api.dexQueries.listContacts, { limit: 200 })
+  
+  // State for contact linking dialog
+  const [showContactDialog, setShowContactDialog] = useState(false)
+  const [contactSearchQuery, setContactSearchQuery] = useState('')
+  
+  // Helper to get full name from contact
+  const getContactFullName = useCallback((contact: { firstName?: string; lastName?: string }) => {
+    const parts = [contact.firstName, contact.lastName].filter(Boolean)
+    return parts.join(' ') || 'Unknown'
+  }, [])
+  
+  // Filter contacts based on search query
+  const filteredContacts = useMemo(() => {
+    const contacts = contactsResult?.contacts ?? []
+    if (!contactSearchQuery.trim()) return contacts.slice(0, 50)
+    const query = contactSearchQuery.toLowerCase()
+    return contacts.filter(c => {
+      const fullName = getContactFullName(c).toLowerCase()
+      const email = c.emails?.[0]?.email?.toLowerCase() ?? ''
+      const instagram = c.instagram?.toLowerCase() ?? ''
+      return (
+        fullName.includes(query) ||
+        email.includes(query) ||
+        instagram.includes(query)
+      )
+    }).slice(0, 50)
+  }, [contactsResult, contactSearchQuery, getContactFullName])
 
   const isLoadingMessages = selectedChatId !== null && messagesStatus === "LoadingFirstPage"
   
@@ -114,6 +183,24 @@ export function ConversationPanel() {
   const handleSendMessage = useCallback(async (text: string) => {
     if (!selectedChatId || !selectedChat) return
 
+    // Create optimistic message immediately
+    const optimisticId = `optimistic-${Date.now()}`
+    const optimisticMessage: OptimisticMessage = {
+      id: optimisticId,
+      text,
+      timestamp: Date.now(),
+      sender: 'user',
+      senderName: 'You',
+      isFromUser: true,
+      isPending: true,
+    }
+    
+    // Add optimistic message to state
+    setOptimisticMessages(prev => [...prev, optimisticMessage])
+    
+    // Clear the input value
+    setInputValue('')
+
     try {
       console.log(`📤 Sending message to ${selectedChat.name}: "${text.slice(0, 50)}..."`)
       
@@ -125,6 +212,9 @@ export function ConversationPanel() {
       if (result.success) {
         console.log(`✅ Message sent! Pending ID: ${result.pendingMessageId}`)
         
+        // Remove optimistic message (real one will come via sync)
+        setOptimisticMessages(prev => prev.filter(m => m.id !== optimisticId))
+        
         // Trigger a sync to get the sent message back
         setTimeout(() => {
           pageLoadSync()
@@ -132,18 +222,24 @@ export function ConversationPanel() {
       } else {
         console.error('❌ Failed to send message:', result.error)
         setError(result.error || 'Failed to send message')
+        // Remove optimistic message on failure
+        setOptimisticMessages(prev => prev.filter(m => m.id !== optimisticId))
       }
     } catch (err) {
       console.error('Failed to send message:', err)
       const errorMessage = err instanceof Error ? err.message : 'Failed to send message'
       setError(errorMessage)
+      // Remove optimistic message on failure
+      setOptimisticMessages(prev => prev.filter(m => m.id !== optimisticId))
     }
   }, [selectedChatId, selectedChat, sendMessageAction, pageLoadSync])
 
-  // Handle generating AI suggestions
-  const handleGenerateAI = useCallback(async (_customContext?: string) => {
-    // This is handled by ReplySuggestionsPanel
-    // Just a placeholder for the interface
+  // Handle generating AI suggestions with custom context
+  const handleGenerateAI = useCallback(async (customContext?: string) => {
+    // If there's text in the input, use it as context for regeneration
+    if (customContext && customContext.trim()) {
+      await suggestionsRef.current?.regenerateWithContext(customContext)
+    }
   }, [])
 
   // Handle opening in Beeper
@@ -219,17 +315,27 @@ export function ConversationPanel() {
     }
   }, [selectedChatId, loadNewerMessages])
 
-  // Handle archive
+  // Handle archive - navigate to next chat after archiving
   const handleArchive = useCallback(async () => {
     if (!selectedChatId) return
 
+    // Get the next chat ID BEFORE archiving (as the list will update)
+    const nextChatId = useChatStore.getState().getNextChatId()
+
     try {
       await archiveChat({ chatId: selectedChatId })
+      
+      // Navigate to the next conversation, or clear selection if none
+      if (nextChatId && nextChatId !== selectedChatId) {
+        navigate({ to: '/inbox', search: { chatId: nextChatId } })
+      } else {
+        navigate({ to: '/inbox', search: { chatId: undefined } })
+      }
     } catch (err) {
       console.error('Failed to archive chat:', err)
       setError(err instanceof Error ? err.message : 'Failed to archive chat')
     }
-  }, [selectedChatId, archiveChat])
+  }, [selectedChatId, archiveChat, navigate])
 
   // Handle block
   const handleBlock = useCallback(async () => {
@@ -259,11 +365,24 @@ export function ConversationPanel() {
     }
   }, [selectedChatId, selectedChat, markChatAsRead, markChatAsUnread])
 
+  // Handle linking chat to a contact
+  const handleLinkToContact = useCallback(async (contactId: Id<"contacts">) => {
+    if (!selectedChatId) return
+
+    try {
+      await linkChatToContact({ chatId: selectedChatId, contactId })
+      setShowContactDialog(false)
+      setContactSearchQuery('')
+    } catch (err) {
+      console.error('Failed to link chat to contact:', err)
+      setError(err instanceof Error ? err.message : 'Failed to link chat to contact')
+    }
+  }, [selectedChatId, linkChatToContact])
+
   // Handle suggestion selection - pass text to input
-  const handleSuggestionSelect = useCallback((_text: string) => {
-    // This would ideally update the MessageInputPanel's value
-    // For now, the MessageInputPanel manages its own state
-    // This is a known limitation - could be improved with a shared ref or callback
+  const handleSuggestionSelect = useCallback((text: string) => {
+    // Update the shared input value so it populates the text area
+    setInputValue(text)
   }, [])
 
   // No chat selected
@@ -334,7 +453,8 @@ export function ConversationPanel() {
             )}
           </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-1">
+          {/* Primary actions - always visible */}
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
@@ -353,69 +473,77 @@ export function ConversationPanel() {
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
+          
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={handleLoadFullConversation}
-                  disabled={isLoadingFullConversation}
-                  title="Load full conversation history (1 year)"
+                  onClick={handleArchive}
+                  title="Archive chat"
                 >
-                  <History className={`w-4 h-4 ${isLoadingFullConversation ? 'animate-pulse' : ''}`} />
+                  <Archive className="w-4 h-4" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent>
-                <p>Load full history (1 year)</p>
+                <p>Archive (E)</p>
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => handleOpenInBeeper()}
-            title="Open in Beeper Desktop"
-          >
-            <ExternalLink className="w-4 h-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleToggleRead}
-            title={selectedChat.unreadCount > 0 ? "Mark as read" : "Mark as unread"}
-          >
-            {selectedChat.unreadCount > 0 ? (
-              <MailOpen className="w-4 h-4" />
-            ) : (
-              <Mail className="w-4 h-4" />
-            )}
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleArchive}
-            title="Archive chat"
-          >
-            <Archive className="w-4 h-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleBlock}
-            title="Block chat"
-          >
-            <Ban className="w-4 h-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setShowDebugPanel(!showDebugPanel)}
-            title="Toggle debug panel"
-            className={showDebugPanel ? 'bg-yellow-100 text-yellow-700' : ''}
-          >
-            <Bug className="w-4 h-4" />
-          </Button>
+
+          {/* More actions dropdown */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="sm" title="More actions">
+                <MoreVertical className="w-4 h-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuItem 
+                onClick={handleLoadFullConversation}
+                disabled={isLoadingFullConversation}
+              >
+                <History className="w-4 h-4 mr-2" />
+                Load full history
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleOpenInBeeper()}>
+                <ExternalLink className="w-4 h-4 mr-2" />
+                Open in Beeper
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleToggleRead}>
+                {selectedChat.unreadCount > 0 ? (
+                  <>
+                    <MailOpen className="w-4 h-4 mr-2" />
+                    Mark as read
+                  </>
+                ) : (
+                  <>
+                    <Mail className="w-4 h-4 mr-2" />
+                    Mark as unread
+                  </>
+                )}
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => setShowContactDialog(true)}>
+                <Link2 className="w-4 h-4 mr-2" />
+                Link to contact
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={handleBlock} className="text-red-600">
+                <Ban className="w-4 h-4 mr-2" />
+                Block chat
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem 
+                onClick={() => setShowDebugPanel(!showDebugPanel)}
+                className={showDebugPanel ? 'bg-yellow-50' : ''}
+              >
+                <Bug className="w-4 h-4 mr-2" />
+                {showDebugPanel ? 'Hide debug' : 'Show debug'}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
@@ -438,7 +566,7 @@ export function ConversationPanel() {
         <>
           {/* Messages */}
           <ChatDetail 
-            messages={cachedMessages || []} 
+            messages={[...(cachedMessages || []), ...optimisticMessages]} 
             isSingleChat={selectedChat?.type === 'single' || selectedChat?.type === undefined}
             messagesStatus={messagesStatus}
             onLoadMore={loadMoreMessages}
@@ -451,10 +579,13 @@ export function ConversationPanel() {
             onGenerateAI={handleGenerateAI}
             onOpenInBeeper={handleOpenInBeeper}
             isLoadingAI={false}
+            externalValue={inputValue}
+            onInputChange={setInputValue}
           />
 
           {/* AI Reply Suggestions */}
           <ReplySuggestionsPanel
+            ref={suggestionsRef}
             selectedChatId={selectedChatId}
             selectedChatName={selectedChat.name}
             username={selectedChat.username}
@@ -463,6 +594,76 @@ export function ConversationPanel() {
           />
         </>
       )}
+
+      {/* Contact Linking Dialog */}
+      <Dialog open={showContactDialog} onOpenChange={setShowContactDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Link to Contact</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            {/* Search input */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="Search contacts..."
+                value={contactSearchQuery}
+                onChange={(e) => setContactSearchQuery(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+            
+            {/* Contact list */}
+            <ScrollArea className="h-72">
+              <div className="space-y-1">
+                {filteredContacts.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-4">
+                    {contactSearchQuery ? 'No contacts found' : 'Loading contacts...'}
+                  </p>
+                ) : (
+                  filteredContacts.map((contact) => {
+                    const fullName = getContactFullName(contact)
+                    const subtitle = contact.instagram || contact.emails?.[0]?.email || null
+                    
+                    return (
+                      <button
+                        key={contact._id}
+                        onClick={() => handleLinkToContact(contact._id)}
+                        className="w-full flex items-center gap-3 p-2 rounded-md hover:bg-accent text-left transition-colors"
+                      >
+                        {contact.imageUrl ? (
+                          <img
+                            src={contact.imageUrl}
+                            alt={fullName}
+                            className="w-8 h-8 rounded-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-medium">
+                            {(contact.firstName?.charAt(0) || contact.lastName?.charAt(0) || '?').toUpperCase()}
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">
+                            {fullName}
+                          </p>
+                          {subtitle && (
+                            <p className="text-xs text-muted-foreground truncate">
+                              {subtitle}
+                            </p>
+                          )}
+                        </div>
+                        {selectedChat?.contactId === contact._id && (
+                          <Check className="w-4 h-4 text-green-600" />
+                        )}
+                      </button>
+                    )
+                  })
+                )}
+              </div>
+            </ScrollArea>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

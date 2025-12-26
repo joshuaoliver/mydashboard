@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from '@tanstack/react-router'
+import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { useMutation, useAction, useQuery as useConvexQuery } from 'convex/react'
 import { api } from '../../../convex/_generated/api'
 import type { Id } from '../../../convex/_generated/dataModel'
@@ -434,6 +434,7 @@ function SessionComplete({ taskTitle, onDone, onPartial }: any) {
 // ==========================================
 
 function FocusPage() {
+  const navigate = useNavigate()
   const [activeSession, setActiveSession] = useState<ActiveSession | null>(null)
   const [elapsedSeconds, setElapsedSeconds] = useState(0)
   const [showComplete, setShowComplete] = useState(false)
@@ -632,6 +633,19 @@ function FocusPage() {
     setResultNote(note) // keep local in sync for completion dialog
   }, [updateSessionNote])
 
+  // Handle Exit Focus - properly end the session before navigating away
+  const handleExitFocus = useCallback(async () => {
+    if (activeSession) {
+      await endTimerSession({ 
+        id: activeSession.id, 
+        result: 'skipped',
+        resultNote: 'Exited focus mode' 
+      })
+      setActiveSession(null)
+    }
+    navigate({ to: '/today-plan' })
+  }, [activeSession, endTimerSession, navigate])
+
   if (!plan) return <FullWidthContent><div className="h-full flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-muted-foreground" /></div></FullWidthContent>
 
   return (
@@ -641,10 +655,13 @@ function FocusPage() {
         {/* Top Navigation Bar */}
         <header className="flex-none px-6 py-4 flex items-center justify-between border-b bg-background/40 backdrop-blur z-10">
           <div className="flex items-center gap-4">
-            <Link to="/today-plan" className="text-muted-foreground hover:text-foreground transition-colors p-2 -ml-2 rounded-full hover:bg-muted/50 group flex items-center gap-2">
+            <button 
+              onClick={handleExitFocus}
+              className="text-muted-foreground hover:text-foreground transition-colors p-2 -ml-2 rounded-full hover:bg-muted/50 group flex items-center gap-2"
+            >
               <LogOut className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
               <span className="text-sm font-medium">Exit Focus</span>
-            </Link>
+            </button>
           </div>
 
           <div className="flex items-center gap-3">

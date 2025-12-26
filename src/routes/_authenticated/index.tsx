@@ -82,28 +82,37 @@ function DashboardPage() {
         </div>
 
         {/* Active Session Banner */}
-        {activeSession?.isActive && (
-          <Card className="mb-6 bg-gradient-to-r from-primary/10 to-primary/5 border-primary/20">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
-                    <Play className="w-5 h-5 text-primary" />
+        {(() => {
+          // Don't show if session doesn't exist or isn't active
+          if (!activeSession?.isActive) return null
+          
+          // Treat sessions older than 24 hours as stale (safety net)
+          const isStale = (Date.now() - activeSession.startedAt) > 24 * 60 * 60 * 1000
+          if (isStale) return null
+          
+          return (
+            <Card className="mb-6 bg-gradient-to-r from-primary/10 to-primary/5 border-primary/20">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
+                      <Play className="w-5 h-5 text-primary" />
+                    </div>
+                    <div>
+                      <p className="font-medium">Active Focus Session</p>
+                      <p className="text-sm text-muted-foreground">
+                        {activeSession.taskTitle}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="font-medium">Active Focus Session</p>
-                    <p className="text-sm text-muted-foreground">
-                      {activeSession.taskTitle}
-                    </p>
-                  </div>
+                  <Link to="/focus">
+                    <Button>Continue Session</Button>
+                  </Link>
                 </div>
-                <Link to="/focus">
-                  <Button>Continue Session</Button>
-                </Link>
-              </div>
-            </CardContent>
-          </Card>
-        )}
+              </CardContent>
+            </Card>
+          )
+        })()}
 
         {/* Quick Stats */}
         {momentum && (

@@ -30,9 +30,9 @@ export function useChatKeyboardShortcuts() {
       
       // Navigate to next chat, or clear selection if no more chats
       if (nextChatId && nextChatId !== selectedChatId) {
-        navigate({ to: '/messages', search: { chatId: nextChatId } })
+        navigate({ to: '/inbox', search: { chatId: nextChatId } })
       } else {
-        navigate({ to: '/messages', search: { chatId: undefined } })
+        navigate({ to: '/inbox', search: { chatId: undefined } })
       }
     } catch (err) {
       console.error('Failed to archive chat:', err)
@@ -43,7 +43,7 @@ export function useChatKeyboardShortcuts() {
   const handleNextChat = useCallback(() => {
     const nextChatId = getNextChatId()
     if (nextChatId) {
-      navigate({ to: '/messages', search: { chatId: nextChatId } })
+      navigate({ to: '/inbox', search: { chatId: nextChatId } })
     }
   }, [getNextChatId, navigate])
 
@@ -51,7 +51,7 @@ export function useChatKeyboardShortcuts() {
   const handlePreviousChat = useCallback(() => {
     const prevChatId = getPreviousChatId()
     if (prevChatId) {
-      navigate({ to: '/messages', search: { chatId: prevChatId } })
+      navigate({ to: '/inbox', search: { chatId: prevChatId } })
     }
   }, [getPreviousChatId, navigate])
 

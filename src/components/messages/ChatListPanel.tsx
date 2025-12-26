@@ -117,7 +117,7 @@ export function ChatListPanel() {
 
   // Handle chat selection
   const handleChatSelect = useCallback((chatId: string) => {
-    navigate({ to: '/messages', search: { chatId } })
+    navigate({ to: '/inbox', search: { chatId } })
   }, [navigate])
 
   // Handle archive/unarchive toggle
@@ -132,9 +132,9 @@ export function ChatListPanel() {
         if (selectedChatId === chatId) {
           const nextChatId = useChatStore.getState().getNextChatId()
           if (nextChatId && nextChatId !== chatId) {
-            navigate({ to: '/messages', search: { chatId: nextChatId } })
+            navigate({ to: '/inbox', search: { chatId: nextChatId } })
           } else {
-            navigate({ to: '/messages', search: { chatId: undefined } })
+            navigate({ to: '/inbox', search: { chatId: undefined } })
           }
         }
       }

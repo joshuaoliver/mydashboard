@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { useMutation, useQuery as useConvexQuery } from 'convex/react'
+import { useMutation, useAction, useQuery as useConvexQuery } from 'convex/react'
 import { api } from '../../../convex/_generated/api'
 import type { Id } from '../../../convex/_generated/dataModel'
 import { useState, useEffect, useCallback, useMemo } from 'react'
@@ -9,6 +9,12 @@ import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Card, CardContent } from '@/components/ui/card'
 import { Textarea } from '@/components/ui/textarea'
+import { Slider } from '@/components/ui/slider'
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover'
 import {
   ResizablePanelGroup,
   ResizablePanel,
@@ -29,7 +35,6 @@ import {
   ShoppingBag,
   Mail,
   ExternalLink,
-  RefreshCw,
   Brain,
   Sparkles,
   TrendingUp,
@@ -39,6 +44,7 @@ import {
   GripVertical,
   Calendar as CalendarIcon,
   Briefcase,
+  FileText,
 } from 'lucide-react'
 import { cn } from '~/lib/utils'
 import { IlamyCalendar, type CalendarEvent } from '@ilamy/calendar'
@@ -345,6 +351,19 @@ function WorkPoolPanel({
                       🐸
                     </Button>
                   )}
+                  {/* Link to source document for todos */}
+                  {item.type === 'todo' && item.source && 'documentId' in item.source && (
+                    <Link 
+                      to="/notes/$documentId" 
+                      params={{ documentId: item.source.documentId as string }}
+                      onClick={(e) => e.stopPropagation()}
+                      className="h-5 w-5 flex items-center justify-center hover:bg-accent rounded"
+                      title="Open in Notes"
+                    >
+                      <FileText className="w-3 h-3 text-muted-foreground" />
+                    </Link>
+                  )}
+                  {/* External link for Linear issues */}
                   {item.type === 'linear' && item.source && 'url' in item.source && (
                     <a
                       href={item.source.url as string}
@@ -836,9 +855,9 @@ function TodayPlanPage() {
   // Frog queries
   const frogLinearIssues = useConvexQuery(api.todayPlan.getFrogLinearIssues, {})
 
-  // Mutations
+  // Mutations & Actions
   const getOrCreatePlan = useMutation(api.todayPlan.getOrCreateTodayPlan)
-  const refreshFreeBlocks = useMutation(api.todayPlan.refreshFreeBlocks)
+  const refreshFreeBlocks = useAction(api.todayPlan.refreshFreeBlocks)
   const addAdhocItem = useMutation(api.todayPlan.addAdhocItem)
   const updateAdhocItem = useMutation(api.todayPlan.updateAdhocItem)
   const deleteAdhocItem = useMutation(api.todayPlan.deleteAdhocItem)
@@ -938,10 +957,47 @@ function TodayPlanPage() {
     }
   }, [toggleTodoFrog, toggleLinearFrog])
 
-  const handleRefreshBlocks = useCallback(async () => {
+  // State for time-aware block creation
+  const [startHour, setStartHour] = useState(14) // Default 2pm for PM picker
+  const [endHour, setEndHour] = useState(18) // Default 6pm
+  const [isPlanningDay, setIsPlanningDay] = useState(false)
+  
+  // Check if it's currently AM or PM (Sydney time)
+  const isAM = useMemo(() => {
+    const now = new Date()
+    const sydneyTime = new Date(now.toLocaleString('en-US', { timeZone: 'Australia/Sydney' }))
+    return sydneyTime.getHours() < 12
+  }, [])
+  
+  const currentHour = useMemo(() => {
+    const now = new Date()
+    const sydneyTime = new Date(now.toLocaleString('en-US', { timeZone: 'Australia/Sydney' }))
+    return sydneyTime.getHours()
+  }, [])
+
+  const handleRefreshBlocks = useCallback(async (customStartHour?: number, customEndHour?: number) => {
     if (!plan) return
-    await refreshFreeBlocks({ planId: plan._id })
+    setIsPlanningDay(true)
+    try {
+      await refreshFreeBlocks({ 
+        planId: plan._id,
+        startHour: customStartHour,
+        endHour: customEndHour ?? 18,
+      })
+    } finally {
+      setIsPlanningDay(false)
+    }
   }, [plan, refreshFreeBlocks])
+  
+  // Quick action for AM - plan from now until 6pm
+  const handlePlanDayAM = useCallback(async () => {
+    await handleRefreshBlocks(currentHour, 18)
+  }, [handleRefreshBlocks, currentHour])
+  
+  // Action with custom times for PM
+  const handlePlanDayPM = useCallback(async () => {
+    await handleRefreshBlocks(startHour, endHour)
+  }, [handleRefreshBlocks, startHour, endHour])
 
   const handleSetMorningContext = useCallback(async (text: string) => {
     await setMorningContext({ context: text })
@@ -1056,10 +1112,106 @@ function TodayPlanPage() {
                       🐸 {frogCount} frog{frogCount > 1 ? 's' : ''} marked
                     </Badge>
                   )}
-                  <Button variant="outline" size="sm" onClick={handleRefreshBlocks}>
-                    <RefreshCw className="w-3 h-3 mr-1" />
-                    Refresh
-                  </Button>
+                  
+                  {/* Plan Day Button - AM vs PM behavior */}
+                  {isAM ? (
+                    // In AM: Direct button to plan from now to 6pm
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={handlePlanDayAM}
+                      disabled={isPlanningDay}
+                    >
+                      {isPlanningDay ? (
+                        <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                      ) : (
+                        <CalendarPlus className="w-3 h-3 mr-1" />
+                      )}
+                      Plan Day
+                    </Button>
+                  ) : (
+                    // In PM: Popover with time range sliders
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          disabled={isPlanningDay}
+                        >
+                          {isPlanningDay ? (
+                            <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                          ) : (
+                            <CalendarPlus className="w-3 h-3 mr-1" />
+                          )}
+                          Plan Day
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-72" align="end">
+                        <div className="space-y-4">
+                          <div className="space-y-2">
+                            <h4 className="font-medium text-sm">Plan Work Blocks</h4>
+                            <p className="text-xs text-muted-foreground">
+                              Set the time range for your focus blocks
+                            </p>
+                          </div>
+                          
+                          {/* Start Time Slider */}
+                          <div className="space-y-2">
+                            <div className="flex justify-between text-xs">
+                              <span className="text-muted-foreground">Start Time</span>
+                              <span className="font-medium">
+                                {startHour === 12 ? '12:00 PM' : startHour > 12 ? `${startHour - 12}:00 PM` : `${startHour}:00 AM`}
+                              </span>
+                            </div>
+                            <Slider
+                              value={[startHour]}
+                              onValueChange={([v]) => {
+                                setStartHour(v)
+                                if (v >= endHour) setEndHour(Math.min(v + 1, 23))
+                              }}
+                              min={currentHour}
+                              max={22}
+                              step={1}
+                              className="w-full"
+                            />
+                          </div>
+                          
+                          {/* End Time Slider */}
+                          <div className="space-y-2">
+                            <div className="flex justify-between text-xs">
+                              <span className="text-muted-foreground">End Time</span>
+                              <span className="font-medium">
+                                {endHour === 12 ? '12:00 PM' : endHour > 12 ? `${endHour - 12}:00 PM` : `${endHour}:00 AM`}
+                              </span>
+                            </div>
+                            <Slider
+                              value={[endHour]}
+                              onValueChange={([v]) => setEndHour(v)}
+                              min={startHour + 1}
+                              max={23}
+                              step={1}
+                              className="w-full"
+                            />
+                          </div>
+                          
+                          <Button 
+                            size="sm" 
+                            className="w-full"
+                            onClick={handlePlanDayPM}
+                            disabled={isPlanningDay}
+                          >
+                            {isPlanningDay ? (
+                              <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                            ) : (
+                              <CalendarPlus className="w-3 h-3 mr-1" />
+                            )}
+                            Create Blocks
+                          </Button>
+                        </div>
+                      </PopoverContent>
+                    </Popover>
+                  )}
+                  
                   <Link to="/focus">
                     <Button size="sm">
                       <Play className="w-3 h-3 mr-1" />
@@ -1104,7 +1256,7 @@ function TodayPlanPage() {
             ) : (
               /* ilamy Calendar - Day View */
               <div 
-                className="flex-1 overflow-hidden"
+                className="flex-1 overflow-hidden min-h-[600px]"
                 onDragOver={(e) => {
                   e.preventDefault()
                   e.dataTransfer.dropEffect = 'copy'
