@@ -515,13 +515,16 @@ Suggest 3-4 different message options representing DIFFERENT conversation pathwa
 
 IMPORTANT: DO NOT use em dashes (—) or en dashes (–). Use ellipsis (...) or split into separate sentences. Write like a real person texting with standard keyboard characters only.
 
+Also, if there is any actionable task or follow-up that Joshua should do based on this conversation, extract it as a single action item. Include ${args.chatName}'s name in the action item text. If there's nothing actionable, omit the actionItem field.
+
 Format as JSON:
 {
   "suggestions": [
     {
       "reply": "The actual message text"
     }
-  ]
+  ],
+  "actionItem": "Send ${args.chatName} the report by Friday"
 }`;
       }
 
@@ -564,6 +567,7 @@ Format as JSON:
       // Parse the AI response
       let suggestions;
       let importance: number | undefined;
+      let actionItem: string | undefined;
       try {
         // Strip markdown code blocks if present (OpenAI sometimes wraps JSON in ```json ... ```)
         let cleanedText = result.text.trim();
@@ -585,6 +589,12 @@ Format as JSON:
           console.log(`[generateReplySuggestions] AI assessed importance: ${importance}`);
         } else {
           console.log(`[generateReplySuggestions] No importance rating in AI response`);
+        }
+        
+        // Extract action item (if any)
+        if (typeof aiResponse.actionItem === 'string' && aiResponse.actionItem.trim()) {
+          actionItem = aiResponse.actionItem.trim();
+          console.log(`[generateReplySuggestions] AI extracted action item: ${actionItem}`);
         }
       } catch (parseError) {
         // If JSON parsing fails, use a fallback
@@ -618,11 +628,12 @@ Format as JSON:
           lastMessageId: lastMessage.id,
           lastMessageTimestamp: lastMessage.timestamp,
           suggestions,
+          actionItem,
           conversationContext,
           modelUsed: modelId,
         });
 
-        console.log(`[generateReplySuggestions] Saved ${suggestions.length} suggestions to cache for chat ${args.chatId}`);
+        console.log(`[generateReplySuggestions] Saved ${suggestions.length} suggestions to cache for chat ${args.chatId}${actionItem ? ` with action item` : ''}`);
       } else {
         console.log(`[generateReplySuggestions] Custom context used - skipping cache save`);
       }

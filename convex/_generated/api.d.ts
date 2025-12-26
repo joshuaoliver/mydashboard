@@ -30,7 +30,6 @@ import type * as costs from "../costs.js";
 import type * as crons from "../crons.js";
 import type * as cursorHelpers from "../cursorHelpers.js";
 import type * as dailySummary from "../dailySummary.js";
-import type * as debugParticipants from "../debugParticipants.js";
 import type * as dexActions from "../dexActions.js";
 import type * as dexAdmin from "../dexAdmin.js";
 import type * as dexQueries from "../dexQueries.js";
@@ -98,7 +97,6 @@ declare const fullApi: ApiFromModules<{
   crons: typeof crons;
   cursorHelpers: typeof cursorHelpers;
   dailySummary: typeof dailySummary;
-  debugParticipants: typeof debugParticipants;
   dexActions: typeof dexActions;
   dexAdmin: typeof dexAdmin;
   dexQueries: typeof dexQueries;

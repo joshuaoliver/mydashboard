@@ -454,6 +454,18 @@ export const updateMessageStatus = internalMutation({
     // When sent successfully, update messageId to the Beeper-assigned ID
     // This prevents duplicates when sync runs (sync checks by messageId)
     if (args.status === "sent" && args.pendingMessageId) {
+      // Check if sync already inserted a message with this ID (race condition)
+      // If so, delete the sync'd duplicate - we keep ours since it has status tracking
+      const existingFromSync = await ctx.db
+        .query("beeperMessages")
+        .withIndex("by_message_id", (q) => q.eq("messageId", args.pendingMessageId))
+        .first();
+      
+      if (existingFromSync && existingFromSync._id !== args.messageDocId) {
+        console.log(`[updateMessageStatus] Deleting duplicate from sync: ${existingFromSync._id}`);
+        await ctx.db.delete(existingFromSync._id);
+      }
+      
       update.messageId = args.pendingMessageId;
       console.log(`[updateMessageStatus] Updated messageId: ${message.messageId} -> ${args.pendingMessageId}`);
     }

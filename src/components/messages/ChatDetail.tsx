@@ -6,7 +6,7 @@ import {
   ConversationScrollButton 
 } from '@/components/ai-elements/conversation'
 import { ProxiedImage } from './ProxiedImage'
-import { RefreshCw, Clock, AlertCircle, RotateCcw } from 'lucide-react'
+import { RefreshCw, Clock, AlertCircle, RotateCcw, History } from 'lucide-react'
 import { memo } from 'react'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
@@ -44,9 +44,11 @@ interface ChatDetailProps {
   messagesStatus?: "LoadingFirstPage" | "CanLoadMore" | "LoadingMore" | "Exhausted"
   onLoadMore?: (numItems: number) => void
   onRetry?: (messageDocId: Id<"beeperMessages">) => void  // Callback to retry failed message
+  onLoadFullHistory?: () => void  // Callback to load full conversation history
+  isLoadingFullHistory?: boolean  // Whether full history is currently loading
 }
 
-export const ChatDetail = memo(function ChatDetail({ messages, isSingleChat = true, messagesStatus, onLoadMore: _onLoadMore, onRetry }: ChatDetailProps) {
+export const ChatDetail = memo(function ChatDetail({ messages, isSingleChat = true, messagesStatus, onLoadMore: _onLoadMore, onRetry, onLoadFullHistory, isLoadingFullHistory }: ChatDetailProps) {
   // Format timestamp for messages
   const formatMessageTime = (timestamp: number) => {
     const date = new Date(timestamp)
@@ -82,6 +84,34 @@ export const ChatDetail = memo(function ChatDetail({ messages, isSingleChat = tr
             />
           ) : (
             <div className="px-3 py-1.5 space-y-1">
+              {/* Load full history button - shown when at the top and all cached messages loaded */}
+              {messagesStatus === "Exhausted" && onLoadFullHistory && (
+                <div className="py-3 text-center border-b border-gray-100 mb-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={onLoadFullHistory}
+                    disabled={isLoadingFullHistory}
+                    className="text-xs text-gray-500 hover:text-gray-700"
+                  >
+                    {isLoadingFullHistory ? (
+                      <>
+                        <RefreshCw className="w-3 h-3 mr-1.5 animate-spin" />
+                        Loading history...
+                      </>
+                    ) : (
+                      <>
+                        <History className="w-3 h-3 mr-1.5" />
+                        Load full conversation history
+                      </>
+                    )}
+                  </Button>
+                  <p className="text-[10px] text-gray-400 mt-1">
+                    Fetches all messages from the past year
+                  </p>
+                </div>
+              )}
+
               {/* Loading indicator for older messages */}
               {messagesStatus === "LoadingMore" && (
                 <div className="py-2 text-center">

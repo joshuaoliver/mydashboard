@@ -285,6 +285,8 @@ export default defineSchema({
     suggestions: v.array(v.object({        // The AI-generated suggestions (just the reply text)
       reply: v.string(),
     })),
+    // Single action item - AI-extracted todo from conversation (if any found)
+    actionItem: v.optional(v.string()),
     conversationContext: v.object({        // Context when generated
       lastMessage: v.string(),
       messageCount: v.number(),
@@ -538,6 +540,10 @@ export default defineSchema({
     createdAt: v.number(),
     updatedAt: v.number(),
     completedAt: v.optional(v.number()),
+    // Source tracking - when created from a conversation
+    sourceChatId: v.optional(v.string()),        // Beeper chat ID
+    sourceContactId: v.optional(v.id("contacts")), // Dex contact reference
+    sourceContactName: v.optional(v.string()),   // Denormalized contact name
   })
     .index("by_document", ["documentId"])
     .index("by_completed", ["isCompleted"])

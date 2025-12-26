@@ -18,6 +18,7 @@ export const getCachedSuggestions = internalQuery({
       suggestions: v.array(v.object({
         reply: v.string(),
       })),
+      actionItem: v.optional(v.string()),
       conversationContext: v.object({
         lastMessage: v.string(),
         messageCount: v.number(),
@@ -44,6 +45,7 @@ export const getCachedSuggestions = internalQuery({
     // Return cached suggestions (map to ensure correct type)
     return {
       suggestions: cached.suggestions.map(s => ({ reply: s.reply })),
+      actionItem: cached.actionItem,
       conversationContext: cached.conversationContext,
       isCached: true,
       generatedAt: cached.generatedAt,
@@ -63,6 +65,7 @@ export const saveSuggestionsToCache = internalMutation({
     suggestions: v.array(v.object({
       reply: v.string(),
     })),
+    actionItem: v.optional(v.string()),
     conversationContext: v.object({
       lastMessage: v.string(),
       messageCount: v.number(),
@@ -83,6 +86,7 @@ export const saveSuggestionsToCache = internalMutation({
       // Update existing cache entry
       await ctx.db.patch(existing._id, {
         suggestions: args.suggestions,
+        actionItem: args.actionItem,
         conversationContext: args.conversationContext,
         lastMessageTimestamp: args.lastMessageTimestamp,
         generatedAt: Date.now(),
@@ -97,6 +101,7 @@ export const saveSuggestionsToCache = internalMutation({
       lastMessageId: args.lastMessageId,
       lastMessageTimestamp: args.lastMessageTimestamp,
       suggestions: args.suggestions,
+      actionItem: args.actionItem,
       conversationContext: args.conversationContext,
       generatedAt: Date.now(),
       modelUsed: args.modelUsed,
@@ -139,6 +144,7 @@ export const getSuggestionsForChat = query({
       suggestions: v.array(v.object({
         reply: v.string(),
       })),
+      actionItem: v.optional(v.string()),
       conversationContext: v.object({
         lastMessage: v.string(),
         messageCount: v.number(),
@@ -165,6 +171,7 @@ export const getSuggestionsForChat = query({
 
     return {
       suggestions: cached.suggestions.map(s => ({ reply: s.reply })),
+      actionItem: cached.actionItem,
       conversationContext: cached.conversationContext,
       generatedAt: cached.generatedAt,
       lastMessageId: cached.lastMessageId,

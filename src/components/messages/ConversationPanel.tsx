@@ -7,10 +7,11 @@ import { useChatStore } from '@/stores/useChatStore'
 import { ChatDetail } from './ChatDetail'
 import { MessageInputPanel } from './MessageInputPanel'
 import { ReplySuggestionsPanel, type ReplySuggestionsPanelRef } from './ReplySuggestionsPanel'
+import { ConversationTodosPanel } from './ConversationTodosPanel'
 import { ChatDebugPanel } from './ChatDebugPanel'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { RefreshCw, ExternalLink, Mail, MailOpen, Archive, MessageCircle, Bug, History, Ban, MoreVertical, Link2, Search, Check } from 'lucide-react'
+import { RefreshCw, ExternalLink, Mail, MailOpen, Archive, MessageCircle, Bug, History, Ban, MoreVertical, Link2, Search, Check, Instagram, Phone } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import {
   DropdownMenu,
@@ -26,6 +27,28 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { cn } from '@/lib/utils'
+
+// Network icon component for the chat header
+function NetworkIcon({ network, className }: { network: string; className?: string }) {
+  const normalizedNetwork = network.toLowerCase()
+  const iconClass = cn("w-4 h-4", className)
+  
+  if (normalizedNetwork.includes('instagram')) {
+    return <Instagram className={cn(iconClass, "text-pink-500")} />
+  }
+  if (normalizedNetwork.includes('whatsapp')) {
+    return <MessageCircle className={cn(iconClass, "text-green-500")} />
+  }
+  if (normalizedNetwork.includes('sms') || normalizedNetwork.includes('imessage')) {
+    return <Phone className={cn(iconClass, "text-blue-500")} />
+  }
+  if (normalizedNetwork.includes('email') || normalizedNetwork.includes('gmail')) {
+    return <Mail className={cn(iconClass, "text-red-400")} />
+  }
+  // Fallback: generic message icon
+  return <MessageCircle className={cn(iconClass, "text-gray-400")} />
+}
 
 export function ConversationPanel() {
   const navigate = useNavigate()
@@ -47,6 +70,12 @@ export function ConversationPanel() {
   // Query the selected chat directly by ID (not from paginated list!)
   const selectedChat = useQuery(
     api.beeperQueries.getChatByIdWithContact,
+    selectedChatId ? { chatId: selectedChatId } : "skip"
+  )
+
+  // Query cached suggestions to get the action item
+  const cachedSuggestions = useQuery(
+    api.aiSuggestions.getSuggestionsForChat,
     selectedChatId ? { chatId: selectedChatId } : "skip"
   )
 
@@ -239,6 +268,17 @@ export function ConversationPanel() {
 
       if (result.success) {
         console.log(`✅ Loaded ${result.messagesLoaded} messages (total fetched: ${result.totalFetched})`)
+        
+        // Force refresh the conversation by briefly navigating away and back
+        // This resets the pagination cursor so all messages are loaded fresh
+        if (result.messagesLoaded > 0) {
+          const currentChatId = selectedChatId
+          navigate({ to: '/inbox', search: { chatId: undefined } })
+          // Small delay to ensure the query unmounts
+          setTimeout(() => {
+            navigate({ to: '/inbox', search: { chatId: currentChatId } })
+          }, 100)
+        }
       } else {
         console.error('❌ Failed to load full conversation:', result.error)
         setError(result.error || 'Failed to load full conversation')
@@ -249,7 +289,7 @@ export function ConversationPanel() {
     } finally {
       setIsLoadingFullConversation(false)
     }
-  }, [selectedChatId, loadFullConversation])
+  }, [selectedChatId, loadFullConversation, navigate])
 
   // Handle refreshing (loading newer messages)
   const handleRefreshConversation = useCallback(async () => {
@@ -412,7 +452,12 @@ export function ConversationPanel() {
             </div>
           )}
           <div className="min-w-0 flex-1">
-            <h2 className="font-semibold text-gray-900 truncate">{selectedChat.name}</h2>
+            <div className="flex items-center gap-1.5">
+              <h2 className="font-semibold text-gray-900 truncate">{selectedChat.name}</h2>
+              {selectedChat.network && (
+                <NetworkIcon network={selectedChat.network} />
+              )}
+            </div>
             {selectedChat.username && (
               <p className="text-xs text-gray-500">@{selectedChat.username}</p>
             )}
@@ -530,12 +575,14 @@ export function ConversationPanel() {
       ) : (
         <>
           {/* Messages */}
-          <ChatDetail 
-            messages={cachedMessages || []} 
+          <ChatDetail
+            messages={cachedMessages || []}
             isSingleChat={selectedChat?.type === 'single' || selectedChat?.type === undefined}
             messagesStatus={messagesStatus}
             onLoadMore={loadMoreMessages}
             onRetry={handleRetryMessage}
+            onLoadFullHistory={handleLoadFullConversation}
+            isLoadingFullHistory={isLoadingFullConversation}
           />
           
           {/* Message Input */}
@@ -557,6 +604,14 @@ export function ConversationPanel() {
             username={selectedChat.username}
             onSuggestionSelect={handleSuggestionSelect}
             onSendMessage={handleSendMessage}
+          />
+
+          {/* Quick Add Todo from Conversation */}
+          <ConversationTodosPanel
+            chatId={selectedChatId}
+            chatName={selectedChat.name}
+            contactId={selectedChat.contactId}
+            actionItem={cachedSuggestions?.actionItem}
           />
         </>
       )}

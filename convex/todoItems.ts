@@ -496,3 +496,86 @@ function updateTaskItemTextInContent(
   
   return false;
 }
+
+// Create a quick todo from a conversation
+// Finds or creates the "Quick Tasks" document and adds the todo
+export const createQuickTodo = mutation({
+  args: {
+    text: v.string(),
+    // Contact attribution - stored in DB for tracking
+    chatId: v.optional(v.string()),
+    contactId: v.optional(v.id("contacts")),
+    contactName: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const now = Date.now();
+
+    // Find or create the "Quick Tasks" document
+    let quickTasksDoc = await ctx.db
+      .query("todoDocuments")
+      .filter((q) => q.eq(q.field("title"), "Quick Tasks"))
+      .first();
+
+    if (!quickTasksDoc) {
+      // Create the Quick Tasks document
+      const emptyContent = JSON.stringify({
+        type: "doc",
+        content: [
+          {
+            type: "paragraph",
+            content: [],
+          },
+        ],
+      });
+
+      const docId = await ctx.db.insert("todoDocuments", {
+        title: "Quick Tasks",
+        content: emptyContent,
+        todoCount: 0,
+        completedCount: 0,
+        createdAt: now,
+        updatedAt: now,
+      });
+
+      quickTasksDoc = await ctx.db.get(docId);
+    }
+
+    if (!quickTasksDoc) {
+      throw new Error("Failed to create Quick Tasks document");
+    }
+
+    // Get the max order for existing items in this document
+    const existingItems = await ctx.db
+      .query("todoItems")
+      .withIndex("by_document", (q) => q.eq("documentId", quickTasksDoc!._id))
+      .collect();
+
+    const maxOrder = existingItems.reduce(
+      (max, item) => Math.max(max, item.order),
+      -1
+    );
+
+    // Create the todo item
+    const todoId = await ctx.db.insert("todoItems", {
+      documentId: quickTasksDoc._id,
+      text: args.text,
+      isCompleted: false,
+      order: maxOrder + 1,
+      nodeId: `quick-${now}`,
+      createdAt: now,
+      updatedAt: now,
+      // Source tracking from conversation
+      sourceChatId: args.chatId,
+      sourceContactId: args.contactId,
+      sourceContactName: args.contactName,
+    });
+
+    // Update the document's todo count
+    await ctx.db.patch(quickTasksDoc._id, {
+      todoCount: quickTasksDoc.todoCount + 1,
+      updatedAt: now,
+    });
+
+    return { todoId, documentId: quickTasksDoc._id };
+  },
+});

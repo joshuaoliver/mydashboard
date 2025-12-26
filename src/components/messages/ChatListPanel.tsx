@@ -107,17 +107,8 @@ export function ChatListPanel() {
     syncOnLoad()
   }, []) // Empty deps - only run once on mount
 
-  // Auto-select first chat if none selected
-  useEffect(() => {
-    if (!selectedChatId && allLoadedChats && allLoadedChats.length > 0) {
-      const firstChat = allLoadedChats[0]
-      navigate({
-        to: '/inbox',
-        search: { chatId: firstChat.id },
-        replace: true
-      })
-    }
-  }, [selectedChatId, allLoadedChats, navigate])
+  // NOTE: Removed auto-select first chat behavior
+  // User should explicitly click a chat to select it
 
   // Infinite scroll handler
   const handleScroll = useCallback((event: React.UIEvent<HTMLDivElement>) => {

@@ -2,7 +2,7 @@ import { action, internalAction } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { v } from "convex/values";
 import { createBeeperClient } from "./beeperClient";
-import { extractMessageText, compareSortKeys } from "./messageHelpers";
+import { extractMessageText } from "./messageHelpers";
 
 /**
  * Focus/open a chat in Beeper Desktop
@@ -210,10 +210,8 @@ export const loadFullConversation = action({
         })),
       }));
 
-      // Sort messages by sortKey (oldest first) for proper storage
-      transformedMessages.sort((a, b) => compareSortKeys(a.sortKey, b.sortKey));
-
       // Store messages using the existing syncChatMessages mutation
+      // (no need to sort - each message has a timestamp, and the query sorts by timestamp)
       const storedCount: number = await ctx.runMutation(
         internal.beeperSync.syncChatMessages,
         {
