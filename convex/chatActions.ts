@@ -128,7 +128,26 @@ export const markChatAsUnread = action({
     await ctx.runMutation(internal.beeperMutations.markChatAsUnread, {
       chatId: args.chatId,
     });
-    
+
+    return { success: true };
+  },
+});
+
+/**
+ * Link a chat to a specific contact (public action)
+ * Used when user wants to manually set which contact a conversation belongs to
+ */
+export const linkChatToContact = action({
+  args: {
+    chatId: v.string(),
+    contactId: v.optional(v.id("contacts")),
+  },
+  handler: async (ctx, args) => {
+    await ctx.runMutation(internal.beeperMutations.linkChatToContact, {
+      chatId: args.chatId,
+      contactId: args.contactId,
+    });
+
     return { success: true };
   },
 });

@@ -259,3 +259,41 @@ export const updateReplyImportance = internalMutation({
   },
 });
 
+/**
+ * Link a chat to a different contact
+ * Used when user wants to manually set which contact a conversation belongs to
+ */
+export const linkChatToContact = internalMutation({
+  args: {
+    chatId: v.string(),
+    contactId: v.optional(v.id("contacts")),
+  },
+  handler: async (ctx, args) => {
+    const chat = await ctx.db
+      .query("beeperChats")
+      .withIndex("by_chat_id", (q) => q.eq("chatId", args.chatId))
+      .first();
+
+    if (!chat) {
+      throw new Error(`Chat ${args.chatId} not found`);
+    }
+
+    // If a contactId is provided, verify the contact exists
+    if (args.contactId) {
+      const contact = await ctx.db.get(args.contactId);
+      if (!contact) {
+        throw new Error(`Contact ${args.contactId} not found`);
+      }
+    }
+
+    await ctx.db.patch(chat._id, {
+      contactId: args.contactId,
+      contactMatchedAt: Date.now(),
+    });
+
+    console.log(`[linkChatToContact] Linked chat ${args.chatId} to contact ${args.contactId ?? 'none'}`);
+
+    return { success: true, chatId: args.chatId, contactId: args.contactId };
+  },
+});
+

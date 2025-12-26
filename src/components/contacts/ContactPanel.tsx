@@ -13,9 +13,9 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { User, Save, Lock, Unlock, X, Check, AlertCircle, MoreVertical, Merge, Pencil } from 'lucide-react'
+import { User, Save, Lock, Unlock, X, Check, AlertCircle, MoreVertical, Merge, Pencil, UserCog, Search } from 'lucide-react'
 import { useState, useEffect } from 'react'
-import { useMutation, useQuery } from 'convex/react'
+import { useMutation, useQuery, useAction } from 'convex/react'
 import { api } from '../../../convex/_generated/api'
 import type { Id } from '../../../convex/_generated/dataModel'
 import { MergeDuplicatesDialog } from '../contacts/MergeDuplicatesDialog'
@@ -55,6 +55,7 @@ interface ContactPanelProps {
   searchedPhoneNumber?: string // WhatsApp phone number
   participantName?: string // Name from chat participant (for creating contacts)
   participantImageUrl?: string // Profile image from chat (for creating contacts)
+  chatId?: string // For linking this chat to a different contact
 }
 
 const connectionOptions = [
@@ -81,7 +82,7 @@ const leadStatusOptions = [
   { value: "Former", label: "Former" },
 ] as const
 
-export function ContactPanel({ contact, isLoading, searchedUsername, searchedPhoneNumber, participantName, participantImageUrl }: ContactPanelProps) {
+export function ContactPanel({ contact, isLoading, searchedUsername, searchedPhoneNumber, participantName, participantImageUrl, chatId }: ContactPanelProps) {
   const [notes, setNotes] = useState(contact?.notes || "")
   const [objective, setObjective] = useState(contact?.objective || "")
   const [isSaving, setIsSaving] = useState(false)
@@ -111,7 +112,11 @@ export function ContactPanel({ contact, isLoading, searchedUsername, searchedPho
   
   // Duplicate detection state
   const [showMergeDialog, setShowMergeDialog] = useState(false)
-  
+
+  // Change contact state
+  const [showChangeContactPopover, setShowChangeContactPopover] = useState(false)
+  const [contactSearchQuery, setContactSearchQuery] = useState("")
+
   // Mutations
   const toggleConnection = useMutation(api.contactMutations.toggleConnectionType)
   const toggleSexMutation = useMutation(api.contactMutations.toggleSex)
@@ -128,7 +133,17 @@ export function ContactPanel({ contact, isLoading, searchedUsername, searchedPho
   const mergeContactsMutation = useMutation(api.contactMerge.mergeContacts)
   const updateSetNameMutation = useMutation(api.contactMutations.updateSetName)
   const updatePriorityMutation = useMutation(api.contactMutations.updatePriority)
-  
+  const linkChatToContactAction = useAction(api.chatActions.linkChatToContact)
+
+  // Query for contact search (only fetch when popover is open)
+  const allContacts = useQuery(
+    api.dexQueries.listContacts,
+    showChangeContactPopover ? { limit: 200, searchTerm: contactSearchQuery || undefined } : "skip"
+  )
+
+  // Already filtered by searchTerm from the query, just limit
+  const filteredContacts = (allContacts?.contacts ?? []).slice(0, 10)
+
   // Query locations, tags, and duplicates
   const locations = useQuery(api.locationQueries.listLocations)
   const tags = useQuery(api.tagQueries.listTags)
@@ -429,7 +444,7 @@ export function ContactPanel({ contact, isLoading, searchedUsername, searchedPho
 
   const handlePriorityCommit = async (value: number[]) => {
     if (!contact) return
-    
+
     const newPriority = value[0]
     try {
       await updatePriorityMutation({
@@ -438,6 +453,36 @@ export function ContactPanel({ contact, isLoading, searchedUsername, searchedPho
       })
     } catch (error) {
       console.error('Failed to update priority:', error)
+    }
+  }
+
+  // Handle changing the linked contact for this chat
+  const handleChangeLinkedContact = async (newContactId: Id<"contacts">) => {
+    if (!chatId) return
+
+    try {
+      await linkChatToContactAction({
+        chatId,
+        contactId: newContactId,
+      })
+      setShowChangeContactPopover(false)
+      setContactSearchQuery("")
+    } catch (error) {
+      console.error('Failed to change linked contact:', error)
+    }
+  }
+
+  const handleUnlinkContact = async () => {
+    if (!chatId) return
+
+    try {
+      await linkChatToContactAction({
+        chatId,
+        contactId: undefined,
+      })
+      setShowChangeContactPopover(false)
+    } catch (error) {
+      console.error('Failed to unlink contact:', error)
     }
   }
 
@@ -639,6 +684,12 @@ export function ContactPanel({ contact, isLoading, searchedUsername, searchedPho
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
+              {chatId && (
+                <DropdownMenuItem onClick={() => setShowChangeContactPopover(true)}>
+                  <UserCog className="h-4 w-4 mr-2" />
+                  Change linked contact
+                </DropdownMenuItem>
+              )}
               <DropdownMenuItem onClick={() => setShowMergeDialog(true)}>
                 <Merge className="h-4 w-4 mr-2" />
                 Merge with another contact
@@ -646,6 +697,88 @@ export function ContactPanel({ contact, isLoading, searchedUsername, searchedPho
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
+
+        {/* Change Contact Popover */}
+        {showChangeContactPopover && chatId && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs font-medium text-blue-800 flex items-center gap-1">
+                <UserCog className="w-4 h-4" />
+                Change linked contact
+              </p>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setShowChangeContactPopover(false)
+                  setContactSearchQuery("")
+                }}
+                className="h-6 w-6 p-0"
+              >
+                <X className="w-3 h-3" />
+              </Button>
+            </div>
+            <div className="relative">
+              <Search className="absolute left-2 top-2.5 h-3 w-3 text-gray-400" />
+              <Input
+                placeholder="Search contacts..."
+                value={contactSearchQuery}
+                onChange={(e) => setContactSearchQuery(e.target.value)}
+                className="pl-7 h-8 text-xs"
+                autoFocus
+              />
+            </div>
+            <div className="mt-2 max-h-40 overflow-y-auto space-y-1">
+              {filteredContacts.length === 0 ? (
+                <p className="text-xs text-gray-500 text-center py-2">
+                  {contactSearchQuery ? "No contacts found" : "Type to search contacts"}
+                </p>
+              ) : (
+                filteredContacts.map((c) => {
+                  const name = [c.firstName, c.lastName].filter(Boolean).join(" ") || "Unknown"
+                  const isCurrentContact = contact?._id === c._id
+                  return (
+                    <button
+                      key={c._id}
+                      onClick={() => !isCurrentContact && handleChangeLinkedContact(c._id)}
+                      disabled={isCurrentContact}
+                      className={`w-full flex items-center gap-2 p-2 rounded text-left text-xs transition-colors ${
+                        isCurrentContact
+                          ? "bg-blue-100 text-blue-700 cursor-not-allowed"
+                          : "hover:bg-blue-100"
+                      }`}
+                    >
+                      {c.imageUrl ? (
+                        <img src={c.imageUrl} alt={name} className="w-6 h-6 rounded-full object-cover" />
+                      ) : (
+                        <div className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center text-[10px] font-medium">
+                          {name.charAt(0)}
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium truncate">{name}</p>
+                        {c.instagram && <p className="text-gray-500 truncate">@{c.instagram}</p>}
+                      </div>
+                      {isCurrentContact && (
+                        <Check className="w-4 h-4 text-blue-600 flex-shrink-0" />
+                      )}
+                    </button>
+                  )
+                })
+              )}
+            </div>
+            {contact && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleUnlinkContact}
+                className="w-full mt-2 text-xs border-red-300 text-red-600 hover:bg-red-50"
+              >
+                Unlink contact from this chat
+              </Button>
+            )}
+          </div>
+        )}
 
         {/* Duplicate Warning */}
         {duplicates && duplicates.length > 0 && (
