@@ -904,6 +904,7 @@ export default defineSchema({
   agentThreads: defineTable({
     title: v.optional(v.string()),           // Thread title (auto-generated or user-set)
     userId: v.string(),                       // User who owns this thread
+    agentThreadId: v.optional(v.string()),   // ID of the thread in the agent component (created on first message)
     lastMessageAt: v.optional(v.number()),   // Timestamp of last message
     messageCount: v.number(),                 // Number of messages in thread
     modelId: v.optional(v.string()),         // User-selected model for this thread (e.g., "openai/gpt-4o")
@@ -911,7 +912,8 @@ export default defineSchema({
     updatedAt: v.number(),
   })
     .index("by_user", ["userId"])
-    .index("by_user_recent", ["userId", "lastMessageAt"]),
+    .index("by_user_recent", ["userId", "lastMessageAt"])
+    .index("by_agent_thread", ["agentThreadId"]),
 
   // Pending actions awaiting user approval (human-in-the-loop)
   agentPendingActions: defineTable({

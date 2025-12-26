@@ -1,66 +1,68 @@
-import { Agent, createTool } from "@convex-dev/agent";
-import { components } from "./_generated/api";
-import { openai } from "@ai-sdk/openai";
-import { createGoogleGenerativeAI } from "@ai-sdk/google";
-import { createOpenAI } from "@ai-sdk/openai";
-import { createAnthropic } from "@ai-sdk/anthropic";
-import { z } from "zod";
-import { query, mutation, internalQuery, internalMutation } from "./_generated/server";
-import { v } from "convex/values";
-import { DEFAULT_SETTINGS } from "./aiSettings";
-import { internal } from "./_generated/api";
-import type { LanguageModel } from "ai";
+import { Agent, createTool } from '@convex-dev/agent'
+import { components } from './_generated/api'
+import { openai } from '@ai-sdk/openai'
+import { createGateway } from 'ai'
+import { z } from 'zod'
+import {
+  query,
+  mutation,
+  internalQuery,
+  internalMutation,
+} from './_generated/server'
+import { v } from 'convex/values'
+import { DEFAULT_SETTINGS } from './aiSettings'
+import { internal } from './_generated/api'
+import type { LanguageModel } from 'ai'
 
 // Type assertion for internal references that may not be in generated types yet
 // Run `npx convex dev` to regenerate types after adding new files
-const internalRef = internal as any;
+const internalRef = internal as any
 
 // =============================================================================
-// Dynamic Model Creation
+// Dynamic Model Creation using Vercel AI Gateway
 // =============================================================================
 
 /**
- * Create a language model from a model ID string (e.g., "google/gemini-3-flash")
+ * Create a Vercel AI Gateway instance with the API key
+ * The gateway handles routing to different providers (Google, OpenAI, Anthropic, etc.)
  */
-export function createModelFromId(modelId: string) {
-  const [provider, modelName] = modelId.split("/");
+function getGateway() {
+  const apiKey =
+    process.env.AI_GATEWAY_API_KEY || process.env.VERCEL_AI_GATEWAY_API_KEY
+  if (!apiKey) {
+    console.error(
+      '[agentChat] No AI Gateway API key found. Check AI_GATEWAY_API_KEY or VERCEL_AI_GATEWAY_API_KEY env var.',
+    )
+    throw new Error(
+      'AI Gateway API key is not configured. Set AI_GATEWAY_API_KEY environment variable.',
+    )
+  }
+  console.log(
+    '[agentChat] Creating gateway with API key (length:',
+    apiKey.length,
+    ')',
+  )
+  return createGateway({ apiKey })
+}
 
-  switch (provider) {
-    case "google":
-      const google = createGoogleGenerativeAI({
-        apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY,
-      });
-      return google(modelName) as unknown as LanguageModel;
-    case "openai":
-      const openaiProvider = createOpenAI({
-        apiKey: process.env.OPENAI_API_KEY,
-      });
-      return openaiProvider(modelName) as unknown as LanguageModel;
-    case "anthropic":
-      const anthropic = createAnthropic({
-        apiKey: process.env.ANTHROPIC_API_KEY,
-      });
-      return anthropic(modelName) as unknown as LanguageModel;
-    case "deepseek":
-      // DeepSeek uses OpenAI-compatible API
-      const deepseek = createOpenAI({
-        apiKey: process.env.DEEPSEEK_API_KEY,
-        baseURL: "https://api.deepseek.com/v1",
-      });
-      return deepseek(modelName) as unknown as LanguageModel;
-    case "xai":
-      // xAI Grok uses OpenAI-compatible API
-      const xai = createOpenAI({
-        apiKey: process.env.XAI_API_KEY,
-        baseURL: "https://api.x.ai/v1",
-      });
-      return xai(modelName) as unknown as LanguageModel;
-    default:
-      // Default to Google Gemini Flash
-      const defaultGoogle = createGoogleGenerativeAI({
-        apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY,
-      });
-      return defaultGoogle("gemini-2.0-flash") as unknown as LanguageModel;
+/**
+ * Create a language model from a model ID string (e.g., "google/gemini-3-flash")
+ * Uses Vercel AI Gateway to route to the appropriate provider
+ */
+export function createModelFromId(modelId: string): LanguageModel {
+  console.log(`[agentChat] Creating model: ${modelId}`)
+
+  try {
+    const gateway = getGateway()
+    // The gateway function accepts the full model ID in "provider/model" format
+    const model = gateway(modelId)
+    console.log(
+      `[agentChat] Successfully created model via gateway: ${modelId}`,
+    )
+    return model
+  } catch (error) {
+    console.error(`[agentChat] Failed to create model ${modelId}:`, error)
+    throw error
   }
 }
 
@@ -68,22 +70,24 @@ export function createModelFromId(modelId: string) {
  * Get the default model ID from settings or fallback
  */
 export function getDefaultModelId(): string {
-  return DEFAULT_SETTINGS["chat-agent"].modelId;
+  return DEFAULT_SETTINGS['chat-agent'].modelId
 }
 
 // =============================================================================
 // Supermemory Integration (Optional)
 // =============================================================================
 
-let supermemoryTools: Record<string, unknown> = {};
-try {
-  if (process.env.SUPERMEMORY_API_KEY) {
-    const { createSupermemoryTools } = require("@supermemory/tools/ai-sdk");
-    supermemoryTools = createSupermemoryTools(process.env.SUPERMEMORY_API_KEY, {});
-  }
-} catch (e) {
-  console.log("Supermemory not configured - memory tools disabled");
-}
+// Note: Supermemory tools are disabled to preserve proper type inference for the Agent
+// If you need supermemory, you'll need to properly type the tools or add them separately
+// let supermemoryTools = {};
+// try {
+//   if (process.env.SUPERMEMORY_API_KEY) {
+//     const { createSupermemoryTools } = require("@supermemory/tools/ai-sdk");
+//     supermemoryTools = createSupermemoryTools(process.env.SUPERMEMORY_API_KEY, {});
+//   }
+// } catch (e) {
+//   console.log("Supermemory not configured - memory tools disabled");
+// }
 
 // =============================================================================
 // Custom Tools
@@ -93,198 +97,261 @@ try {
  * Look up a contact by name
  */
 const lookupContact = createTool({
-  description: "Look up a contact by name to find their details (phone, email, Instagram, WhatsApp, etc.)",
+  description:
+    'Look up a contact by name to find their details (phone, email, Instagram, WhatsApp, etc.)',
   args: z.object({
-    name: z.string().describe("The name to search for (first name, last name, or both)"),
+    name: z
+      .string()
+      .describe('The name to search for (first name, last name, or both)'),
   }),
   handler: async (ctx, args) => {
     const contacts = await ctx.runQuery(internalRef.agentChat.searchContacts, {
       query: args.name,
-    });
+    })
     if (contacts.length === 0) {
-      return { found: false, message: `No contacts found matching "${args.name}"` };
+      return {
+        found: false,
+        message: `No contacts found matching "${args.name}"`,
+      }
     }
-    return { found: true, contacts };
+    return { found: true, contacts }
   },
-});
+})
 
 /**
  * Create a pending action that requires user approval
  */
 const createPendingAction = createTool({
-  description: "Create a pending action that requires user approval before execution. Use this for any action that modifies data or sends messages.",
+  description:
+    'Create a pending action that requires user approval before execution. Use this for any action that modifies data or sends messages.',
   args: z.object({
-    actionType: z.enum([
-      "message_contact",
-      "create_todo",
-      "create_reminder",
-      "add_to_note",
-      "schedule_task",
-      "other"
-    ]).describe("The type of action to create"),
-    title: z.string().describe("Short title describing the action"),
-    description: z.string().optional().describe("Detailed description of what the action will do"),
-    actionData: z.any().describe("Action-specific data (e.g., contact info, todo text, reminder time)"),
+    actionType: z
+      .enum([
+        'message_contact',
+        'create_todo',
+        'create_reminder',
+        'add_to_note',
+        'schedule_task',
+        'other',
+      ])
+      .describe('The type of action to create'),
+    title: z.string().describe('Short title describing the action'),
+    description: z
+      .string()
+      .optional()
+      .describe('Detailed description of what the action will do'),
+    actionData: z
+      .any()
+      .describe(
+        'Action-specific data (e.g., contact info, todo text, reminder time)',
+      ),
   }),
   handler: async (ctx, args) => {
-    const result = await ctx.runMutation(internalRef.agentChat.insertPendingAction, {
-      threadId: ctx.threadId!,
-      messageId: ctx.messageId,
-      actionType: args.actionType,
-      title: args.title,
-      description: args.description,
-      actionData: args.actionData,
-    });
+    const result = await ctx.runMutation(
+      internalRef.agentChat.insertPendingAction,
+      {
+        threadId: ctx.threadId!,
+        messageId: ctx.messageId,
+        actionType: args.actionType,
+        title: args.title,
+        description: args.description,
+        actionData: args.actionData,
+      },
+    )
     return {
       success: true,
       message: `Created pending action: ${args.title}. User will need to approve this before it executes.`,
       actionId: result.actionId,
-    };
+    }
   },
-});
+})
 
 /**
  * Create a todo item immediately
  */
 const createTodo = createTool({
-  description: "Create a todo item immediately without requiring approval. Use for simple, low-risk tasks.",
+  description:
+    'Create a todo item immediately without requiring approval. Use for simple, low-risk tasks.',
   args: z.object({
-    text: z.string().describe("The todo item text"),
-    documentId: z.string().optional().describe("Optional: specific todo document to add to"),
+    text: z.string().describe('The todo item text'),
+    documentId: z
+      .string()
+      .optional()
+      .describe('Optional: specific todo document to add to'),
   }),
   handler: async (ctx, args) => {
     const result = await ctx.runMutation(internalRef.agentChat.createTodoItem, {
       text: args.text,
       documentId: args.documentId,
-    });
+    })
     return {
       success: true,
       message: `Created todo: "${args.text}"`,
       todoId: result.todoId,
-    };
+    }
   },
-});
+})
 
 /**
  * Search recent messages for a contact
  */
 const searchContactMessages = createTool({
-  description: "Search recent messages from a specific contact to understand context for a reply",
+  description:
+    'Search recent messages from a specific contact to understand context for a reply',
   args: z.object({
-    contactName: z.string().describe("Name of the contact to search messages for"),
-    limit: z.number().optional().describe("Maximum number of messages to return (default 10)"),
+    contactName: z
+      .string()
+      .describe('Name of the contact to search messages for'),
+    limit: z
+      .number()
+      .optional()
+      .describe('Maximum number of messages to return (default 10)'),
   }),
   handler: async (ctx, args) => {
-    const messages = await ctx.runQuery(internalRef.agentChat.getContactMessages, {
-      contactName: args.contactName,
-      limit: args.limit ?? 10,
-    });
-    return messages;
+    const messages = await ctx.runQuery(
+      internalRef.agentChat.getContactMessages,
+      {
+        contactName: args.contactName,
+        limit: args.limit ?? 10,
+      },
+    )
+    return messages
   },
-});
+})
 
 /**
  * List recent pending actions
  */
 const listPendingActions = createTool({
-  description: "List pending actions that are awaiting user approval",
+  description: 'List pending actions that are awaiting user approval',
   args: z.object({
-    limit: z.number().optional().describe("Maximum number of actions to return (default 10)"),
+    limit: z
+      .number()
+      .optional()
+      .describe('Maximum number of actions to return (default 10)'),
   }),
   handler: async (ctx, args) => {
-    const actions = await ctx.runQuery(internalRef.agentChat.getPendingActions, {
-      threadId: ctx.threadId!,
-      limit: args.limit ?? 10,
-    });
-    return actions;
+    const actions = await ctx.runQuery(
+      internalRef.agentChat.getPendingActions,
+      {
+        threadId: ctx.threadId!,
+        limit: args.limit ?? 10,
+      },
+    )
+    return actions
   },
-});
+})
 
 /**
  * Get current date and time context
  */
 const getCurrentContext = createTool({
-  description: "Get the current date, time, and any relevant context for planning",
+  description:
+    'Get the current date, time, and any relevant context for planning',
   args: z.object({}),
   handler: async (ctx) => {
-    const context = await ctx.runQuery(internalRef.agentChat.getDailyContext, {});
-    return context;
+    const context = await ctx.runQuery(
+      internalRef.agentChat.getDailyContext,
+      {},
+    )
+    return context
   },
-});
+})
 
 /**
  * Get today's calendar events
  */
 const getCalendarEvents = createTool({
-  description: "Get calendar events for today or a specific date",
+  description: 'Get calendar events for today or a specific date',
   args: z.object({
-    date: z.string().optional().describe("Date in YYYY-MM-DD format. Defaults to today."),
+    date: z
+      .string()
+      .optional()
+      .describe('Date in YYYY-MM-DD format. Defaults to today.'),
   }),
   handler: async (ctx, args) => {
     const events = await ctx.runQuery(internalRef.agentChat.getCalendarEvents, {
       date: args.date,
-    });
-    return events;
+    })
+    return events
   },
-});
+})
 
 /**
  * Get today's plan
  */
 const getTodayPlan = createTool({
-  description: "Get the current day's plan including scheduled blocks, tasks, and adhoc items",
+  description:
+    "Get the current day's plan including scheduled blocks, tasks, and adhoc items",
   args: z.object({}),
   handler: async (ctx) => {
-    const plan = await ctx.runQuery(internalRef.agentChat.getTodayPlanSummary, {});
-    return plan;
+    const plan = await ctx.runQuery(
+      internalRef.agentChat.getTodayPlanSummary,
+      {},
+    )
+    return plan
   },
-});
+})
 
 /**
  * Add an adhoc task to today's plan
  */
 const addAdhocTask = createTool({
-  description: "Add an adhoc task to today's plan that needs to be done but isn't scheduled in a specific block",
+  description:
+    "Add an adhoc task to today's plan that needs to be done but isn't scheduled in a specific block",
   args: z.object({
-    text: z.string().describe("The task description"),
-    priority: z.enum(["high", "medium", "low"]).optional().describe("Task priority (default: medium)"),
+    text: z.string().describe('The task description'),
+    priority: z
+      .enum(['high', 'medium', 'low'])
+      .optional()
+      .describe('Task priority (default: medium)'),
   }),
   handler: async (ctx, args) => {
-    const result = await ctx.runMutation(internalRef.agentChat.addAdhocTaskToday, {
-      text: args.text,
-      priority: args.priority ?? "medium",
-    });
-    return result;
+    const result = await ctx.runMutation(
+      internalRef.agentChat.addAdhocTaskToday,
+      {
+        text: args.text,
+        priority: args.priority ?? 'medium',
+      },
+    )
+    return result
   },
-});
+})
 
 /**
  * List active projects
  */
 const listProjects = createTool({
-  description: "List all active projects to understand what the user is working on",
+  description:
+    'List all active projects to understand what the user is working on',
   args: z.object({}),
   handler: async (ctx) => {
-    const projects = await ctx.runQuery(internalRef.agentChat.getActiveProjects, {});
-    return projects;
+    const projects = await ctx.runQuery(
+      internalRef.agentChat.getActiveProjects,
+      {},
+    )
+    return projects
   },
-});
+})
 
 /**
  * List notes/documents
  */
 const listNotes = createTool({
-  description: "List available note documents to see where tasks can be added",
+  description: 'List available note documents to see where tasks can be added',
   args: z.object({
-    limit: z.number().optional().describe("Maximum number of notes to return (default 10)"),
+    limit: z
+      .number()
+      .optional()
+      .describe('Maximum number of notes to return (default 10)'),
   }),
   handler: async (ctx, args) => {
     const notes = await ctx.runQuery(internalRef.agentChat.getRecentNotes, {
       limit: args.limit ?? 10,
-    });
-    return notes;
+    })
+    return notes
   },
-});
+})
 
 // =============================================================================
 // Agent Instructions
@@ -339,62 +406,47 @@ const agentInstructions = `You are Joshua's personal AI assistant. Your role is 
 You have access to long-term memory across conversations. Use it to:
 - Remember important details about contacts and preferences
 - Recall past decisions and context
-- Store useful information for future reference`;
+- Store useful information for future reference`
 
 // =============================================================================
-// Agent Definition (Default)
+// Shared Tools Configuration
 // =============================================================================
 
-// Default agent uses the settings default model
-// For dynamic model selection, use createAgentWithModel()
-// Note: components.agent may not be typed until `npx convex dev` is run
-export const chatAgent = new Agent((components as any).agent, {
-  name: "PersonalAssistant",
-  languageModel: createModelFromId(getDefaultModelId()),
-  textEmbeddingModel: openai.embedding("text-embedding-3-small"),
-  instructions: agentInstructions,
-  tools: {
-    lookupContact,
-    createPendingAction,
-    createTodo,
-    searchContactMessages,
-    listPendingActions,
-    getCurrentContext,
-    getCalendarEvents,
-    getTodayPlan,
-    addAdhocTask,
-    listProjects,
-    listNotes,
-    ...supermemoryTools,
-  },
-});
+const agentTools = {
+  lookupContact,
+  createPendingAction,
+  createTodo,
+  searchContactMessages,
+  listPendingActions,
+  getCurrentContext,
+  getCalendarEvents,
+  getTodayPlan,
+  addAdhocTask,
+  listProjects,
+  listNotes,
+}
+
+// =============================================================================
+// Agent Factory (Dynamic Model Selection)
+// =============================================================================
 
 /**
- * Create an agent with a specific model and optional custom instructions
- * Use this when you need to use a different model than the default
+ * Create an agent with a specific model
+ * This is the recommended pattern for dynamic model selection per the Convex Agent docs
  */
-export function createAgentWithModel(modelId: string, customInstructions?: string) {
-  return new Agent((components as any).agent, {
-    name: "PersonalAssistant",
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function createAgentWithModel(modelId: string): any {
+  return new Agent(components.agent, {
+    name: 'PersonalAssistant',
     languageModel: createModelFromId(modelId),
-    textEmbeddingModel: openai.embedding("text-embedding-3-small"),
-    instructions: customInstructions || agentInstructions,
-    tools: {
-      lookupContact,
-      createPendingAction,
-      createTodo,
-      searchContactMessages,
-      listPendingActions,
-      getCurrentContext,
-      getCalendarEvents,
-      getTodayPlan,
-      addAdhocTask,
-      listProjects,
-      listNotes,
-      ...supermemoryTools,
-    },
-  });
+    textEmbeddingModel: openai.embedding('text-embedding-3-small'),
+    instructions: agentInstructions,
+    tools: agentTools,
+  })
 }
+
+// Default agent instance for cases where the default model is sufficient
+export const chatAgent = createAgentWithModel(getDefaultModelId())
 
 // =============================================================================
 // Internal Queries and Mutations for Tools
@@ -406,35 +458,36 @@ export function createAgentWithModel(modelId: string, customInstructions?: strin
 export const searchContacts = internalQuery({
   args: { query: v.string() },
   handler: async (ctx, args) => {
-    const allContacts = await ctx.db.query("contacts").collect();
-    const query = args.query.toLowerCase();
+    const allContacts = await ctx.db.query('contacts').collect()
+    const query = args.query.toLowerCase()
 
     const matches = allContacts.filter((contact) => {
-      const firstName = contact.firstName?.toLowerCase() || "";
-      const lastName = contact.lastName?.toLowerCase() || "";
-      const fullName = `${firstName} ${lastName}`.trim();
-      const setName = contact.setName?.toLowerCase() || "";
+      const firstName = contact.firstName?.toLowerCase() || ''
+      const lastName = contact.lastName?.toLowerCase() || ''
+      const fullName = `${firstName} ${lastName}`.trim()
+      const setName = contact.setName?.toLowerCase() || ''
 
       return (
         firstName.includes(query) ||
         lastName.includes(query) ||
         fullName.includes(query) ||
         setName.includes(query)
-      );
-    });
+      )
+    })
 
     return matches.slice(0, 5).map((c) => ({
       id: c._id,
       firstName: c.firstName,
       lastName: c.lastName,
-      displayName: c.setName || `${c.firstName || ""} ${c.lastName || ""}`.trim(),
+      displayName:
+        c.setName || `${c.firstName || ''} ${c.lastName || ''}`.trim(),
       instagram: c.instagram,
       whatsapp: c.whatsapp,
       phones: c.phones?.map((p) => p.phone) || [],
       emails: c.emails?.map((e) => e.email) || [],
-    }));
+    }))
   },
-});
+})
 
 /**
  * Insert a pending action
@@ -444,31 +497,31 @@ export const insertPendingAction = internalMutation({
     threadId: v.string(),
     messageId: v.optional(v.string()),
     actionType: v.union(
-      v.literal("message_contact"),
-      v.literal("create_todo"),
-      v.literal("create_reminder"),
-      v.literal("add_to_note"),
-      v.literal("schedule_task"),
-      v.literal("other")
+      v.literal('message_contact'),
+      v.literal('create_todo'),
+      v.literal('create_reminder'),
+      v.literal('add_to_note'),
+      v.literal('schedule_task'),
+      v.literal('other'),
     ),
     title: v.string(),
     description: v.optional(v.string()),
     actionData: v.any(),
   },
   handler: async (ctx, args) => {
-    const actionId = await ctx.db.insert("agentPendingActions", {
+    const actionId = await ctx.db.insert('agentPendingActions', {
       threadId: args.threadId,
       messageId: args.messageId,
       actionType: args.actionType,
       title: args.title,
       description: args.description,
       actionData: args.actionData,
-      status: "pending",
+      status: 'pending',
       createdAt: Date.now(),
-    });
-    return { actionId };
+    })
+    return { actionId }
   },
-});
+})
 
 /**
  * Create a todo item
@@ -479,35 +532,38 @@ export const createTodoItem = internalMutation({
     documentId: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    let docId = args.documentId;
+    let docId = args.documentId
 
     if (!docId) {
       const existingDoc = await ctx.db
-        .query("todoDocuments")
-        .filter((q) => q.eq(q.field("title"), "Quick Tasks"))
-        .first();
+        .query('todoDocuments')
+        .filter((q) => q.eq(q.field('title'), 'Quick Tasks'))
+        .first()
 
       if (existingDoc) {
-        docId = existingDoc._id;
+        docId = existingDoc._id
       } else {
-        docId = await ctx.db.insert("todoDocuments", {
-          title: "Quick Tasks",
-          content: "[]",
+        docId = await ctx.db.insert('todoDocuments', {
+          title: 'Quick Tasks',
+          content: '[]',
           todoCount: 0,
           completedCount: 0,
           createdAt: Date.now(),
           updatedAt: Date.now(),
-        });
+        })
       }
     }
 
     const existingItems = await ctx.db
-      .query("todoItems")
-      .withIndex("by_document", (q) => q.eq("documentId", docId as any))
-      .collect();
-    const maxOrder = existingItems.reduce((max, item) => Math.max(max, item.order), -1);
+      .query('todoItems')
+      .withIndex('by_document', (q) => q.eq('documentId', docId as any))
+      .collect()
+    const maxOrder = existingItems.reduce(
+      (max, item) => Math.max(max, item.order),
+      -1,
+    )
 
-    const todoId = await ctx.db.insert("todoItems", {
+    const todoId = await ctx.db.insert('todoItems', {
       documentId: docId as any,
       text: args.text,
       isCompleted: false,
@@ -515,16 +571,16 @@ export const createTodoItem = internalMutation({
       nodeId: `node-${Date.now()}`,
       createdAt: Date.now(),
       updatedAt: Date.now(),
-    });
+    })
 
     await ctx.db.patch(docId as any, {
       todoCount: existingItems.filter((i) => !i.isCompleted).length + 1,
       updatedAt: Date.now(),
-    });
+    })
 
-    return { todoId };
+    return { todoId }
   },
-});
+})
 
 /**
  * Get messages from a specific contact
@@ -535,60 +591,65 @@ export const getContactMessages = internalQuery({
     limit: v.number(),
   },
   handler: async (ctx, args) => {
-    const allContacts = await ctx.db.query("contacts").collect();
-    const query = args.contactName.toLowerCase();
+    const allContacts = await ctx.db.query('contacts').collect()
+    const query = args.contactName.toLowerCase()
 
     const matchedContact = allContacts.find((contact) => {
-      const firstName = contact.firstName?.toLowerCase() || "";
-      const lastName = contact.lastName?.toLowerCase() || "";
-      const fullName = `${firstName} ${lastName}`.trim();
+      const firstName = contact.firstName?.toLowerCase() || ''
+      const lastName = contact.lastName?.toLowerCase() || ''
+      const fullName = `${firstName} ${lastName}`.trim()
       return (
         firstName.includes(query) ||
         lastName.includes(query) ||
         fullName.includes(query)
-      );
-    });
+      )
+    })
 
     if (!matchedContact) {
-      return { found: false, message: `No contact found matching "${args.contactName}"` };
+      return {
+        found: false,
+        message: `No contact found matching "${args.contactName}"`,
+      }
     }
 
     const chats = await ctx.db
-      .query("beeperChats")
-      .withIndex("by_contact", (q) => q.eq("contactId", matchedContact._id))
-      .collect();
+      .query('beeperChats')
+      .withIndex('by_contact', (q) => q.eq('contactId', matchedContact._id))
+      .collect()
 
     if (chats.length === 0) {
       return {
         found: true,
         contact: {
-          name: `${matchedContact.firstName || ""} ${matchedContact.lastName || ""}`.trim(),
+          name: `${matchedContact.firstName || ''} ${matchedContact.lastName || ''}`.trim(),
         },
         messages: [],
-        message: "No chat history found for this contact",
-      };
+        message: 'No chat history found for this contact',
+      }
     }
 
-    const allMessages = [];
+    const allMessages = []
     for (const chat of chats) {
       const messages = await ctx.db
-        .query("beeperMessages")
-        .withIndex("by_chat", (q) => q.eq("chatId", chat.chatId))
-        .order("desc")
-        .take(args.limit);
-      allMessages.push(...messages.map((m) => ({
-        ...m,
-        network: chat.network,
-        chatTitle: chat.title,
-      })));
+        .query('beeperMessages')
+        .withIndex('by_chat', (q) => q.eq('chatId', chat.chatId))
+        .order('desc')
+        .take(args.limit)
+      allMessages.push(
+        ...messages.map((m) => ({
+          ...m,
+          network: chat.network,
+          chatTitle: chat.title,
+        })),
+      )
     }
 
-    allMessages.sort((a, b) => b.timestamp - a.timestamp);
+    allMessages.sort((a, b) => b.timestamp - a.timestamp)
 
     return {
       found: true,
       contact: {
-        name: `${matchedContact.firstName || ""} ${matchedContact.lastName || ""}`.trim(),
+        name: `${matchedContact.firstName || ''} ${matchedContact.lastName || ''}`.trim(),
       },
       messages: allMessages.slice(0, args.limit).map((m) => ({
         text: m.text,
@@ -596,9 +657,9 @@ export const getContactMessages = internalQuery({
         timestamp: m.timestamp,
         network: m.network,
       })),
-    };
+    }
   },
-});
+})
 
 /**
  * Get pending actions for a thread
@@ -610,12 +671,12 @@ export const getPendingActions = internalQuery({
   },
   handler: async (ctx, args) => {
     const actions = await ctx.db
-      .query("agentPendingActions")
-      .withIndex("by_thread_status", (q) =>
-        q.eq("threadId", args.threadId).eq("status", "pending")
+      .query('agentPendingActions')
+      .withIndex('by_thread_status', (q) =>
+        q.eq('threadId', args.threadId).eq('status', 'pending'),
       )
-      .order("desc")
-      .take(args.limit);
+      .order('desc')
+      .take(args.limit)
 
     return actions.map((a) => ({
       id: a._id,
@@ -623,9 +684,9 @@ export const getPendingActions = internalQuery({
       title: a.title,
       description: a.description,
       createdAt: a.createdAt,
-    }));
+    }))
   },
-});
+})
 
 /**
  * Get daily context for AI
@@ -633,30 +694,33 @@ export const getPendingActions = internalQuery({
 export const getDailyContext = internalQuery({
   args: {},
   handler: async (ctx) => {
-    const now = new Date();
-    const today = now.toISOString().split("T")[0];
+    const now = new Date()
+    const today = now.toISOString().split('T')[0]
 
     const todayPlan = await ctx.db
-      .query("todayPlans")
-      .withIndex("by_date", (q) => q.eq("date", today))
-      .first();
+      .query('todayPlans')
+      .withIndex('by_date', (q) => q.eq('date', today))
+      .first()
 
     const dailyContext = await ctx.db
-      .query("dailyContext")
-      .withIndex("by_date", (q) => q.eq("date", today))
-      .first();
+      .query('dailyContext')
+      .withIndex('by_date', (q) => q.eq('date', today))
+      .first()
 
     return {
       date: today,
-      dayOfWeek: now.toLocaleDateString("en-US", { weekday: "long" }),
-      time: now.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }),
+      dayOfWeek: now.toLocaleDateString('en-US', { weekday: 'long' }),
+      time: now.toLocaleTimeString('en-US', {
+        hour: 'numeric',
+        minute: '2-digit',
+      }),
       hasPlan: !!todayPlan,
       energy: dailyContext?.inferredEnergy,
       focus: dailyContext?.inferredFocus,
       morningContext: dailyContext?.morningContext,
-    };
+    }
   },
-});
+})
 
 /**
  * Get calendar events (internal query for tools)
@@ -664,32 +728,38 @@ export const getDailyContext = internalQuery({
 export const getCalendarEventsInternal = internalQuery({
   args: { date: v.optional(v.string()) },
   handler: async (ctx, args) => {
-    const targetDate = args.date || new Date().toISOString().split("T")[0];
+    const targetDate = args.date || new Date().toISOString().split('T')[0]
 
     // Get events for the target date
-    const startOfDay = new Date(targetDate + "T00:00:00").getTime();
-    const endOfDay = new Date(targetDate + "T23:59:59").getTime();
+    const startOfDay = new Date(targetDate + 'T00:00:00').getTime()
+    const endOfDay = new Date(targetDate + 'T23:59:59').getTime()
 
     const events = await ctx.db
-      .query("calendarEvents")
-      .withIndex("by_start_time")
+      .query('calendarEvents')
+      .withIndex('by_start_time')
       .filter((q) =>
         q.and(
-          q.gte(q.field("startTime"), startOfDay),
-          q.lte(q.field("startTime"), endOfDay)
-        )
+          q.gte(q.field('startTime'), startOfDay),
+          q.lte(q.field('startTime'), endOfDay),
+        ),
       )
-      .collect();
+      .collect()
 
     return events.map((e) => ({
       title: e.summary,
-      startTime: new Date(e.startTime).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }),
-      endTime: new Date(e.endTime).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }),
+      startTime: new Date(e.startTime).toLocaleTimeString('en-US', {
+        hour: 'numeric',
+        minute: '2-digit',
+      }),
+      endTime: new Date(e.endTime).toLocaleTimeString('en-US', {
+        hour: 'numeric',
+        minute: '2-digit',
+      }),
       location: e.location,
       description: e.description,
-    }));
+    }))
   },
-});
+})
 
 /**
  * Get today's plan summary
@@ -697,28 +767,28 @@ export const getCalendarEventsInternal = internalQuery({
 export const getTodayPlanSummary = internalQuery({
   args: {},
   handler: async (ctx) => {
-    const today = new Date().toISOString().split("T")[0];
+    const today = new Date().toISOString().split('T')[0]
 
     const todayPlan = await ctx.db
-      .query("todayPlans")
-      .withIndex("by_date", (q) => q.eq("date", today))
-      .first();
+      .query('todayPlans')
+      .withIndex('by_date', (q) => q.eq('date', today))
+      .first()
 
     if (!todayPlan) {
-      return { hasPlan: false, message: "No plan created for today" };
+      return { hasPlan: false, message: 'No plan created for today' }
     }
 
     // Get adhoc items
     const adhocItems = await ctx.db
-      .query("adhocItems")
-      .withIndex("by_plan", (q) => q.eq("planId", todayPlan._id))
-      .collect();
+      .query('adhocItems')
+      .withIndex('by_plan', (q) => q.eq('planId', todayPlan._id))
+      .collect()
 
     // Get daily context for additional info (morningContext is stored there)
     const dailyContext = await ctx.db
-      .query("dailyContext")
-      .withIndex("by_date", (q) => q.eq("date", today))
-      .first();
+      .query('dailyContext')
+      .withIndex('by_date', (q) => q.eq('date', today))
+      .first()
 
     return {
       hasPlan: true,
@@ -728,9 +798,9 @@ export const getTodayPlanSummary = internalQuery({
         text: item.text,
         isCompleted: item.isCompleted,
       })),
-    };
+    }
   },
-});
+})
 
 /**
  * Add adhoc task to today's plan
@@ -741,42 +811,49 @@ export const addAdhocTaskToday = internalMutation({
     priority: v.string(),
   },
   handler: async (ctx, args) => {
-    const today = new Date().toISOString().split("T")[0];
+    const today = new Date().toISOString().split('T')[0]
 
     let todayPlan = await ctx.db
-      .query("todayPlans")
-      .withIndex("by_date", (q) => q.eq("date", today))
-      .first();
+      .query('todayPlans')
+      .withIndex('by_date', (q) => q.eq('date', today))
+      .first()
 
     if (!todayPlan) {
       // Create a basic plan
-      const planId = await ctx.db.insert("todayPlans", {
+      const planId = await ctx.db.insert('todayPlans', {
         date: today,
         freeBlocks: [],
         createdAt: Date.now(),
         updatedAt: Date.now(),
-      });
-      todayPlan = await ctx.db.get(planId);
+      })
+      todayPlan = await ctx.db.get(planId)
     }
 
     // Get existing adhoc items to determine order
     const existingAdhoc = await ctx.db
-      .query("adhocItems")
-      .withIndex("by_plan", (q) => q.eq("planId", todayPlan!._id))
-      .collect();
-    const maxOrder = existingAdhoc.reduce((max, item) => Math.max(max, item.order), -1);
+      .query('adhocItems')
+      .withIndex('by_plan', (q) => q.eq('planId', todayPlan!._id))
+      .collect()
+    const maxOrder = existingAdhoc.reduce(
+      (max, item) => Math.max(max, item.order),
+      -1,
+    )
 
-    const adhocId = await ctx.db.insert("adhocItems", {
+    const adhocId = await ctx.db.insert('adhocItems', {
       planId: todayPlan!._id,
       text: args.text,
       isCompleted: false,
       order: maxOrder + 1,
       createdAt: Date.now(),
-    });
+    })
 
-    return { success: true, adhocId, message: `Added "${args.text}" to today's plan` };
+    return {
+      success: true,
+      adhocId,
+      message: `Added "${args.text}" to today's plan`,
+    }
   },
-});
+})
 
 /**
  * Get active projects
@@ -785,18 +862,18 @@ export const getActiveProjects = internalQuery({
   args: {},
   handler: async (ctx) => {
     const projects = await ctx.db
-      .query("projects")
-      .filter((q) => q.eq(q.field("isActive"), true))
-      .collect();
+      .query('projects')
+      .filter((q) => q.eq(q.field('isActive'), true))
+      .collect()
 
     return projects.map((p) => ({
       id: p._id,
       name: p.name,
       hubstaffProjectName: p.hubstaffProjectName,
       linearTeamName: p.linearTeamName,
-    }));
+    }))
   },
-});
+})
 
 /**
  * Get recent notes
@@ -805,9 +882,9 @@ export const getRecentNotes = internalQuery({
   args: { limit: v.number() },
   handler: async (ctx, args) => {
     const notes = await ctx.db
-      .query("todoDocuments")
-      .order("desc")
-      .take(args.limit);
+      .query('todoDocuments')
+      .order('desc')
+      .take(args.limit)
 
     return notes.map((n) => ({
       id: n._id,
@@ -815,9 +892,9 @@ export const getRecentNotes = internalQuery({
       todoCount: n.todoCount,
       completedCount: n.completedCount,
       updatedAt: n.updatedAt,
-    }));
+    }))
   },
-});
+})
 
 // =============================================================================
 // Public Queries for Frontend
@@ -830,49 +907,49 @@ export const listPendingActionsForThread = query({
   args: { threadId: v.string() },
   handler: async (ctx, args) => {
     const actions = await ctx.db
-      .query("agentPendingActions")
-      .withIndex("by_thread", (q) => q.eq("threadId", args.threadId))
-      .order("desc")
-      .collect();
+      .query('agentPendingActions')
+      .withIndex('by_thread', (q) => q.eq('threadId', args.threadId))
+      .order('desc')
+      .collect()
 
-    return actions;
+    return actions
   },
-});
+})
 
 /**
  * Approve a pending action
  */
 export const approvePendingAction = mutation({
-  args: { actionId: v.id("agentPendingActions") },
+  args: { actionId: v.id('agentPendingActions') },
   handler: async (ctx, args) => {
-    const action = await ctx.db.get(args.actionId);
-    if (!action) throw new Error("Action not found");
-    if (action.status !== "pending") throw new Error("Action is not pending");
+    const action = await ctx.db.get(args.actionId)
+    if (!action) throw new Error('Action not found')
+    if (action.status !== 'pending') throw new Error('Action is not pending')
 
     await ctx.db.patch(args.actionId, {
-      status: "approved",
-    });
+      status: 'approved',
+    })
 
     // TODO: Trigger action execution based on actionType
 
-    return { success: true };
+    return { success: true }
   },
-});
+})
 
 /**
  * Reject a pending action
  */
 export const rejectPendingAction = mutation({
-  args: { actionId: v.id("agentPendingActions") },
+  args: { actionId: v.id('agentPendingActions') },
   handler: async (ctx, args) => {
-    const action = await ctx.db.get(args.actionId);
-    if (!action) throw new Error("Action not found");
-    if (action.status !== "pending") throw new Error("Action is not pending");
+    const action = await ctx.db.get(args.actionId)
+    if (!action) throw new Error('Action not found')
+    if (action.status !== 'pending') throw new Error('Action is not pending')
 
     await ctx.db.patch(args.actionId, {
-      status: "rejected",
-    });
+      status: 'rejected',
+    })
 
-    return { success: true };
+    return { success: true }
   },
-});
+})

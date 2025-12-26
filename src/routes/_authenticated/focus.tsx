@@ -6,7 +6,6 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
 import { FullWidthContent } from '@/components/layout/full-width-content'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import {
@@ -19,7 +18,6 @@ import {
   Calendar,
   ExternalLink,
   ArrowLeft,
-  Zap,
   Target,
   Maximize2,
   Minimize2,
@@ -242,7 +240,7 @@ function UpNextPanel({ planId }: { planId?: Id<"todayPlans"> }) {
   // Filter for future/assigned tasks only
   const upcoming = assignments
     .filter(a => a.status === 'assigned' || a.status === 'suggested')
-    .sort((a, b) => 0) // Keep implicit order
+    .sort(() => 0) // Keep implicit order
 
   if (upcoming.length === 0) {
     return (
@@ -396,7 +394,7 @@ function NoActiveSession({ onStartSession, isLoading }: { onStartSession: () => 
 // Complete Dialog
 // ==========================================
 
-function SessionComplete({ taskTitle, onDone, onPartial, resultNote, setResultNote }: any) {
+function SessionComplete({ taskTitle, onDone, onPartial }: any) {
   return (
     <div className="max-w-md w-full mx-auto text-center animate-in zoom-in-95 duration-300">
       <div className="w-20 h-20 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center mx-auto mb-8">

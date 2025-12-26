@@ -3,7 +3,7 @@ import { v } from "convex/values";
 import { experimental_transcribe as transcribe } from "ai";
 import { openai } from "@ai-sdk/openai";
 import { internal } from "./_generated/api";
-import { chatAgent } from "./agentChat";
+import { createAgentWithModel, getDefaultModelId } from "./agentChat";
 
 // Type assertion for internal references that may not be in generated types yet
 // Run `npx convex dev` to regenerate types after adding new files
@@ -132,11 +132,43 @@ export const processTranscription = internalAction({
     transcription: v.string(),
   },
   handler: async (ctx, args) => {
-    // Generate response from agent with streaming
-    // Type assertion needed due to AI SDK version conflicts
-    await (chatAgent as any).streamText(
+    // Get thread info to find the agent thread ID
+    const threadInfo = await ctx.runQuery(internalRef.chat.getThreadInfo, {
+      threadId: args.threadId,
+    });
+
+    if (!threadInfo) {
+      console.error(`[voiceNotes:processTranscription] Thread not found: ${args.threadId}`);
+      return;
+    }
+
+    // Get the model ID from thread or default
+    const modelId = threadInfo.modelId || getDefaultModelId();
+    const agent = createAgentWithModel(modelId);
+
+    // Determine the agent thread ID - create one if needed
+    let agentThreadId = threadInfo.agentThreadId;
+
+    if (!agentThreadId) {
+      console.log(`[voiceNotes:processTranscription] Creating new agent thread...`);
+      const { threadId: newAgentThreadId } = await agent.createThread(ctx, {
+        userId: threadInfo.userId,
+      });
+      agentThreadId = newAgentThreadId;
+
+      // Store the agent thread ID in our table
+      if (threadInfo._id) {
+        await ctx.runMutation(internalRef.chat.updateAgentThreadId, {
+          threadId: threadInfo._id,
+          agentThreadId,
+        });
+      }
+    }
+
+    // Generate response from agent with streaming using the correct agent thread ID
+    await agent.streamText(
       ctx,
-      { threadId: args.threadId },
+      { threadId: agentThreadId },
       {
         prompt: `[Voice Note Transcription]\n\n${args.transcription}\n\nPlease process this voice note and extract any actions, reminders, or tasks mentioned.`,
       },

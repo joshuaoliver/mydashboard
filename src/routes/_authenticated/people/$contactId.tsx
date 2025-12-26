@@ -7,11 +7,11 @@ import { api } from '../../../../convex/_generated/api'
 import { ArrowLeft, Mail, Phone, Instagram, Calendar, ExternalLink, User as UserIcon, Clock } from 'lucide-react'
 import type { Id } from '../../../../convex/_generated/dataModel'
 
-export const Route = createFileRoute('/_authenticated/contacts/$contactId')({
-  component: ContactDetailPage,
+export const Route = createFileRoute('/_authenticated/people/$contactId')({
+  component: PeopleContactDetailPage,
 })
 
-function ContactDetailPage() {
+function PeopleContactDetailPage() {
   const { contactId } = Route.useParams()
   const { data: contact } = useQuery(convexQuery(api.dexQueries.getContactById, { contactId: contactId as Id<'contacts'> }))
 

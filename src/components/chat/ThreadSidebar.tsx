@@ -1,12 +1,21 @@
-import { useQuery, useMutation } from "convex/react";
-import { api } from "../../../convex/_generated/api";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Plus, MessageSquare, Trash2, Pencil, Search, Check, X } from "lucide-react";
-import { cn } from "~/lib/utils";
-import { formatDistanceToNow } from "~/lib/utils";
-import { useState, useRef, useEffect, useMemo } from "react";
+import { useQuery, useMutation } from 'convex/react'
+import { api } from '../../../convex/_generated/api'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import {
+  Plus,
+  MessageSquare,
+  Trash2,
+  Pencil,
+  Search,
+  Check,
+  X,
+  Wrench,
+} from 'lucide-react'
+import { cn } from '~/lib/utils'
+import { formatDistanceToNow } from '~/lib/utils'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -16,103 +25,124 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import type { Id } from "../../../convex/_generated/dataModel";
+} from '@/components/ui/alert-dialog'
+import type { Id } from '../../../convex/_generated/dataModel'
 
 // Type assertion for API references not yet in generated types
 // Run `npx convex dev` to regenerate types after adding new files
-const chatApi = (api as any).chat;
+const chatApi = (api as any).chat
 
 interface Thread {
-  id: { toString(): string };
-  title: string;
-  lastMessageAt?: number;
+  id: { toString(): string }
+  title: string
+  lastMessageAt?: number
 }
 
 interface ThreadSidebarProps {
-  selectedThreadId: string | null;
-  onSelectThread: (threadId: string) => void;
+  selectedThreadId: string | null
+  onSelectThread: (threadId: string) => void
+  onThreadCreated?: (threadId: string) => void
 }
 
 export function ThreadSidebar({
   selectedThreadId,
   onSelectThread,
+  onThreadCreated,
 }: ThreadSidebarProps) {
-  const threads = useQuery(chatApi.listThreads);
-  const createThread = useMutation(chatApi.createThread);
-  const deleteThread = useMutation(chatApi.deleteThread);
-  const updateThreadTitle = useMutation(chatApi.updateThreadTitle);
-  const [threadToDelete, setThreadToDelete] = useState<string | null>(null);
-  const [editingThreadId, setEditingThreadId] = useState<string | null>(null);
-  const [editingTitle, setEditingTitle] = useState("");
-  const [searchTerm, setSearchTerm] = useState("");
-  const editInputRef = useRef<HTMLInputElement>(null);
+  const threads = useQuery(chatApi.listThreads)
+  const createThread = useMutation(chatApi.createThread)
+  const deleteThread = useMutation(chatApi.deleteThread)
+  const updateThreadTitle = useMutation(chatApi.updateThreadTitle)
+  const repairCorruptedThreads = useMutation(chatApi.repairCorruptedThreads)
+  const [threadToDelete, setThreadToDelete] = useState<string | null>(null)
+  const [editingThreadId, setEditingThreadId] = useState<string | null>(null)
+  const [editingTitle, setEditingTitle] = useState('')
+  const [searchTerm, setSearchTerm] = useState('')
+  const [repairStatus, setRepairStatus] = useState<string | null>(null)
+  const editInputRef = useRef<HTMLInputElement>(null)
 
   // Focus input when editing starts
   useEffect(() => {
     if (editingThreadId && editInputRef.current) {
-      editInputRef.current.focus();
-      editInputRef.current.select();
+      editInputRef.current.focus()
+      editInputRef.current.select()
     }
-  }, [editingThreadId]);
+  }, [editingThreadId])
 
   // Filter threads based on search
   const filteredThreads = useMemo(() => {
-    if (!threads) return [];
-    if (!searchTerm.trim()) return threads;
-    const lower = searchTerm.toLowerCase();
-    return threads.filter((t: Thread) =>
-      t.title.toLowerCase().includes(lower)
-    );
-  }, [threads, searchTerm]);
+    if (!threads) return []
+    if (!searchTerm.trim()) return threads
+    const lower = searchTerm.toLowerCase()
+    return threads.filter((t: Thread) => t.title.toLowerCase().includes(lower))
+  }, [threads, searchTerm])
 
   const handleNewThread = async () => {
-    const result = await createThread({});
-    onSelectThread(result.agentThreadId);
-  };
+    const result = await createThread({})
+    // Use onThreadCreated if provided (for URL updates), otherwise fall back to onSelectThread
+    if (onThreadCreated) {
+      onThreadCreated(result.threadId)
+    } else {
+      onSelectThread(result.threadId)
+    }
+  }
 
   const handleDeleteThread = async () => {
     if (threadToDelete) {
-      await deleteThread({ threadId: threadToDelete as Id<"agentThreads"> });
-      setThreadToDelete(null);
+      await deleteThread({ threadId: threadToDelete as Id<'agentThreads'> })
+      setThreadToDelete(null)
       if (selectedThreadId === threadToDelete) {
         // Select the first remaining thread or nothing
-        const remainingThreads = threads?.filter((t: Thread) => t.id.toString() !== threadToDelete);
+        const remainingThreads = threads?.filter(
+          (t: Thread) => t.id.toString() !== threadToDelete,
+        )
         if (remainingThreads && remainingThreads.length > 0) {
-          onSelectThread(remainingThreads[0].id.toString());
+          onSelectThread(remainingThreads[0].id.toString())
         }
       }
     }
-  };
+  }
 
   const startEditing = (threadId: string, currentTitle: string) => {
-    setEditingThreadId(threadId);
-    setEditingTitle(currentTitle);
-  };
+    setEditingThreadId(threadId)
+    setEditingTitle(currentTitle)
+  }
 
   const cancelEditing = () => {
-    setEditingThreadId(null);
-    setEditingTitle("");
-  };
+    setEditingThreadId(null)
+    setEditingTitle('')
+  }
 
   const saveTitle = async () => {
     if (editingThreadId && editingTitle.trim()) {
       await updateThreadTitle({
-        threadId: editingThreadId as Id<"agentThreads">,
+        threadId: editingThreadId as Id<'agentThreads'>,
         title: editingTitle.trim(),
-      });
+      })
     }
-    cancelEditing();
-  };
+    cancelEditing()
+  }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      saveTitle();
-    } else if (e.key === "Escape") {
-      cancelEditing();
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      saveTitle()
+    } else if (e.key === 'Escape') {
+      cancelEditing()
     }
-  };
+  }
+
+  const handleRepairThreads = async () => {
+    try {
+      setRepairStatus('Repairing...')
+      const result = await repairCorruptedThreads({})
+      setRepairStatus(`Fixed ${result.repaired}/${result.total}`)
+      setTimeout(() => setRepairStatus(null), 3000)
+    } catch {
+      setRepairStatus('Repair failed')
+      setTimeout(() => setRepairStatus(null), 3000)
+    }
+  }
 
   return (
     <div className="flex flex-col h-full border-r bg-muted/30">
@@ -120,15 +150,32 @@ export function ThreadSidebar({
       <div className="p-4 border-b flex-shrink-0">
         <div className="flex items-center justify-between mb-3">
           <h2 className="font-semibold text-lg">Conversations</h2>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={handleNewThread}
-            title="New conversation"
-            className="h-8 w-8"
-          >
-            <Plus className="h-4 w-4" />
-          </Button>
+          <div className="flex items-center gap-1">
+            {repairStatus && (
+              <span className="text-xs text-muted-foreground mr-1">
+                {repairStatus}
+              </span>
+            )}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleRepairThreads}
+              disabled={repairStatus !== null}
+              title="Repair corrupted threads"
+              className="h-8 w-8"
+            >
+              <Wrench className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleNewThread}
+              title="New conversation"
+              className="h-8 w-8"
+            >
+              <Plus className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
         {/* Search Input */}
         <div className="relative">
@@ -155,7 +202,9 @@ export function ThreadSidebar({
             <div className="p-4 text-center">
               <MessageSquare className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
               <p className="text-sm text-muted-foreground">
-                {searchTerm ? "No matching conversations" : "No conversations yet"}
+                {searchTerm
+                  ? 'No matching conversations'
+                  : 'No conversations yet'}
               </p>
               {!searchTerm && (
                 <Button
@@ -171,18 +220,18 @@ export function ThreadSidebar({
           ) : (
             // Thread list
             filteredThreads.map((thread: Thread) => {
-              const threadIdStr = thread.id.toString();
-              const isEditing = editingThreadId === threadIdStr;
-              const isSelected = selectedThreadId === threadIdStr;
+              const threadIdStr = thread.id.toString()
+              const isEditing = editingThreadId === threadIdStr
+              const isSelected = selectedThreadId === threadIdStr
 
               return (
                 <div
                   key={threadIdStr}
                   className={cn(
-                    "flex items-center gap-2 p-3 rounded-lg cursor-pointer transition-colors group",
+                    'flex items-center gap-2 p-3 rounded-lg cursor-pointer transition-colors group',
                     isSelected
-                      ? "bg-accent border-l-2 border-l-primary"
-                      : "hover:bg-accent/50 border-l-2 border-l-transparent"
+                      ? 'bg-accent border-l-2 border-l-primary'
+                      : 'hover:bg-accent/50 border-l-2 border-l-transparent',
                   )}
                   onClick={() => !isEditing && onSelectThread(threadIdStr)}
                 >
@@ -204,8 +253,8 @@ export function ThreadSidebar({
                           size="icon"
                           className="h-5 w-5 flex-shrink-0"
                           onClick={(e) => {
-                            e.stopPropagation();
-                            saveTitle();
+                            e.stopPropagation()
+                            saveTitle()
                           }}
                         >
                           <Check className="h-3 w-3 text-green-600" />
@@ -215,8 +264,8 @@ export function ThreadSidebar({
                           size="icon"
                           className="h-5 w-5 flex-shrink-0"
                           onClick={(e) => {
-                            e.stopPropagation();
-                            cancelEditing();
+                            e.stopPropagation()
+                            cancelEditing()
                           }}
                         >
                           <X className="h-3 w-3 text-muted-foreground" />
@@ -224,11 +273,13 @@ export function ThreadSidebar({
                       </div>
                     ) : (
                       <>
-                        <p className="text-sm font-medium truncate">{thread.title}</p>
+                        <p className="text-sm font-medium truncate">
+                          {thread.title}
+                        </p>
                         <p className="text-xs text-muted-foreground">
                           {thread.lastMessageAt
                             ? formatDistanceToNow(thread.lastMessageAt)
-                            : "Just now"}
+                            : 'Just now'}
                         </p>
                       </>
                     )}
@@ -240,8 +291,8 @@ export function ThreadSidebar({
                         size="icon"
                         className="h-6 w-6"
                         onClick={(e) => {
-                          e.stopPropagation();
-                          startEditing(threadIdStr, thread.title);
+                          e.stopPropagation()
+                          startEditing(threadIdStr, thread.title)
                         }}
                         title="Rename conversation"
                       >
@@ -252,8 +303,8 @@ export function ThreadSidebar({
                         size="icon"
                         className="h-6 w-6"
                         onClick={(e) => {
-                          e.stopPropagation();
-                          setThreadToDelete(threadIdStr);
+                          e.stopPropagation()
+                          setThreadToDelete(threadIdStr)
                         }}
                         title="Delete conversation"
                       >
@@ -262,7 +313,7 @@ export function ThreadSidebar({
                     </div>
                   )}
                 </div>
-              );
+              )
             })
           )}
         </div>
@@ -277,8 +328,8 @@ export function ThreadSidebar({
           <AlertDialogHeader>
             <AlertDialogTitle>Delete conversation?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete this conversation and all its messages.
-              This action cannot be undone.
+              This will permanently delete this conversation and all its
+              messages. This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -293,5 +344,5 @@ export function ThreadSidebar({
         </AlertDialogContent>
       </AlertDialog>
     </div>
-  );
+  )
 }

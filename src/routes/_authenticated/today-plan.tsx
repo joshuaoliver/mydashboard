@@ -928,7 +928,7 @@ function TodayPlanPage() {
                     <RefreshCw className="w-3 h-3 mr-1" />
                     Refresh
                   </Button>
-                  <Link to="/work">
+                  <Link to="/focus">
                     <Button size="sm">
                       <Play className="w-3 h-3 mr-1" />
                       Start Work

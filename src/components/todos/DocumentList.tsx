@@ -145,7 +145,7 @@ export function DocumentList({
                 return (
                   <Link
                     key={doc._id}
-                    to="/todos/$documentId"
+                    to="/notes/$documentId"
                     params={{ documentId: doc._id }}
                     className={cn(
                       "block p-3 rounded-lg transition-colors",

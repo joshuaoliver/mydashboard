@@ -1,82 +1,129 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { FullWidthContent } from "@/components/layout/full-width-content";
-import { ThreadSidebar } from "@/components/chat/ThreadSidebar";
-import { ChatConversation } from "@/components/chat/ChatConversation";
-import { PendingActionsPanel } from "@/components/chat/PendingActionsPanel";
-import { useQuery } from "convex/react";
-import { api } from "../../../convex/_generated/api";
-import { useState } from "react";
+import { createFileRoute, useNavigate } from '@tanstack/react-router'
+import { FullWidthContent } from '@/components/layout/full-width-content'
+import { ThreadSidebar } from '@/components/chat/ThreadSidebar'
+import { ChatConversation } from '@/components/chat/ChatConversation'
+import { PendingActionsPanel } from '@/components/chat/PendingActionsPanel'
+import { useQuery, useMutation } from 'convex/react'
+import { api } from '../../../convex/_generated/api'
+import { useState, useEffect } from 'react'
 import {
   ResizableHandle,
   ResizablePanel,
   ResizablePanelGroup,
-} from "@/components/ui/resizable";
-import { useIsMobile } from "@/lib/hooks/use-mobile";
+} from '@/components/ui/resizable'
+import { useIsMobile } from '@/lib/hooks/use-mobile'
 import {
   Sheet,
   SheetContent,
   SheetHeader,
   SheetTitle,
-} from "@/components/ui/sheet";
-import { Button } from "@/components/ui/button";
-import { ArrowLeft, ListTodo } from "lucide-react";
-import { Sidebar, SidebarHeader } from "@/components/layout/sidebar";
-import { cn } from "~/lib/utils";
+} from '@/components/ui/sheet'
+import { Button } from '@/components/ui/button'
+import { ArrowLeft, ListTodo, Wrench } from 'lucide-react'
+import { Sidebar, SidebarHeader } from '@/components/layout/sidebar'
+import { cn } from '~/lib/utils'
 
 // Type assertion for API references not yet in generated types
 // Run `npx convex dev` to regenerate types after adding new files
-const chatApi = (api as any).chat;
-const agentChatApi = (api as any).agentChat;
+const chatApi = (api as any).chat
+const agentChatApi = (api as any).agentChat
 
 interface PendingAction {
-  status: string;
+  status: string
 }
 
 interface Thread {
-  id: { toString(): string };
-  title?: string;
+  id: { toString(): string }
+  title?: string
 }
 
-export const Route = createFileRoute("/_authenticated/chat")({
+export const Route = createFileRoute('/_authenticated/chat')({
   component: ChatPage,
   validateSearch: (search: Record<string, unknown>) => {
     return {
       threadId: (search.threadId as string) || undefined,
-    };
+    }
   },
-});
+})
 
 function ChatPage() {
-  const { threadId: urlThreadId } = Route.useSearch();
+  const { threadId: urlThreadId } = Route.useSearch()
+  const navigate = useNavigate()
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>(
-    urlThreadId || null
-  );
-  const [mobileSheetOpen, setMobileSheetOpen] = useState(false);
-  const [actionsPanelOpen, setActionsPanelOpen] = useState(false);
-  const isMobile = useIsMobile();
+    urlThreadId || null,
+  )
+  const [mobileSheetOpen, setMobileSheetOpen] = useState(false)
+  const [actionsPanelOpen, setActionsPanelOpen] = useState(false)
+  const [repairStatus, setRepairStatus] = useState<string | null>(null)
+  const isMobile = useIsMobile()
+
+  // Sync selected thread with URL changes
+  useEffect(() => {
+    if (urlThreadId !== selectedThreadId) {
+      setSelectedThreadId(urlThreadId || null)
+    }
+  }, [urlThreadId])
+
+  // Repair mutation for corrupted threads
+  const repairCorruptedThreads = useMutation(chatApi.repairCorruptedThreads)
 
   // Get pending actions count for the badge
   const pendingActions = useQuery(
     agentChatApi.listPendingActionsForThread,
-    selectedThreadId ? { threadId: selectedThreadId } : "skip"
-  );
-  const pendingCount = pendingActions?.filter((a: PendingAction) => a.status === "pending").length || 0;
+    selectedThreadId ? { threadId: selectedThreadId } : 'skip',
+  )
+  const pendingCount =
+    pendingActions?.filter((a: PendingAction) => a.status === 'pending')
+      .length || 0
 
   // Get thread title for mobile header
-  const threads = useQuery(chatApi.listThreads);
-  const currentThread = threads?.find((t: Thread) => t.id.toString() === selectedThreadId);
-  const threadTitle = currentThread?.title || "Conversation";
+  const threads = useQuery(chatApi.listThreads)
+  const currentThread = threads?.find(
+    (t: Thread) => t.id.toString() === selectedThreadId,
+  )
+  const threadTitle = currentThread?.title || 'Conversation'
 
   const handleSelectThread = (threadId: string) => {
-    setSelectedThreadId(threadId);
+    setSelectedThreadId(threadId)
+    // Update URL to reflect selected thread
+    navigate({
+      to: '/chat',
+      search: { threadId },
+      replace: true,
+    })
     if (isMobile) {
-      setMobileSheetOpen(true);
+      setMobileSheetOpen(true)
     }
-  };
+  }
+
+  // Handle new thread creation - navigate to the new thread
+  const handleThreadCreated = (threadId: string) => {
+    setSelectedThreadId(threadId)
+    navigate({
+      to: '/chat',
+      search: { threadId },
+      replace: true,
+    })
+    if (isMobile) {
+      setMobileSheetOpen(true)
+    }
+  }
 
   const handleCloseMobileSheet = () => {
-    setMobileSheetOpen(false);
-  };
+    setMobileSheetOpen(false)
+  }
+
+  const handleRepairThreads = async () => {
+    try {
+      setRepairStatus('Repairing...')
+      const result = await repairCorruptedThreads({})
+      setRepairStatus(`Repaired ${result.repaired} of ${result.total} threads`)
+      setTimeout(() => setRepairStatus(null), 3000)
+    } catch (error) {
+      setRepairStatus('Repair failed')
+      setTimeout(() => setRepairStatus(null), 3000)
+    }
+  }
 
   return (
     <FullWidthContent>
@@ -88,6 +135,7 @@ function ChatPage() {
             <ThreadSidebar
               selectedThreadId={selectedThreadId}
               onSelectThread={handleSelectThread}
+              onThreadCreated={handleThreadCreated}
             />
           </ResizablePanel>
 
@@ -95,7 +143,10 @@ function ChatPage() {
 
           {/* Main Content - Conversation */}
           <ResizablePanel defaultSize={pendingCount > 0 ? 50 : 78} minSize={40}>
-            <ChatConversation threadId={selectedThreadId} />
+            <ChatConversation
+              threadId={selectedThreadId}
+              onThreadCreated={handleThreadCreated}
+            />
           </ResizablePanel>
 
           {/* Right Panel - Pending Actions (only if there are any) */}
@@ -113,18 +164,30 @@ function ChatPage() {
         <>
           <Sidebar
             width="w-full"
-            className={cn(mobileSheetOpen && "hidden")}
+            className={cn(mobileSheetOpen && 'hidden')}
             header={
               <SidebarHeader
                 title="Agent Chat"
                 subtitle="Your AI assistant"
-                actions={<div />}
+                actions={
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleRepairThreads}
+                    disabled={repairStatus !== null}
+                    title="Repair corrupted threads"
+                    className="h-8 w-8 p-0"
+                  >
+                    <Wrench className="h-4 w-4" />
+                  </Button>
+                }
               />
             }
           >
             <ThreadSidebar
               selectedThreadId={selectedThreadId}
               onSelectThread={handleSelectThread}
+              onThreadCreated={handleThreadCreated}
             />
           </Sidebar>
 
@@ -168,7 +231,10 @@ function ChatPage() {
               </SheetHeader>
 
               <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-                <ChatConversation threadId={selectedThreadId} />
+                <ChatConversation
+                  threadId={selectedThreadId}
+                  onThreadCreated={handleThreadCreated}
+                />
               </div>
             </SheetContent>
           </Sheet>
@@ -200,5 +266,5 @@ function ChatPage() {
         </>
       )}
     </FullWidthContent>
-  );
+  )
 }

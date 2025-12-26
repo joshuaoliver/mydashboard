@@ -201,7 +201,7 @@ function TodoItem({ todo, onToggle, onUpdateText, onHashtagClick }: TodoItemProp
         <div className="flex flex-wrap items-center gap-2 mt-2">
           {/* Document link */}
           <Link
-            to="/todos/$documentId"
+            to="/notes/$documentId"
             params={{ documentId: todo.documentId }}
             className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
             onClick={(e) => e.stopPropagation()}
