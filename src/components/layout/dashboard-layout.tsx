@@ -52,6 +52,7 @@ import { useQuery as useConvexQuery, useMutation } from 'convex/react'
 import { api } from '../../../convex/_generated/api'
 import { cn } from "~/lib/utils"
 import * as React from 'react'
+import { toast } from 'sonner'
 
 // ==========================================
 // Active Session Timer Component
@@ -148,9 +149,48 @@ function AudioRecordButton() {
   const [mediaRecorder, setMediaRecorder] = React.useState<MediaRecorder | null>(null)
   const chunksRef = React.useRef<Blob[]>([])
   const streamRef = React.useRef<MediaStream | null>(null)
+  const acknowledgedRef = React.useRef<Set<string>>(new Set())
 
   const generateUploadUrl = useMutation(api.voiceNotes.generateUploadUrl)
   const startChatFromRecording = useMutation(api.voiceNotes.startChatFromRecording)
+  const acknowledgeTranscription = useMutation(api.voiceNotes.acknowledgeTranscription)
+  const pendingTranscriptions = useConvexQuery(api.voiceNotes.getPendingTranscriptions)
+
+  // Watch for completed/failed transcriptions and show toasts
+  React.useEffect(() => {
+    if (!pendingTranscriptions) return
+
+    for (const t of pendingTranscriptions) {
+      const id = t._id.toString()
+
+      // Skip if we've already shown a toast for this one
+      if (acknowledgedRef.current.has(id)) continue
+
+      if (t.status === 'completed' && t.threadId) {
+        acknowledgedRef.current.add(id)
+        toast.success('Voice note transcribed!', {
+          description: t.transcription?.slice(0, 60) + (t.transcription && t.transcription.length > 60 ? '...' : ''),
+          action: {
+            label: 'View Chat',
+            onClick: () => {
+              navigate({ to: '/chat', search: { threadId: t.threadId } })
+            },
+          },
+          duration: 10000,
+        })
+        // Clean up the record
+        acknowledgeTranscription({ transcriptionId: t._id })
+      } else if (t.status === 'failed') {
+        acknowledgedRef.current.add(id)
+        toast.error('Transcription failed', {
+          description: t.errorMessage || 'Unknown error occurred',
+          duration: 5000,
+        })
+        // Clean up the record
+        acknowledgeTranscription({ transcriptionId: t._id })
+      }
+    }
+  }, [pendingTranscriptions, navigate, acknowledgeTranscription])
 
   const handleStartRecording = async () => {
     try {
@@ -193,11 +233,16 @@ function AudioRecordButton() {
           // Start the transcription and chat creation in background
           await startChatFromRecording({ storageId })
 
-          // Navigate to chat page - the new conversation will appear there
-          navigate({ to: '/chat' })
+          // Show toast that transcription is in progress
+          toast.info('Transcribing voice note...', {
+            description: 'A new chat will be created when ready',
+            duration: 3000,
+          })
         } catch (err) {
           console.error('Error processing recording:', err)
-          alert('Failed to process recording. Please try again.')
+          toast.error('Failed to process recording', {
+            description: 'Please try again',
+          })
         }
 
         setIsProcessing(false)
@@ -210,7 +255,9 @@ function AudioRecordButton() {
       setIsRecording(true)
     } catch (err) {
       console.error('Error accessing microphone:', err)
-      alert('Could not access microphone. Please ensure you have granted permission.')
+      toast.error('Microphone access denied', {
+        description: 'Please grant microphone permission to record',
+      })
     }
   }
 

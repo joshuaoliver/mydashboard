@@ -969,4 +969,22 @@ export default defineSchema({
   })
     .index("by_thread", ["threadId"])
     .index("by_status", ["status"]),
+
+  // Pending voice transcriptions from navbar recording
+  pendingVoiceTranscriptions: defineTable({
+    userId: v.id("users"),
+    storageId: v.id("_storage"),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("transcribing"),
+      v.literal("completed"),
+      v.literal("failed")
+    ),
+    threadId: v.optional(v.string()),         // Set when chat is created
+    transcription: v.optional(v.string()),    // Set when transcription completes
+    errorMessage: v.optional(v.string()),
+    createdAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_status", ["userId", "status"]),
 });

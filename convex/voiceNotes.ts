@@ -240,9 +240,16 @@ export const transcribeAndStartChat = internalAction({
   args: {
     storageId: v.id("_storage"),
     userId: v.id("users"),
+    transcriptionId: v.id("pendingVoiceTranscriptions"),
   },
   handler: async (ctx, args) => {
     try {
+      // Update status to transcribing
+      await ctx.runMutation(internalRef.voiceNotes.updateTranscriptionStatus, {
+        transcriptionId: args.transcriptionId,
+        status: "transcribing",
+      });
+
       // Get audio from storage
       const audioUrl = await ctx.storage.getUrl(args.storageId);
       if (!audioUrl) {
@@ -290,6 +297,14 @@ export const transcribeAndStartChat = internalAction({
       // Clean up the audio file from storage
       await ctx.storage.delete(args.storageId);
 
+      // Update status to completed with the thread ID
+      await ctx.runMutation(internalRef.voiceNotes.updateTranscriptionStatus, {
+        transcriptionId: args.transcriptionId,
+        status: "completed",
+        threadId: threadId.toString(),
+        transcription,
+      });
+
       return {
         success: true,
         threadId: threadId.toString(),
@@ -297,8 +312,42 @@ export const transcribeAndStartChat = internalAction({
       };
     } catch (error) {
       console.error("[voiceNotes:transcribeAndStartChat] Error:", error);
+
+      // Update status to failed
+      await ctx.runMutation(internalRef.voiceNotes.updateTranscriptionStatus, {
+        transcriptionId: args.transcriptionId,
+        status: "failed",
+        errorMessage: error instanceof Error ? error.message : "Unknown error",
+      });
+
       throw error;
     }
+  },
+});
+
+/**
+ * Internal mutation to update transcription status
+ */
+export const updateTranscriptionStatus = internalMutation({
+  args: {
+    transcriptionId: v.id("pendingVoiceTranscriptions"),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("transcribing"),
+      v.literal("completed"),
+      v.literal("failed")
+    ),
+    threadId: v.optional(v.string()),
+    transcription: v.optional(v.string()),
+    errorMessage: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.transcriptionId, {
+      status: args.status,
+      threadId: args.threadId,
+      transcription: args.transcription,
+      errorMessage: args.errorMessage,
+    });
   },
 });
 
@@ -339,13 +388,66 @@ export const startChatFromRecording = mutation({
       throw new Error("Not authenticated");
     }
 
+    // Create a pending transcription record for UI tracking
+    const transcriptionId = await ctx.db.insert("pendingVoiceTranscriptions", {
+      userId,
+      storageId: args.storageId,
+      status: "pending",
+      createdAt: Date.now(),
+    });
+
     // Schedule the transcription and chat creation
     await ctx.scheduler.runAfter(0, internalRef.voiceNotes.transcribeAndStartChat, {
       storageId: args.storageId,
       userId,
+      transcriptionId,
     });
 
-    return { success: true };
+    return { success: true, transcriptionId };
+  },
+});
+
+/**
+ * Get pending/recent transcriptions for the current user (for toast notifications)
+ */
+export const getPendingTranscriptions = query({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return [];
+
+    // Get transcriptions from the last 5 minutes
+    const fiveMinutesAgo = Date.now() - 5 * 60 * 1000;
+
+    const transcriptions = await ctx.db
+      .query("pendingVoiceTranscriptions")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .order("desc")
+      .filter((q) => q.gte(q.field("createdAt"), fiveMinutesAgo))
+      .collect();
+
+    return transcriptions;
+  },
+});
+
+/**
+ * Mark a transcription as acknowledged (user has seen the toast)
+ */
+export const acknowledgeTranscription = mutation({
+  args: {
+    transcriptionId: v.id("pendingVoiceTranscriptions"),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+
+    const transcription = await ctx.db.get(args.transcriptionId);
+    if (!transcription || transcription.userId !== userId) {
+      throw new Error("Transcription not found");
+    }
+
+    // Delete the record after acknowledgment
+    await ctx.db.delete(args.transcriptionId);
   },
 });
 
