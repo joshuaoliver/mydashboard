@@ -41,6 +41,9 @@ import {
   BarChart3,
   ListTodo,
   Timer,
+  Mic,
+  MicOff,
+  Loader2,
 } from "lucide-react"
 import { ModeToggle } from "@/components/ui/mode-toggle"
 import { Link, useNavigate } from '@tanstack/react-router'
@@ -131,6 +134,96 @@ function ActiveSessionTimer() {
         {dbSession.taskTitle}
       </span>
     </button>
+  )
+}
+
+// ==========================================
+// Audio Record Button Component
+// ==========================================
+
+function AudioRecordButton() {
+  const [isRecording, setIsRecording] = React.useState(false)
+  const [isProcessing, setIsProcessing] = React.useState(false)
+  const [mediaRecorder, setMediaRecorder] = React.useState<MediaRecorder | null>(null)
+  const chunksRef = React.useRef<Blob[]>([])
+
+  const handleStartRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const recorder = new MediaRecorder(stream)
+      chunksRef.current = []
+
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) {
+          chunksRef.current.push(e.data)
+        }
+      }
+
+      recorder.onstop = async () => {
+        setIsProcessing(true)
+        const blob = new Blob(chunksRef.current, { type: 'audio/webm' })
+
+        // Stop all tracks
+        stream.getTracks().forEach(track => track.stop())
+
+        // For now, just download the file
+        // TODO: Send to transcription API
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `recording-${new Date().toISOString().slice(0, 10)}.webm`
+        a.click()
+        URL.revokeObjectURL(url)
+
+        setIsProcessing(false)
+        setMediaRecorder(null)
+        chunksRef.current = []
+      }
+
+      recorder.start()
+      setMediaRecorder(recorder)
+      setIsRecording(true)
+    } catch (err) {
+      console.error('Error accessing microphone:', err)
+      alert('Could not access microphone. Please ensure you have granted permission.')
+    }
+  }
+
+  const handleStopRecording = () => {
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+      mediaRecorder.stop()
+      setIsRecording(false)
+    }
+  }
+
+  const handleClick = () => {
+    if (isRecording) {
+      handleStopRecording()
+    } else {
+      handleStartRecording()
+    }
+  }
+
+  return (
+    <Button
+      variant="ghost"
+      size="sm"
+      onClick={handleClick}
+      disabled={isProcessing}
+      className={cn(
+        "text-slate-300 hover:text-white hover:bg-slate-800/80 h-9 w-9 p-0",
+        isRecording && "text-red-400 hover:text-red-300 animate-pulse"
+      )}
+      title={isRecording ? "Stop recording" : "Start audio recording"}
+    >
+      {isProcessing ? (
+        <Loader2 className="h-4 w-4 animate-spin" />
+      ) : isRecording ? (
+        <MicOff className="h-4 w-4" />
+      ) : (
+        <Mic className="h-4 w-4" />
+      )}
+    </Button>
   )
 }
 
@@ -676,9 +769,10 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
             <h1 className="text-lg font-semibold text-white">Dashboard</h1>
           </div>
 
-          {/* Right side - Active session timer + Theme toggle + User menu */}
+          {/* Right side - Active session timer + Audio record + Theme toggle + User menu */}
           <div className="flex items-center gap-2">
             <ActiveSessionTimer />
+            <AudioRecordButton />
             <ModeToggle />
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
