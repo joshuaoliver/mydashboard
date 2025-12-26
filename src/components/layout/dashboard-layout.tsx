@@ -48,7 +48,7 @@ import {
 import { ModeToggle } from "@/components/ui/mode-toggle"
 import { Link, useNavigate } from '@tanstack/react-router'
 import { useAuthActions } from '@convex-dev/auth/react'
-import { useQuery as useConvexQuery } from 'convex/react'
+import { useQuery as useConvexQuery, useMutation } from 'convex/react'
 import { api } from '../../../convex/_generated/api'
 import { cn } from "~/lib/utils"
 import * as React from 'react'
@@ -142,14 +142,20 @@ function ActiveSessionTimer() {
 // ==========================================
 
 function AudioRecordButton() {
+  const navigate = useNavigate()
   const [isRecording, setIsRecording] = React.useState(false)
   const [isProcessing, setIsProcessing] = React.useState(false)
   const [mediaRecorder, setMediaRecorder] = React.useState<MediaRecorder | null>(null)
   const chunksRef = React.useRef<Blob[]>([])
+  const streamRef = React.useRef<MediaStream | null>(null)
+
+  const generateUploadUrl = useMutation(api.voiceNotes.generateUploadUrl)
+  const startChatFromRecording = useMutation(api.voiceNotes.startChatFromRecording)
 
   const handleStartRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      streamRef.current = stream
       const recorder = new MediaRecorder(stream)
       chunksRef.current = []
 
@@ -164,16 +170,35 @@ function AudioRecordButton() {
         const blob = new Blob(chunksRef.current, { type: 'audio/webm' })
 
         // Stop all tracks
-        stream.getTracks().forEach(track => track.stop())
+        if (streamRef.current) {
+          streamRef.current.getTracks().forEach(track => track.stop())
+          streamRef.current = null
+        }
 
-        // For now, just download the file
-        // TODO: Send to transcription API
-        const url = URL.createObjectURL(blob)
-        const a = document.createElement('a')
-        a.href = url
-        a.download = `recording-${new Date().toISOString().slice(0, 10)}.webm`
-        a.click()
-        URL.revokeObjectURL(url)
+        try {
+          // Upload the audio to Convex storage
+          const uploadUrl = await generateUploadUrl()
+          const uploadResponse = await fetch(uploadUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'audio/webm' },
+            body: blob,
+          })
+
+          if (!uploadResponse.ok) {
+            throw new Error('Failed to upload audio')
+          }
+
+          const { storageId } = await uploadResponse.json()
+
+          // Start the transcription and chat creation in background
+          await startChatFromRecording({ storageId })
+
+          // Navigate to chat page - the new conversation will appear there
+          navigate({ to: '/chat' })
+        } catch (err) {
+          console.error('Error processing recording:', err)
+          alert('Failed to process recording. Please try again.')
+        }
 
         setIsProcessing(false)
         setMediaRecorder(null)
@@ -214,7 +239,7 @@ function AudioRecordButton() {
         "text-slate-300 hover:text-white hover:bg-slate-800/80 h-9 w-9 p-0",
         isRecording && "text-red-400 hover:text-red-300 animate-pulse"
       )}
-      title={isRecording ? "Stop recording" : "Start audio recording"}
+      title={isRecording ? "Stop recording" : "Start voice note (transcribes and creates chat)"}
     >
       {isProcessing ? (
         <Loader2 className="h-4 w-4 animate-spin" />
