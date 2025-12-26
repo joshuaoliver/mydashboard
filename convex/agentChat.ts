@@ -445,8 +445,19 @@ export function createAgentWithModel(modelId: string): any {
   })
 }
 
-// Default agent instance for cases where the default model is sufficient
-export const chatAgent = createAgentWithModel(getDefaultModelId())
+// Default agent instance - lazily created to avoid module-load side effects
+let _chatAgent: ReturnType<typeof createAgentWithModel> | null = null
+
+export function getChatAgent() {
+  if (!_chatAgent) {
+    _chatAgent = createAgentWithModel(getDefaultModelId())
+  }
+  return _chatAgent
+}
+
+// For backwards compatibility - but prefer using getChatAgent() for lazy loading
+// Note: This will still create the agent at module load time if imported
+// export const chatAgent = createAgentWithModel(getDefaultModelId())
 
 // =============================================================================
 // Internal Queries and Mutations for Tools

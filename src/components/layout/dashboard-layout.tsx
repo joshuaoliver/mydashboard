@@ -11,9 +11,6 @@ import {
   NavigationMenu,
   NavigationMenuItem,
   NavigationMenuList,
-  NavigationMenuTrigger,
-  NavigationMenuContent,
-  NavigationMenuLink,
 } from "@/components/ui/navigation-menu"
 import {
   Sheet,
@@ -677,78 +674,38 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                   </Link>
                 </NavigationMenuItem>
 
-                {/* Focus - dropdown with Plan access */}
+                {/* Focus - direct link */}
                 <NavigationMenuItem>
-                  <NavigationMenuTrigger className={cn(
-                    "inline-flex items-center gap-2 px-3 py-2 rounded-md",
-                    "text-sm font-medium transition-all",
-                    "text-slate-300 hover:text-white hover:bg-slate-800/80 data-[state=open]:bg-slate-800 data-[state=open]:text-white",
-                    "bg-transparent"
-                  )}>
+                  <Link
+                    to="/focus"
+                    className={cn(
+                      "inline-flex items-center gap-2 px-3 py-2 rounded-md",
+                      "text-sm font-medium transition-all",
+                      "text-slate-300 hover:text-white hover:bg-slate-800/80",
+                      "[&.active]:bg-slate-800 [&.active]:text-white"
+                    )}
+                    activeProps={{ className: "active" }}
+                  >
                     <Target className="h-4 w-4" />
                     <span><span className="underline decoration-slate-500">F</span>ocus</span>
-                  </NavigationMenuTrigger>
-                  <NavigationMenuContent className="z-[100]">
-                    <ul className="grid w-[180px] gap-1 p-2">
-                      <li>
-                        <NavigationMenuLink asChild>
-                          <Link to="/today-plan" className="w-full">
-                            <ListTodo className="h-4 w-4 flex-shrink-0" />
-                            <span>Today's Plan</span>
-                          </Link>
-                        </NavigationMenuLink>
-                      </li>
-                      <li>
-                        <NavigationMenuLink asChild>
-                          <Link to="/focus" className="w-full">
-                            <Timer className="h-4 w-4 flex-shrink-0" />
-                            <span>Focus Timer</span>
-                          </Link>
-                        </NavigationMenuLink>
-                      </li>
-                    </ul>
-                  </NavigationMenuContent>
+                  </Link>
                 </NavigationMenuItem>
 
-                {/* Notes - dropdown with Notes and Todos */}
+                {/* Notes - direct link */}
                 <NavigationMenuItem>
-                  <NavigationMenuTrigger className={cn(
-                    "inline-flex items-center gap-2 px-3 py-2 rounded-md",
-                    "text-sm font-medium transition-all",
-                    "text-slate-300 hover:text-white hover:bg-slate-800/80 data-[state=open]:bg-slate-800 data-[state=open]:text-white",
-                    "bg-transparent"
-                  )}>
+                  <Link
+                    to="/notes"
+                    className={cn(
+                      "inline-flex items-center gap-2 px-3 py-2 rounded-md",
+                      "text-sm font-medium transition-all",
+                      "text-slate-300 hover:text-white hover:bg-slate-800/80",
+                      "[&.active]:bg-slate-800 [&.active]:text-white"
+                    )}
+                    activeProps={{ className: "active" }}
+                  >
                     <FileText className="h-4 w-4" />
                     <span><span className="underline decoration-slate-500">N</span>otes</span>
-                  </NavigationMenuTrigger>
-                  <NavigationMenuContent className="z-[100]">
-                    <ul className="grid w-[180px] gap-1 p-2">
-                      <li>
-                        <NavigationMenuLink asChild>
-                          <Link to="/notes" className="w-full">
-                            <FileText className="h-4 w-4 flex-shrink-0" />
-                            <span>Notes</span>
-                          </Link>
-                        </NavigationMenuLink>
-                      </li>
-                      <li>
-                        <NavigationMenuLink asChild>
-                          <Link to="/todos" className="w-full">
-                            <ListTodo className="h-4 w-4 flex-shrink-0" />
-                            <span>Todos</span>
-                          </Link>
-                        </NavigationMenuLink>
-                      </li>
-                      <li>
-                        <NavigationMenuLink asChild>
-                          <Link to="/todos-list" className="w-full">
-                            <CheckSquare className="h-4 w-4 flex-shrink-0" />
-                            <span>All Todos</span>
-                          </Link>
-                        </NavigationMenuLink>
-                      </li>
-                    </ul>
-                  </NavigationMenuContent>
+                  </Link>
                 </NavigationMenuItem>
 
                 {/* Inbox - direct link */}
@@ -769,125 +726,54 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                   </Link>
                 </NavigationMenuItem>
 
-                {/* People - dropdown */}
+                {/* People - direct link */}
                 <NavigationMenuItem>
-                  <NavigationMenuTrigger className={cn(
-                    "inline-flex items-center gap-2 px-3 py-2 rounded-md",
-                    "text-sm font-medium transition-all",
-                    "text-slate-300 hover:text-white hover:bg-slate-800/80 data-[state=open]:bg-slate-800 data-[state=open]:text-white",
-                    "bg-transparent"
-                  )}>
+                  <Link
+                    to="/people"
+                    className={cn(
+                      "inline-flex items-center gap-2 px-3 py-2 rounded-md",
+                      "text-sm font-medium transition-all",
+                      "text-slate-300 hover:text-white hover:bg-slate-800/80",
+                      "[&.active]:bg-slate-800 [&.active]:text-white"
+                    )}
+                    activeProps={{ className: "active" }}
+                  >
                     <Users className="h-4 w-4" />
                     <span><span className="underline decoration-slate-500">P</span>eople</span>
-                  </NavigationMenuTrigger>
-                  <NavigationMenuContent className="z-[100]">
-                    <ul className="grid w-[180px] gap-1 p-2">
-                      <li>
-                        <NavigationMenuLink asChild>
-                          <Link to="/people" className="w-full">
-                            <Users className="h-4 w-4 flex-shrink-0" />
-                            <span>Contacts</span>
-                          </Link>
-                        </NavigationMenuLink>
-                      </li>
-                      <li>
-                        <NavigationMenuLink asChild>
-                          <Link to="/people/dating" className="w-full">
-                            <HeartHandshake className="h-4 w-4 flex-shrink-0" />
-                            <span>Dating</span>
-                          </Link>
-                        </NavigationMenuLink>
-                      </li>
-                    </ul>
-                  </NavigationMenuContent>
+                  </Link>
                 </NavigationMenuItem>
 
-                {/* Reflect - dropdown */}
+                {/* Reflect - direct link */}
                 <NavigationMenuItem>
-                  <NavigationMenuTrigger className={cn(
-                    "inline-flex items-center gap-2 px-3 py-2 rounded-md",
-                    "text-sm font-medium transition-all",
-                    "text-slate-300 hover:text-white hover:bg-slate-800/80 data-[state=open]:bg-slate-800 data-[state=open]:text-white",
-                    "bg-transparent"
-                  )}>
+                  <Link
+                    to="/reflect"
+                    className={cn(
+                      "inline-flex items-center gap-2 px-3 py-2 rounded-md",
+                      "text-sm font-medium transition-all",
+                      "text-slate-300 hover:text-white hover:bg-slate-800/80",
+                      "[&.active]:bg-slate-800 [&.active]:text-white"
+                    )}
+                    activeProps={{ className: "active" }}
+                  >
                     <BookOpen className="h-4 w-4" />
                     <span><span className="underline decoration-slate-500">R</span>eflect</span>
-                  </NavigationMenuTrigger>
-                  <NavigationMenuContent className="z-[100]">
-                    <ul className="grid w-[180px] gap-1 p-2">
-                      <li>
-                        <NavigationMenuLink asChild>
-                          <Link to="/reflect" className="w-full">
-                            <BookOpen className="h-4 w-4 flex-shrink-0" />
-                            <span>Summaries</span>
-                          </Link>
-                        </NavigationMenuLink>
-                      </li>
-                      <li>
-                        <NavigationMenuLink asChild>
-                          <Link to="/reflect/stats" className="w-full">
-                            <BarChart3 className="h-4 w-4 flex-shrink-0" />
-                            <span>Stats</span>
-                          </Link>
-                        </NavigationMenuLink>
-                      </li>
-                    </ul>
-                  </NavigationMenuContent>
+                  </Link>
                 </NavigationMenuItem>
+                {/* Settings - direct link */}
                 <NavigationMenuItem>
-                  <NavigationMenuTrigger className={cn(
-                    "inline-flex items-center gap-2 px-3 py-2 rounded-md",
-                    "text-sm font-medium transition-all",
-                    "text-slate-300 hover:text-white hover:bg-slate-800/80 data-[state=open]:bg-slate-800 data-[state=open]:text-white",
-                    "bg-transparent"
-                  )}>
+                  <Link
+                    to="/settings"
+                    className={cn(
+                      "inline-flex items-center gap-2 px-3 py-2 rounded-md",
+                      "text-sm font-medium transition-all",
+                      "text-slate-300 hover:text-white hover:bg-slate-800/80",
+                      "[&.active]:bg-slate-800 [&.active]:text-white"
+                    )}
+                    activeProps={{ className: "active" }}
+                  >
                     <Settings className="h-4 w-4" />
                     Settings
-                  </NavigationMenuTrigger>
-                  <NavigationMenuContent className="z-[100]">
-                    <ul className="grid w-[200px] gap-1 p-2">
-                      <li>
-                        <NavigationMenuLink asChild>
-                          <Link to="/settings/integrations" className="w-full">
-                            <Zap className="h-4 w-4 flex-shrink-0" />
-                            <span>Integrations</span>
-                          </Link>
-                        </NavigationMenuLink>
-                      </li>
-                      <li>
-                        <NavigationMenuLink asChild>
-                          <Link to="/settings/projects" className="w-full">
-                            <FolderKanban className="h-4 w-4 flex-shrink-0" />
-                            <span>Projects</span>
-                          </Link>
-                        </NavigationMenuLink>
-                      </li>
-                      <li>
-                        <NavigationMenuLink asChild>
-                          <Link to="/settings/ai" className="w-full">
-                            <Bot className="h-4 w-4 flex-shrink-0" />
-                            <span>AI Settings</span>
-                          </Link>
-                        </NavigationMenuLink>
-                      </li>
-                      <li>
-                        <NavigationMenuLink asChild>
-                          <Link to="/settings/sample-outputs" className="w-full">
-                            <Download className="h-4 w-4 flex-shrink-0" />
-                            <span>Sample Outputs</span>
-                          </Link>
-                        </NavigationMenuLink>
-                      </li>
-                      <li>
-                        <NavigationMenuLink asChild>
-                          <Link to="/settings" className="w-full">
-                            <Settings className="h-4 w-4 flex-shrink-0" />
-                            <span>General</span>
-                          </Link>
-                        </NavigationMenuLink>
-                      </li>
-                    </ul>
-                  </NavigationMenuContent>
+                  </Link>
                 </NavigationMenuItem>
               </NavigationMenuList>
             </NavigationMenu>

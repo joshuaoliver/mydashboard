@@ -501,21 +501,20 @@ export const debugMessageDistribution = query({
 /**
  * Get the last N messages sent by the user (isFromUser = true)
  * Used for "Sample Outputs" feature to show user's writing style
- * Returns messages sorted by timestamp descending (newest first)
+ * Returns messages sorted by actual timestamp descending (newest first)
  */
 export const getUserSentMessages = query({
   args: {
-    limit: v.optional(v.number()), // Default 200
+    limit: v.optional(v.number()), // Default 500
   },
   handler: async (ctx, args) => {
-    const limit = args.limit ?? 200;
+    const limit = args.limit ?? 500;
     
-    // Query all messages, filter for user-sent, order by timestamp desc
-    // We need to scan all messages since there's no index on isFromUser
+    // Query using index on isFromUser + timestamp for proper ordering by send time
     const allMessages = await ctx.db
       .query("beeperMessages")
-      .order("desc") // Use default ordering (by _creationTime)
-      .filter((q) => q.eq(q.field("isFromUser"), true))
+      .withIndex("by_user_timestamp", (q) => q.eq("isFromUser", true))
+      .order("desc") // Order by timestamp descending (newest first)
       .take(limit);
 
     // Get unique chat IDs to fetch chat names

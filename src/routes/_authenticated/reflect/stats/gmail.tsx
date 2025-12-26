@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useQuery as useConvexQuery, useAction, useMutation } from 'convex/react'
-import { api } from '../../../../convex/_generated/api'
+import { api } from '~/../convex/_generated/api'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import {
@@ -22,7 +22,7 @@ import {
   Trash2,
 } from 'lucide-react'
 import { useState } from 'react'
-import type { Id } from '../../../../convex/_generated/dataModel'
+import type { Id } from '~/../convex/_generated/dataModel'
 import { formatSydneyDateTime } from '@/lib/timezone'
 
 export const Route = createFileRoute('/_authenticated/reflect/stats/gmail')({

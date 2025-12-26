@@ -463,14 +463,11 @@ ${args.customContext}
         prompt = promptTemplate.description
           .replace(/\{\{chatName\}\}/g, args.chatName)
           .replace(/\{\{conversationHistory\}\}/g, conversationHistory)
-          .replace(/\{\{lastMessageText\}\}/g, lastMessageText)
           .replace(/\{\{contactContext\}\}/g, contactContext)
           .replace(/\{\{customContext\}\}/g, customContextSection)
           .replace(/\{\{platform\}\}/g, platform)
           .replace(/\{\{messageCount\}\}/g, messages.length.toString())
-          .replace(/\{\{temporalContext\}\}/g, temporalContext)
-          .replace(/\{\{currentTime\}\}/g, currentTimeSydney)
-          .replace(/\{\{lastMessageTime\}\}/g, lastMessageTime);
+          .replace(/\{\{temporalContext\}\}/g, temporalContext);
         
         console.log(`[generateReplySuggestions] Using configured prompt template from database`);
       } else {
@@ -487,8 +484,6 @@ ${customContextSection}
 
 Conversation history (with timestamps):
 ${conversationHistory}
-
-Latest message from ${args.chatName} at ${lastMessageTime}: "${lastMessageText}"
 
 IMPORTANT TEMPORAL CONTEXT: Consider the time difference between when the last message was sent and the current time. If the conversation happened yesterday or earlier, do NOT suggest replies that would have been appropriate at that time (like "have a good sleep" for a tired message from last night). Instead, suggest replies that are appropriate for NOW.
 

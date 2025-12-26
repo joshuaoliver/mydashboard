@@ -30,10 +30,6 @@ import { Route as AuthenticatedReflectIndexRouteImport } from './routes/_authent
 import { Route as AuthenticatedPeopleIndexRouteImport } from './routes/_authenticated/people/index'
 import { Route as AuthenticatedNotesIndexRouteImport } from './routes/_authenticated/notes/index'
 import { Route as AuthenticatedTodosDocumentIdRouteImport } from './routes/_authenticated/todos/$documentId'
-import { Route as AuthenticatedStatsMessagesRouteImport } from './routes/_authenticated/stats/messages'
-import { Route as AuthenticatedStatsLinearRouteImport } from './routes/_authenticated/stats/linear'
-import { Route as AuthenticatedStatsHubstaffRouteImport } from './routes/_authenticated/stats/hubstaff'
-import { Route as AuthenticatedStatsGmailRouteImport } from './routes/_authenticated/stats/gmail'
 import { Route as AuthenticatedSettingsSampleOutputsRouteImport } from './routes/_authenticated/settings/sample-outputs'
 import { Route as AuthenticatedSettingsPromptsRouteImport } from './routes/_authenticated/settings/prompts'
 import { Route as AuthenticatedSettingsProjectsRouteImport } from './routes/_authenticated/settings/projects'
@@ -162,29 +158,6 @@ const AuthenticatedTodosDocumentIdRoute =
     path: '/$documentId',
     getParentRoute: () => AuthenticatedTodosRoute,
   } as any)
-const AuthenticatedStatsMessagesRoute =
-  AuthenticatedStatsMessagesRouteImport.update({
-    id: '/stats/messages',
-    path: '/stats/messages',
-    getParentRoute: () => AuthenticatedRoute,
-  } as any)
-const AuthenticatedStatsLinearRoute =
-  AuthenticatedStatsLinearRouteImport.update({
-    id: '/stats/linear',
-    path: '/stats/linear',
-    getParentRoute: () => AuthenticatedRoute,
-  } as any)
-const AuthenticatedStatsHubstaffRoute =
-  AuthenticatedStatsHubstaffRouteImport.update({
-    id: '/stats/hubstaff',
-    path: '/stats/hubstaff',
-    getParentRoute: () => AuthenticatedRoute,
-  } as any)
-const AuthenticatedStatsGmailRoute = AuthenticatedStatsGmailRouteImport.update({
-  id: '/stats/gmail',
-  path: '/stats/gmail',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
 const AuthenticatedSettingsSampleOutputsRoute =
   AuthenticatedSettingsSampleOutputsRouteImport.update({
     id: '/sample-outputs',
@@ -327,10 +300,6 @@ export interface FileRoutesByFullPath {
   '/settings/projects': typeof AuthenticatedSettingsProjectsRouteWithChildren
   '/settings/prompts': typeof AuthenticatedSettingsPromptsRoute
   '/settings/sample-outputs': typeof AuthenticatedSettingsSampleOutputsRoute
-  '/stats/gmail': typeof AuthenticatedStatsGmailRoute
-  '/stats/hubstaff': typeof AuthenticatedStatsHubstaffRoute
-  '/stats/linear': typeof AuthenticatedStatsLinearRoute
-  '/stats/messages': typeof AuthenticatedStatsMessagesRoute
   '/todos/$documentId': typeof AuthenticatedTodosDocumentIdRoute
   '/notes/': typeof AuthenticatedNotesIndexRoute
   '/people/': typeof AuthenticatedPeopleIndexRoute
@@ -367,10 +336,6 @@ export interface FileRoutesByTo {
   '/settings/projects': typeof AuthenticatedSettingsProjectsRouteWithChildren
   '/settings/prompts': typeof AuthenticatedSettingsPromptsRoute
   '/settings/sample-outputs': typeof AuthenticatedSettingsSampleOutputsRoute
-  '/stats/gmail': typeof AuthenticatedStatsGmailRoute
-  '/stats/hubstaff': typeof AuthenticatedStatsHubstaffRoute
-  '/stats/linear': typeof AuthenticatedStatsLinearRoute
-  '/stats/messages': typeof AuthenticatedStatsMessagesRoute
   '/todos/$documentId': typeof AuthenticatedTodosDocumentIdRoute
   '/notes': typeof AuthenticatedNotesIndexRoute
   '/people': typeof AuthenticatedPeopleIndexRoute
@@ -414,10 +379,6 @@ export interface FileRoutesById {
   '/_authenticated/settings/projects': typeof AuthenticatedSettingsProjectsRouteWithChildren
   '/_authenticated/settings/prompts': typeof AuthenticatedSettingsPromptsRoute
   '/_authenticated/settings/sample-outputs': typeof AuthenticatedSettingsSampleOutputsRoute
-  '/_authenticated/stats/gmail': typeof AuthenticatedStatsGmailRoute
-  '/_authenticated/stats/hubstaff': typeof AuthenticatedStatsHubstaffRoute
-  '/_authenticated/stats/linear': typeof AuthenticatedStatsLinearRoute
-  '/_authenticated/stats/messages': typeof AuthenticatedStatsMessagesRoute
   '/_authenticated/todos/$documentId': typeof AuthenticatedTodosDocumentIdRoute
   '/_authenticated/notes/': typeof AuthenticatedNotesIndexRoute
   '/_authenticated/people/': typeof AuthenticatedPeopleIndexRoute
@@ -461,10 +422,6 @@ export interface FileRouteTypes {
     | '/settings/projects'
     | '/settings/prompts'
     | '/settings/sample-outputs'
-    | '/stats/gmail'
-    | '/stats/hubstaff'
-    | '/stats/linear'
-    | '/stats/messages'
     | '/todos/$documentId'
     | '/notes/'
     | '/people/'
@@ -501,10 +458,6 @@ export interface FileRouteTypes {
     | '/settings/projects'
     | '/settings/prompts'
     | '/settings/sample-outputs'
-    | '/stats/gmail'
-    | '/stats/hubstaff'
-    | '/stats/linear'
-    | '/stats/messages'
     | '/todos/$documentId'
     | '/notes'
     | '/people'
@@ -547,10 +500,6 @@ export interface FileRouteTypes {
     | '/_authenticated/settings/projects'
     | '/_authenticated/settings/prompts'
     | '/_authenticated/settings/sample-outputs'
-    | '/_authenticated/stats/gmail'
-    | '/_authenticated/stats/hubstaff'
-    | '/_authenticated/stats/linear'
-    | '/_authenticated/stats/messages'
     | '/_authenticated/todos/$documentId'
     | '/_authenticated/notes/'
     | '/_authenticated/people/'
@@ -720,34 +669,6 @@ declare module '@tanstack/react-router' {
       fullPath: '/todos/$documentId'
       preLoaderRoute: typeof AuthenticatedTodosDocumentIdRouteImport
       parentRoute: typeof AuthenticatedTodosRoute
-    }
-    '/_authenticated/stats/messages': {
-      id: '/_authenticated/stats/messages'
-      path: '/stats/messages'
-      fullPath: '/stats/messages'
-      preLoaderRoute: typeof AuthenticatedStatsMessagesRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/stats/linear': {
-      id: '/_authenticated/stats/linear'
-      path: '/stats/linear'
-      fullPath: '/stats/linear'
-      preLoaderRoute: typeof AuthenticatedStatsLinearRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/stats/hubstaff': {
-      id: '/_authenticated/stats/hubstaff'
-      path: '/stats/hubstaff'
-      fullPath: '/stats/hubstaff'
-      preLoaderRoute: typeof AuthenticatedStatsHubstaffRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/stats/gmail': {
-      id: '/_authenticated/stats/gmail'
-      path: '/stats/gmail'
-      fullPath: '/stats/gmail'
-      preLoaderRoute: typeof AuthenticatedStatsGmailRouteImport
-      parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/settings/sample-outputs': {
       id: '/_authenticated/settings/sample-outputs'
@@ -1012,10 +933,6 @@ interface AuthenticatedRouteChildren {
   AuthenticatedTodosRoute: typeof AuthenticatedTodosRouteWithChildren
   AuthenticatedTodosListRoute: typeof AuthenticatedTodosListRoute
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
-  AuthenticatedStatsGmailRoute: typeof AuthenticatedStatsGmailRoute
-  AuthenticatedStatsHubstaffRoute: typeof AuthenticatedStatsHubstaffRoute
-  AuthenticatedStatsLinearRoute: typeof AuthenticatedStatsLinearRoute
-  AuthenticatedStatsMessagesRoute: typeof AuthenticatedStatsMessagesRoute
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
@@ -1030,10 +947,6 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedTodosRoute: AuthenticatedTodosRouteWithChildren,
   AuthenticatedTodosListRoute: AuthenticatedTodosListRoute,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
-  AuthenticatedStatsGmailRoute: AuthenticatedStatsGmailRoute,
-  AuthenticatedStatsHubstaffRoute: AuthenticatedStatsHubstaffRoute,
-  AuthenticatedStatsLinearRoute: AuthenticatedStatsLinearRoute,
-  AuthenticatedStatsMessagesRoute: AuthenticatedStatsMessagesRoute,
 }
 
 const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(

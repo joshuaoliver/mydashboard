@@ -47,7 +47,7 @@ export const DEFAULT_SETTINGS = {
     description: "The AI model used for the chat assistant",
     modelId: "google/gemini-3-flash",
     promptName: undefined,
-    temperature: 0.7,
+    temperature: 1,
     isEnabled: true,
   },
   "reply-suggestions": {
@@ -79,7 +79,7 @@ export const DEFAULT_SETTINGS = {
     description: "Auto-generate conversation titles from first message",
     modelId: "google/gemini-3-flash",
     promptName: undefined,
-    temperature: 0.7,
+    temperature: 1,
     isEnabled: true,
   },
 } as const;

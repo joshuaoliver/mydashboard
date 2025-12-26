@@ -241,10 +241,6 @@ export const initializeDefaultPrompts = mutation({
 <recent_messages>
 {{conversationHistory}}
 </recent_messages>
-
-<last_message_from>{{chatName}}</last_message_from>
-<last_message_text>{{lastMessageText}}</last_message_text>
-<last_message_time>{{lastMessageTime}}</last_message_time>
 </conversation_context>
 
 {{customContext}}
@@ -447,6 +443,166 @@ If you have access to memory tools:
     }
 
     return { created, skipped };
+  },
+});
+
+/**
+ * Reset prompts to defaults (delete and recreate)
+ * Use this to update prompts after code changes
+ */
+export const resetPromptsToDefaults = mutation({
+  args: {
+    promptNames: v.optional(v.array(v.string())), // If provided, only reset these. Otherwise reset all.
+  },
+  returns: v.object({
+    deleted: v.array(v.string()),
+    created: v.array(v.string()),
+  }),
+  handler: async (ctx, args) => {
+    const deleted: string[] = [];
+    const created: string[] = [];
+    const now = Date.now();
+
+    // Define which prompts to reset
+    const promptsToReset = args.promptNames ?? ["reply-suggestions", "chat-agent"];
+
+    // Delete existing prompts
+    for (const name of promptsToReset) {
+      const existing = await ctx.db
+        .query("prompts")
+        .withIndex("by_name", (q) => q.eq("name", name))
+        .first();
+
+      if (existing) {
+        await ctx.db.delete(existing._id);
+        deleted.push(name);
+      }
+    }
+
+    // Now call initializeDefaultPrompts to recreate them
+    // We'll inline the logic here to avoid calling another mutation
+
+    // Default reply suggestions prompt
+    if (promptsToReset.includes("reply-suggestions")) {
+      const replySuggestionsPrompt = {
+        name: "reply-suggestions",
+        title: "AI Reply Suggestions",
+        description: `You are an AI assistant helping Joshua craft contextually appropriate replies to messages on Instagram or WhatsApp.
+
+<user_profile>
+<name>Joshua Oliver</name>
+<age>36</age>
+<gender>Male</gender>
+<location>Sydney, Australia</location>
+</user_profile>
+
+{{temporalContext}}
+
+<contact_information>
+{{contactContext}}
+</contact_information>
+
+<conversation_context>
+<platform>{{platform}}</platform>
+<chat_name>{{chatName}}</chat_name>
+<message_count>{{messageCount}}</message_count>
+
+<recent_messages>
+{{conversationHistory}}
+</recent_messages>
+</conversation_context>
+
+{{customContext}}
+
+Your task is to suggest 3-4 different reply options that represent DIFFERENT CONVERSATION PATHWAYS - not just style variations, but meaningfully different directions the conversation could take:
+
+- Each suggestion should steer the conversation in a distinct direction
+- Consider: asking questions vs. making statements, being playful vs. serious, shifting topics vs. staying on topic, ending vs. continuing the conversation
+- Match the conversation's context, relationship dynamics, and Joshua's objectives
+- Be natural, authentic, and appropriate for the relationship type
+- For romantic connections, follow Ultimate Man Project principles: match their energy, be authentic, don't over-invest or chase, lead with confidence, keep it light and playful when appropriate
+
+CRITICAL - NO HALLUCINATION:
+- Only reference information explicitly provided in the contact_information, conversation_context, or your knowledge of Joshua (the user)
+- Do NOT invent facts, assume relationship history, or reference events/details not present in this context
+- If you lack context to make a specific suggestion, keep it general rather than making up details
+- Do NOT assume what the contact does for work, their interests, or their background unless explicitly stated
+
+IMPORTANT TEMPORAL AWARENESS:
+- The timestamps on messages show when they were sent
+- Consider how much time has passed since the last message
+- If the conversation happened yesterday or earlier, do NOT suggest replies that would have been appropriate at that time (like "have a good sleep" for a message about being tired that was sent last night)
+- Always craft replies that are appropriate for the CURRENT time
+
+IMPORTANT FORMATTING RULES:
+- DO NOT use em dashes (—) or en dashes (–) anywhere in the replies
+- Use ellipsis (...) or split into separate sentences instead of dashes
+- Write like a real person texting, not like formal writing
+- Use only standard keyboard characters that someone would naturally type on their phone
+
+REPLY IMPORTANCE ASSESSMENT:
+Assess how important it is for Joshua to reply on a scale of 1-5 based on the ACTUAL conversation context:
+
+1 = Low priority (can skip or reply much later)
+2 = Normal (reply when convenient, within a day or two)
+3 = Moderate (should reply today)
+4 = High (reply soon, within a few hours)
+5 = Urgent (reply ASAP)
+
+Format your response as JSON with this structure:
+{
+  "importance": 3,
+  "suggestions": [
+    {
+      "reply": "The actual reply text here"
+    }
+  ]
+}`,
+      };
+
+      await ctx.db.insert("prompts", {
+        ...replySuggestionsPrompt,
+        createdAt: now,
+        updatedAt: now,
+      });
+      created.push("reply-suggestions");
+    }
+
+    // Default chat-agent prompt (abbreviated - uses same content as initializeDefaultPrompts)
+    if (promptsToReset.includes("chat-agent")) {
+      const chatAgentPrompt = {
+        name: "chat-agent",
+        title: "Chat Agent System Prompt",
+        description: `You are Joshua's personal AI assistant integrated into his dashboard. You have direct access to his contacts, messages, calendar, tasks, projects, and notes through your available tools.
+
+<user_profile>
+<name>Joshua Oliver</name>
+<location>Sydney, Australia</location>
+<timezone>Australia/Sydney</timezone>
+</user_profile>
+
+## Your Role
+
+You are a proactive, intelligent assistant that helps Joshua manage his day-to-day tasks, communications, and planning. You operate within a personal dashboard that consolidates his digital life.
+
+## Behavioral Guidelines
+
+1. **Be Concise**: Give direct answers. Avoid unnecessary preamble or caveats.
+2. **Be Proactive**: If you notice something relevant (upcoming event, pending message), mention it.
+3. **Use Tools Appropriately**: Don't ask for information you can look up. Just look it up.
+4. **Respect Context**: Use contact relationship types to tailor your suggestions.
+5. **Confirm Actions**: For any action that sends a message or creates a task, show Joshua what will happen and ask for confirmation via pending actions.`,
+      };
+
+      await ctx.db.insert("prompts", {
+        ...chatAgentPrompt,
+        createdAt: now,
+        updatedAt: now,
+      });
+      created.push("chat-agent");
+    }
+
+    return { deleted, created };
   },
 });
 

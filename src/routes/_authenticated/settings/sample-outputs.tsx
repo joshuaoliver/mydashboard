@@ -19,7 +19,7 @@ export const Route = createFileRoute('/_authenticated/settings/sample-outputs')(
 })
 
 function SampleOutputsPage() {
-  const { data, isLoading } = useQuery(convexQuery(api.beeperQueries.getUserSentMessages, { limit: 200 }))
+  const { data, isLoading } = useQuery(convexQuery(api.beeperQueries.getUserSentMessages, { limit: 500 }))
   const [copied, setCopied] = useState(false)
   const [copiedTable, setCopiedTable] = useState(false)
 

@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Label } from '@/components/ui/label'
+import { Slider } from '@/components/ui/slider'
 import { 
   Select,
   SelectContent,
@@ -14,7 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Bot, Sparkles, RefreshCw, Check } from 'lucide-react'
+import { Bot, Sparkles, RefreshCw, Check, FileText } from 'lucide-react'
 import { useState } from 'react'
 
 export const Route = createFileRoute('/_authenticated/settings/ai')({
@@ -31,8 +32,14 @@ function AISettingsPage() {
   
   const updateSetting = useMutation(api.aiSettings.updateSetting)
   const initializeDefaults = useMutation(api.aiSettings.initializeDefaults)
+  const initializePrompts = useMutation(api.prompts.initializeDefaultPrompts)
+  const resetPrompts = useMutation(api.prompts.resetPromptsToDefaults)
   
   const [isInitializing, setIsInitializing] = useState(false)
+  const [isInitializingPrompts, setIsInitializingPrompts] = useState(false)
+  const [isResettingPrompts, setIsResettingPrompts] = useState(false)
+  const [promptsResult, setPromptsResult] = useState<{ created: string[], skipped: string[] } | null>(null)
+  const [resetResult, setResetResult] = useState<{ deleted: string[], created: string[] } | null>(null)
   const [savedKeys, setSavedKeys] = useState<Set<string>>(new Set())
 
   // Group models by provider
@@ -53,11 +60,45 @@ function AISettingsPage() {
     }
   }
 
+  const handleInitializePrompts = async () => {
+    setIsInitializingPrompts(true)
+    try {
+      const result = await initializePrompts()
+      setPromptsResult(result)
+      setTimeout(() => setPromptsResult(null), 5000)
+    } finally {
+      setIsInitializingPrompts(false)
+    }
+  }
+
+  const handleResetPrompts = async () => {
+    setIsResettingPrompts(true)
+    try {
+      const result = await resetPrompts({})
+      setResetResult(result)
+      setTimeout(() => setResetResult(null), 5000)
+    } finally {
+      setIsResettingPrompts(false)
+    }
+  }
+
   const handleModelChange = async (settingKey: string, modelId: string) => {
     await updateSetting({
       key: settingKey,
       modelId,
     })
+    markSaved(settingKey)
+  }
+
+  const handleTemperatureChange = async (settingKey: string, temperature: number) => {
+    await updateSetting({
+      key: settingKey,
+      temperature,
+    })
+    markSaved(settingKey)
+  }
+
+  const markSaved = (settingKey: string) => {
     setSavedKeys(prev => new Set([...prev, settingKey]))
     setTimeout(() => {
       setSavedKeys(prev => {
@@ -105,6 +146,67 @@ function AISettingsPage() {
             </CardContent>
           </Card>
         )}
+
+        {/* Initialize prompts card */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <FileText className="w-5 h-5 text-purple-500" />
+              <CardTitle>Prompt Templates</CardTitle>
+            </div>
+            <CardDescription>
+              Install or reset the default prompt templates used by AI features.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex gap-2">
+              <Button
+                onClick={handleInitializePrompts}
+                disabled={isInitializingPrompts || isResettingPrompts}
+                variant="outline"
+              >
+                <RefreshCw className={`w-4 h-4 mr-2 ${isInitializingPrompts ? 'animate-spin' : ''}`} />
+                {isInitializingPrompts ? 'Installing...' : 'Install Missing Prompts'}
+              </Button>
+              <Button
+                onClick={handleResetPrompts}
+                disabled={isInitializingPrompts || isResettingPrompts}
+                variant="destructive"
+              >
+                <RefreshCw className={`w-4 h-4 mr-2 ${isResettingPrompts ? 'animate-spin' : ''}`} />
+                {isResettingPrompts ? 'Resetting...' : 'Reset to Defaults'}
+              </Button>
+            </div>
+            {promptsResult && (
+              <div className="text-sm">
+                {promptsResult.created.length > 0 && (
+                  <p className="text-green-600">
+                    Created: {promptsResult.created.join(', ')}
+                  </p>
+                )}
+                {promptsResult.skipped.length > 0 && (
+                  <p className="text-muted-foreground">
+                    Already exists: {promptsResult.skipped.join(', ')}
+                  </p>
+                )}
+              </div>
+            )}
+            {resetResult && (
+              <div className="text-sm">
+                {resetResult.deleted.length > 0 && (
+                  <p className="text-orange-600">
+                    Deleted: {resetResult.deleted.join(', ')}
+                  </p>
+                )}
+                {resetResult.created.length > 0 && (
+                  <p className="text-green-600">
+                    Recreated: {resetResult.created.join(', ')}
+                  </p>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
         {/* Settings cards */}
         {(settings ?? []).map((setting) => (
@@ -169,15 +271,33 @@ function AISettingsPage() {
                 </code>
               </div>
 
-              {/* Temperature and prompt info if available */}
-              <div className="flex gap-4 text-sm text-muted-foreground">
-                {setting.temperature !== undefined && (
-                  <span>Temperature: {setting.temperature}</span>
-                )}
-                {setting.promptName && (
-                  <span>Prompt: {setting.promptName}</span>
-                )}
+              {/* Temperature slider */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label>Temperature</Label>
+                  <span className="text-sm font-mono text-muted-foreground">
+                    {(setting.temperature ?? 1).toFixed(1)}
+                  </span>
+                </div>
+                <Slider
+                  value={[setting.temperature ?? 1]}
+                  min={0}
+                  max={2}
+                  step={0.1}
+                  onValueCommit={(value) => handleTemperatureChange(setting.key, value[0])}
+                  className="w-full"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Higher = more creative, Lower = more focused
+                </p>
               </div>
+
+              {/* Prompt info if available */}
+              {setting.promptName && (
+                <div className="text-sm text-muted-foreground">
+                  Prompt template: <code className="bg-muted px-1.5 py-0.5 rounded">{setting.promptName}</code>
+                </div>
+              )}
             </CardContent>
           </Card>
         ))}

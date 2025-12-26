@@ -44,4 +44,8 @@ export default defineConfig({
     target: 'esnext',
     outDir: 'dist',
   },
+  // Force re-bundle of dependencies (remove after restart)
+  optimizeDeps: {
+    force: true,
+  },
 })

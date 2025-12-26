@@ -83,7 +83,7 @@ export const ChatDetail = memo(function ChatDetail({ messages, isSingleChat = tr
               )}
               
               {messages.map((message) => (
-                <div key={message.id} className={cn('flex group', message.isFromUser ? 'justify-end' : 'justify-start')}>
+                <div key={message.id} className={cn('flex flex-col group', message.isFromUser ? 'items-end' : 'items-start')}>
                   <AIMessage from={message.isFromUser ? 'user' : 'assistant'}>
                     <MessageContent variant="contained" className="px-2.5 py-1.5">
                       {/* Only show sender name in group chats */}
@@ -126,20 +126,21 @@ export const ChatDetail = memo(function ChatDetail({ messages, isSingleChat = tr
                         </div>
                       )}
                       
-                      {/* Render text content with timestamp */}
-                      <div className="flex items-end gap-1.5">
-                        {message.text && (
-                          <p className="text-xs whitespace-pre-wrap break-words flex-1">
-                            {message.text}
-                          </p>
-                        )}
-                        {/* Timestamp inside bubble - shown on hover */}
-                        <div className="text-[9px] text-gray-500 opacity-0 group-hover:opacity-70 transition-opacity select-none whitespace-nowrap self-end">
-                          {formatMessageTime(message.timestamp)}
-                        </div>
-                      </div>
+                      {/* Render text content */}
+                      {message.text && (
+                        <p className="text-xs whitespace-pre-wrap break-words">
+                          {message.text}
+                        </p>
+                      )}
                     </MessageContent>
                   </AIMessage>
+                  {/* Timestamp outside bubble - shown on hover */}
+                  <div className={cn(
+                    "text-[9px] text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity select-none mt-0.5 px-1",
+                    message.isFromUser ? "text-right" : "text-left"
+                  )}>
+                    {formatMessageTime(message.timestamp)}
+                  </div>
                 </div>
               ))}
             </div>
