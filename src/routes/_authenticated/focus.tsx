@@ -112,7 +112,7 @@ function FocusHero({
         )} />
       </div>
 
-      <div className="space-y-10 max-w-4xl mx-auto w-full text-center">
+      <div className="space-y-10 max-w-5xl mx-auto w-full text-center px-4">
         {/* Header Badges */}
         <div className="flex items-center justify-center gap-3">
           <Badge
@@ -134,7 +134,7 @@ function FocusHero({
         </div>
 
         {/* The Task Title - Refined Size */}
-        <div className="space-y-4 px-4">
+        <div className="space-y-4">
           <h1 className="text-3xl md:text-5xl font-bold tracking-tight leading-tight text-foreground drop-shadow-sm line-clamp-3">
             {task.title}
           </h1>
@@ -161,7 +161,7 @@ function FocusHero({
             </div>
 
             {/* Subtle Progress Bar */}
-            < div className="w-64 h-1.5 mt-4 bg-muted/30 rounded-full overflow-hidden">
+            <div className="w-80 h-2 mt-4 bg-muted/30 rounded-full overflow-hidden">
               <div
                 className={cn(
                   "h-full transition-all duration-1000",
@@ -647,7 +647,19 @@ function FocusPage() {
             </Link>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
+            {activeSession && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleSkip}
+                className="text-muted-foreground hover:text-foreground"
+                title="Skip to next task"
+              >
+                <SkipForward className="w-4 h-4 mr-1" />
+                Next Task
+              </Button>
+            )}
             <Button variant="ghost" size="icon" onClick={toggleFullscreen} title="Toggle Fullscreen">
               {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
             </Button>
