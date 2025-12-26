@@ -1104,6 +1104,7 @@ function TodayPlanPage() {
                   initialDate={currentDate}
                   firstDayOfWeek="monday"
                   timeFormat="12-hour"
+                  headerComponent={<></>}
                   onDateChange={(date) => setCurrentDate(date.toDate())}
                   onEventClick={(event) => {
                     console.log('Clicked event:', event)
