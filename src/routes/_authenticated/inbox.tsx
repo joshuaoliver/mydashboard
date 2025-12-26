@@ -33,7 +33,7 @@ export const Route = createFileRoute('/_authenticated/inbox')({
 })
 
 function InboxPage() {
-  const navigate = useNavigate({ from: '/_authenticated/inbox' })
+  const navigate = useNavigate({ from: '/inbox' })
   const { chatId } = Route.useSearch()
   const isMobile = useIsMobile()
 
@@ -101,13 +101,6 @@ function InboxPage() {
           <Sidebar
             width="w-full"
             className={cn(sheetOpen && "hidden")}
-            header={
-              <SidebarHeader
-                title=""
-                subtitle=""
-                actions={<div />}
-              />
-            }
           >
             <ChatListPanel />
           </Sidebar>

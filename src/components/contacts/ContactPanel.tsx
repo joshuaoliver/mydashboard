@@ -980,8 +980,8 @@ export function ContactPanel({ contact, isLoading, searchedUsername, searchedPho
           )}
         </div>
 
-        {/* Hidden sections - visible on hover and persists for 2 minutes */}
-        <div className={`transition-opacity duration-200 space-y-4 ${isHoverRevealed ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+        {/* Additional contact fields - always visible */}
+        <div className="space-y-4">
           {/* Connection Direction - Multi-select with grayscale emojis, no label */}
           <div className="flex flex-wrap gap-2">
             {connectionOptions.map((option) => {
@@ -1065,7 +1065,7 @@ export function ContactPanel({ contact, isLoading, searchedUsername, searchedPho
                     key={option.value}
                     onClick={() => handleLeadStatusToggle(option.value)}
                     disabled={isSaving}
-                    className={`px-3 py-2 text-sm font-medium rounded-lg transition-all border-2 ${
+                    className={`px-2 py-1.5 text-xs font-medium rounded-lg transition-all border-2 ${
                       isSelected
                         ? 'bg-blue-100 border-blue-500'
                         : 'bg-white border-gray-200 hover:border-gray-300 hover:bg-gray-50'
